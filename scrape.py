@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -16,8 +17,9 @@ HEADERS = {
 
 BASE_URL = "https://api.github.com/repos"
 request_count = 0
-modified_commit_count = 0
-commit_count = 0
+# modified_commit_count = 0
+total_commit_count = 0
+stored_commit_count = 0
 
 code_extensions = set(json.load(open("code_extensions.json", "r")))
 
@@ -26,11 +28,14 @@ def get_commits(repo_path):
     """
     Get all commits from a specific repository.
     """
-    global request_count, commit_count
+    global request_count, total_commit_count
     url = f"{BASE_URL}/{repo_path}/commits"
     response = requests.get(url, headers=HEADERS)
+    if response.status_code != 200:
+        print(response.json())
+        raise Exception(f"Error getting file content: {response.status_code}")
     request_count += 1
-    commit_count += len(response.json())
+    total_commit_count += len(response.json())
     return response.json()
 
 
@@ -41,6 +46,9 @@ def get_commit_details(repo_path, commit_sha):
     global request_count
     url = f"{BASE_URL}/{repo_path}/commits/{commit_sha}"
     response = requests.get(url, headers=HEADERS)
+    if response.status_code != 200:
+        print(response.json())
+        raise Exception(f"Error getting file content: {response.status_code}")
     request_count += 1
     return response.json()
 
@@ -76,6 +84,9 @@ def get_file_content_at_commit(repo_path, file_path, commit_sha):
     global request_count
     url = f"{BASE_URL}/{repo_path}/contents/{file_path}?ref={commit_sha}"
     response = requests.get(url, headers=HEADERS)
+    if response.status_code != 200:
+        print(response.json())
+        raise Exception(f"Error getting file content: {response.status_code}")
     request_count += 1
     content_data = response.json()
 
@@ -87,10 +98,11 @@ def get_file_content_at_commit(repo_path, file_path, commit_sha):
 
 
 def extract_commit_info(repo_path, commit):
+    # sourcery skip: raise-specific-error
     """
     Extract desired information from a commit.
     """
-    global modified_commit_count
+    global stored_commit_count
     commit_details = get_commit_details(repo_path, commit["sha"])
     data = []
 
@@ -100,7 +112,7 @@ def extract_commit_info(repo_path, commit):
         file_extension = file_name.split(".")[-1]
         if f".{file_extension}" not in code_extensions:
             continue
-        modified_commit_count += 1
+        stored_commit_count += 1
         # 4 cases: added, removed, modified, renamed
         if file["status"] == "modified":
             patch = file.get("patch", None)
@@ -119,6 +131,7 @@ def extract_commit_info(repo_path, commit):
                     "commit_message": commit["commit"]["message"],
                     "relative_path": file["filename"],
                     "previous_code_file": previous_file_content,
+                    "previous_id": commit["parents"][0]["sha"],
                     "new_code_file": new_file_content,
                     "diff": patch,
                     "status": "modified",
@@ -150,6 +163,7 @@ def extract_commit_info(repo_path, commit):
                     "commit_message": commit["commit"]["message"],
                     "relative_path": file["filename"],
                     "previous_code_file": previous_file_content,
+                    "previous_id": commit["parents"][0]["sha"],
                     "new_code_file": None,
                     "diff": None,
                     "status": "removed",
@@ -169,6 +183,8 @@ def extract_commit_info(repo_path, commit):
                     "commit_message": commit["commit"]["message"],
                     "relative_path": file["filename"],
                     "previous_code_file": previous_file_content,
+                    "previous_id": commit["parents"][0]["sha"],
+                    "previous_file_name": file["previous_filename"],
                     "new_code_file": new_file_content,
                     "diff": None,
                     "status": "renamed",
@@ -184,18 +200,46 @@ def scrape_repository(repo_path):
     """
     Scrape all commits and their details from a repository.
     """
+    owner, repo_name = repo_path.split("/")
+
+    # Ensure the 'data' directory exists
+    if not os.path.exists("data"):
+        os.makedirs("data")
+
     commits = get_commits(repo_path)
     data = []
 
     for commit in commits:
         data.extend(extract_commit_info(repo_path, commit))
-    with open("commit_data.json", "w") as f:
+    # with open("commit_data.json", "w") as f:
+    #     json.dump(data, f)
+    with open(f"data/{owner}_{repo_name}_commit_data.json", "w") as f:
         json.dump(data, f)
 
 
+# sourcery skip: hoist-statement-from-loop
 if __name__ == "__main__":
-    repo_path = "karpathy/micrograd"  # In the format: <owner>/<repository_name>
-    scrape_repository(repo_path)
-    print(
-        f"Total Number of requests for {commit_count} total & {modified_commit_count} modified commits is {request_count}"
-    )
+    # repo_path = "karpathy/micrograd"  # In the format: <owner>/<repository_name>
+    # delete stats file
+    if os.path.exists("request_stats.txt"):
+        os.remove("request_stats.txt")
+    # repos = ["karpathy/micrograd", "karpathy/makemore", "karpathy/llama2.c"]
+    repos = ["karpathy/llama2.c"]
+    # scrape_repository(repo_path)
+    for repo_path in repos:
+        request_count = 0
+        total_commit_count = 0
+        # modified_commit_count = 0
+        # add a timer
+
+        start_time = time.perf_counter()
+        scrape_repository(repo_path)
+        end_time = time.perf_counter()
+        stats_message = f"Repo: {repo_path} - Total Commits: {total_commit_count}, Stored Commits: {stored_commit_count}, Total Number of requests: {request_count} - Time Taken: {end_time - start_time:.2f}s"
+
+        print(stats_message)
+        with open("request_stats.txt", "a+") as stats_file:
+            stats_file.write(stats_message + "\n")
+    # print(
+    #     f"Total Number of requests for {total_commit_count} total & {modified_commit_count} modified commits is {request_count}"
+    # )
