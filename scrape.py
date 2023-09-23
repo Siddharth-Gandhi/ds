@@ -1,8 +1,10 @@
+# RATE LIMIT : 5000 requests per hour
 import json
 import os
 import time
 
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 load_dotenv()
 
@@ -24,19 +26,49 @@ stored_commit_count = 0
 code_extensions = set(json.load(open("code_extensions.json", "r")))
 
 
+# def get_commits(repo_path):
+#     """
+#     Get all commits from a specific repository.
+#     """
+#     global request_count, total_commit_count
+#     url = f"{BASE_URL}/{repo_path}/commits"
+#     response = requests.get(url, headers=HEADERS)
+#     if response.status_code != 200:
+#         print(response.json())
+#         raise Exception(f"Error getting file content: {response.status_code}")
+#     request_count += 1
+#     total_commit_count += len(response.json())
+#     return response.json()
+
+
 def get_commits(repo_path):
     """
     Get all commits from a specific repository.
     """
     global request_count, total_commit_count
-    url = f"{BASE_URL}/{repo_path}/commits"
-    response = requests.get(url, headers=HEADERS)
-    if response.status_code != 200:
-        print(response.json())
-        raise Exception(f"Error getting file content: {response.status_code}")
-    request_count += 1
-    total_commit_count += len(response.json())
-    return response.json()
+
+    commits = []
+    page = 1
+    while True:
+        url = f"{BASE_URL}/{repo_path}/commits?per_page=100&page={page}"
+        response = requests.get(url, headers=HEADERS)
+
+        if response.status_code != 200:
+            print(response.json())
+            raise Exception(f"Error getting file content: {response.status_code}")
+
+        request_count += 1
+        current_commits = response.json()
+        total_commit_count += len(current_commits)
+        commits.extend(current_commits)
+
+        # Check if there are more pages of commits
+        if "next" in response.links:
+            page += 1
+        else:
+            break
+
+    return commits
 
 
 def get_commit_details(repo_path, commit_sha):
@@ -209,8 +241,18 @@ def scrape_repository(repo_path):
     commits = get_commits(repo_path)
     data = []
 
-    for commit in commits:
-        data.extend(extract_commit_info(repo_path, commit))
+    prev_time = time.time()
+    # for commit in tqdm(commits):
+    with tqdm(commits, unit="commit") as pbar:
+        for commit in pbar:
+            prev_requests = request_count
+            data.extend(extract_commit_info(repo_path, commit))
+            elapsed_time = time.time() - prev_time
+            avg_rate = (request_count - prev_requests) / elapsed_time
+            pbar.set_description(f"Repo: {repo_path}")
+            pbar.set_postfix(avg_req_per_sec=f"{avg_rate:.2f}")
+            pbar.set_postfix(total_req=request_count)
+            prev_time = time.time()
     # with open("commit_data.json", "w") as f:
     #     json.dump(data, f)
     with open(f"data/{owner}_{repo_name}_commit_data.json", "w") as f:
@@ -221,10 +263,12 @@ def scrape_repository(repo_path):
 if __name__ == "__main__":
     # repo_path = "karpathy/micrograd"  # In the format: <owner>/<repository_name>
     # delete stats file
-    if os.path.exists("request_stats.txt"):
-        os.remove("request_stats.txt")
-    # repos = ["karpathy/micrograd", "karpathy/makemore", "karpathy/llama2.c"]
-    repos = ["karpathy/llama2.c"]
+    # if os.path.exists("request_stats.txt"):
+    #     os.remove("request_stats.txt")
+    repos = ["ggerganov/whisper.cpp"]
+    # repos = ["karpathy/nanoGPT"]
+    # repos = ["karpathy/micrograd", "karpathy/makemore"]
+    # repos = ["karpathy/llama2.c"]
     # scrape_repository(repo_path)
     for repo_path in repos:
         request_count = 0
