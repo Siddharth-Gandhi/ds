@@ -37,9 +37,34 @@ def get_all_commits():
     return run_command(cmd).splitlines()
 
 
+# V1
+# def get_files_changed_in_commit(commit_sha):
+#     cmd = f"git show {commit_sha} --pretty='' --name-only"
+#     return run_command(cmd).splitlines()
+
+
+# V2
+# def get_files_changed_in_commit(commit_sha):
+# num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}").split())
+# if num_parents <= 1:
+#     return run_command(f"git show {commit_sha} --pretty='' --name-only").splitlines()
+# # It's a merge commit, get changes between the two parents
+# parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}").split()
+# return run_command(f"git diff --name-only {parents[0]} {parents[1]}").splitlines()
+
+
+# V3
 def get_files_changed_in_commit(commit_sha):
-    cmd = f"git show {commit_sha} --pretty='' --name-only"
-    return run_command(cmd).splitlines()
+    num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}").split())
+    if num_parents > 1:
+        # It's a merge commit
+        parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}").split()
+        # Find the common ancestor of the two parents
+        base = run_command(f"git merge-base {parents[0]} {parents[1]}").strip()
+        # Get changes introduced by the merged branch
+        return run_command(f"git diff --name-only {base} {parents[1]}").splitlines()
+    else:
+        return run_command(f"git show {commit_sha} --pretty='' --name-only").splitlines()
 
 
 def get_commit_message(commit_sha):
@@ -54,12 +79,18 @@ def get_file_content_at_commit(commit_sha, file_path, parent=False):
 
 
 def get_diff(cur_sha, prev_sha, file_path):
-    cmd = f"git diff {cur_sha}:{file_path} {prev_sha}:{file_path} | awk '/@@/ {{flag=1}} flag'"
+    cmd = f"git diff {prev_sha}:{file_path} {cur_sha}:{file_path} | awk '/@@/ {{flag=1}} flag'"
+    # cmd = f"git diff {prev_sha}:{file_path} {cur_sha}:{file_path} | awk '/@@/ {{flag=1}} flag'"
     return run_command(cmd)
 
 
 def get_previous_commit(commit_sha):
     cmd = f"git rev-parse {commit_sha}^"
+    return run_command(cmd)
+
+
+def get_date(commit_sha):
+    cmd = f"git show -s --format=%ci {commit_sha}"
     return run_command(cmd)
 
 
@@ -85,8 +116,11 @@ def scrape_repository(repo_path):
     data = []
 
     for commit in all_commits:
+        if commit == "ed7887c888270d9b7724556658c1e2bf0e0b628e":
+            print("hi")
         files_changed = get_files_changed_in_commit(commit)
         commit_message = get_commit_message(commit)
+        commit_date = get_date(commit)
         for file in files_changed:
             # Skip files that are not code
             file_extension = file.split(".")[-1]
@@ -109,12 +143,15 @@ def scrape_repository(repo_path):
 
             data.append(
                 {
+                    "owner": owner,
+                    "repo_name": repo_name,
+                    "commit_date": commit_date,
                     "commit_id": commit,
                     "commit_message": commit_message,
                     "file_path": file,
-                    "previous_commit": prev_commit,
-                    "previous_content": previous_content,
-                    "new_content": new_content,
+                    "previous_commit_id": prev_commit,
+                    "previous_file_content": previous_content,
+                    "cur_file_content": new_content,
                     "diff": diff,
                 }
             )
@@ -125,6 +162,7 @@ def scrape_repository(repo_path):
 if __name__ == "__main__":
     CWD = os.getcwd()
     # repos = ["siddharth-gandhi/refpred"]
+    # repos = ["karpathy/nanoGPT"]
     repos = ["karpathy/llama2.c"]
     # commit_data = extract_commits_info("repos/makemore")
     if not os.path.exists("data_local"):
