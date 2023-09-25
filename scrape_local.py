@@ -3,7 +3,8 @@ import json
 import os
 import subprocess
 
-code_extensions = set(json.load(open("code_extensions.json", "r")))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+code_extensions = set(json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r")))
 
 
 def clone_repository(repo_path):
@@ -11,7 +12,8 @@ def clone_repository(repo_path):
     Clone a repository if it doesn't exist locally.
     """
     owner, repo_name = repo_path.split("/")
-    local_path = f"repos/{owner}_{repo_name}"
+    # local_path = f"repos/{owner}_{repo_name}"
+    local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
     # print current working directory
     print(os.getcwd())
     if not os.path.exists(local_path):
@@ -28,9 +30,9 @@ def run_command(command: str, cwd=None, timeout=60):
     return "" if result.returncode != 0 else result.stdout
 
 
-def get_all_commits():
+def get_all_commits(local_path=None):
     cmd = "git log --pretty=format:'%H'"
-    return run_command(cmd).splitlines()
+    return run_command(cmd, cwd=local_path).splitlines()
 
 
 # V1
@@ -40,48 +42,53 @@ def get_all_commits():
 
 
 # V3
-def get_files_changed_in_commit(commit_sha):
-    num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}").split())
+def get_files_changed_in_commit(commit_sha, local_path=None):
+    num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}", cwd=local_path).split())
     is_merge_request = False
     if num_parents <= 1:
         return (
-            run_command(f"git show {commit_sha} --pretty='' --name-only").splitlines(),
+            run_command(
+                f"git show {commit_sha} --pretty='' --name-only", cwd=local_path
+            ).splitlines(),
             is_merge_request,
         )
     # It's a merge commit
     is_merge_request = True
-    parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}").split()
+    parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}", cwd=local_path).split()
     # Find the common ancestor of the two parents
-    base = run_command(f"git merge-base {parents[0]} {parents[1]}").strip()
+    base = run_command(f"git merge-base {parents[0]} {parents[1]}", cwd=local_path).strip()
     # Get changes introduced by the merged branch
-    return run_command(f"git diff --name-only {base} {parents[1]}").splitlines(), is_merge_request
+    return (
+        run_command(f"git diff --name-only {base} {parents[1]}", cwd=local_path).splitlines(),
+        is_merge_request,
+    )
 
 
-def get_commit_message(commit_sha):
+def get_commit_message(commit_sha, local_path=None):
     cmd = f"git show -s --format=%B {commit_sha}"
-    return run_command(cmd)
+    return run_command(cmd, cwd=local_path)
 
 
-def get_file_content_at_commit(commit_sha, file_path, parent=False):
+def get_file_content_at_commit(commit_sha, file_path, parent=False, local_path=None):
     # If parent=True, get the content from the parent commit (before the change)
     cmd = f"git show {commit_sha}{'^' if parent else ''}:{file_path}"
-    return run_command(cmd)
+    return run_command(cmd, cwd=local_path)
 
 
-def get_diff(cur_sha, prev_sha, file_path):
+def get_diff(cur_sha, prev_sha, file_path, local_path=None):
     cmd = f"git diff {prev_sha}:{file_path} {cur_sha}:{file_path} | awk '/@@/ {{flag=1}} flag'"
     # cmd = f"git diff {prev_sha}:{file_path} {cur_sha}:{file_path} | awk '/@@/ {{flag=1}} flag'"
-    return run_command(cmd)
+    return run_command(cmd, cwd=local_path)
 
 
-def get_previous_commit(commit_sha):
+def get_previous_commit(commit_sha, local_path=None):
     cmd = f"git rev-parse {commit_sha}^"
-    return run_command(cmd)
+    return run_command(cmd, cwd=local_path)
 
 
-def get_date(commit_sha):
+def get_date(commit_sha, local_paths=None):
     cmd = f"git show -s --format=%ci {commit_sha}"
-    return run_command(cmd)
+    return run_command(cmd, cwd=local_paths)
 
 
 def scrape_repository(repo_path):
@@ -91,28 +98,29 @@ def scrape_repository(repo_path):
     owner, repo_name = repo_path.split("/")
     local_path = f"repos/{owner}_{repo_name}"
     try:
-        if not os.path.exists(local_path):
+        if not os.path.exists(local_path) or not os.listdir(local_path):
             print(f"Cloning {repo_path}...")
             clone_repository(repo_path)
-        os.chdir(local_path)
+        # os.chdir(local_path)
+        # run_command("git checkout main", cwd=local_path)
     except Exception as e:
         raise Exception(f"Failed to clone {repo_path}") from e
     # TODO lmao - maybe checkout HEAD instead?
     try:
-        run_command("git checkout main")
+        run_command("git checkout main", cwd=local_path)
     except Exception:
-        run_command("git checkout master")
+        run_command("git checkout master", cwd=local_path)
     # Ensure the repository is cloned locally
-    local_path = clone_repository(repo_path)
-    all_commits = get_all_commits()
+    # local_path = clone_repository(repo_path)
+    all_commits = get_all_commits(local_path)
     print(f"Found {len(all_commits)} commits in {repo_path}")
 
     data = []
 
     for commit in all_commits:
-        files_changed, is_merge_request = get_files_changed_in_commit(commit)
-        commit_message = get_commit_message(commit)
-        commit_date = get_date(commit)
+        files_changed, is_merge_request = get_files_changed_in_commit(commit, local_path)
+        commit_message = get_commit_message(commit, local_path)
+        commit_date = get_date(commit, local_path)
         for file in files_changed:
             # Skip files that are not code
             file_extension = file.split(".")[-1]
@@ -120,18 +128,22 @@ def scrape_repository(repo_path):
                 continue
             # TODO bad code, might need to fix
             try:
-                previous_content = get_file_content_at_commit(commit, file, parent=True)
-                prev_commit = get_previous_commit(commit)
+                previous_content = get_file_content_at_commit(
+                    commit, file, parent=True, local_path=local_path
+                )
+                prev_commit = get_previous_commit(commit, local_path=local_path)
             except Exception:
                 previous_content = None
                 prev_commit = None
             try:
-                new_content = get_file_content_at_commit(commit, file, parent=False)
+                new_content = get_file_content_at_commit(
+                    commit, file, parent=False, local_path=local_path
+                )
             except Exception:
                 new_content = None
             diff = None
             if previous_content is not None and new_content is not None:
-                diff = get_diff(commit, f"{commit}^", file)
+                diff = get_diff(commit, f"{commit}^", file, local_path=local_path)
 
             status = None
             if previous_content is None and new_content is not None:
@@ -164,20 +176,29 @@ def scrape_repository(repo_path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("start_index", type=int, help="Start index for repos")
-    parser.add_argument("end_index", type=int, help="End index for repos")
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument(
+    #     "file_path", type=str, help="File path for the .txt file containing the list of repos"
+    # )
+    # parser.add_argument("start_index", type=int, help="Start index for repos")
+    # parser.add_argument("end_index", type=int, help="End index for repos")
+    # args = parser.parse_args()
 
     # repos = ["siddharth-gandhi/refpred"]
-    # repos = ["karpathy/nanoGPT", "karpathy/llama2.c", "siddharth-gandhi/refpred"]
+    repos = [
+        "karpathy/nanoGPT",
+        "karpathy/llama2.c",
+        "siddharth-gandhi/refpred",
+        "ggerganov/llama.cpp",
+    ]
     # repos = ["ggerganov/llama.cpp"]
     if not os.path.exists("data"):
         os.makedirs("data")
-    repo_file_name = "test_repos.txt"
+    # repo_file_name = "test_repos.txt"
     # repo_file_name = "top_repos.txt"
-    with open(repo_file_name, "r") as f:
-        repos = f.read().splitlines()[args.start_index : args.end_index + 1]
+    # repo_file_name = args.file_path
+    # with open(os.path.join(BASE_DIR, repo_file_name), "r") as f:
+    #     repos = f.read().splitlines()[args.start_index : args.end_index + 1]
     CWD = os.getcwd()
     print(f"Scraping {len(repos)} repositories...")
     print(f"Current working directory: {CWD}")
@@ -190,6 +211,6 @@ if __name__ == "__main__":
             print(e)
             continue
         # reset path to cur_dir after each repo
-        os.chdir(CWD)
-        with open(f"data/{owner}_{repo_name}_commit_data.json", "w") as f:
+        # os.chdir(CWD)
+        with open(os.path.join(BASE_DIR, f"data/{owner}_{repo_name}_commit_data.json"), "w") as f:
             json.dump(data, f)
