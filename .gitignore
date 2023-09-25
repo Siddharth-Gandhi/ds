@@ -13,6 +13,7 @@ temp.py
 view.py
 data/
 data_local/
+data_api/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

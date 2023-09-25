@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import subprocess
@@ -36,16 +37,6 @@ def get_all_commits():
 # def get_files_changed_in_commit(commit_sha):
 #     cmd = f"git show {commit_sha} --pretty='' --name-only"
 #     return run_command(cmd).splitlines()
-
-
-# V2
-# def get_files_changed_in_commit(commit_sha):
-# num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}").split())
-# if num_parents <= 1:
-#     return run_command(f"git show {commit_sha} --pretty='' --name-only").splitlines()
-# # It's a merge commit, get changes between the two parents
-# parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}").split()
-# return run_command(f"git diff --name-only {parents[0]} {parents[1]}").splitlines()
 
 
 # V3
@@ -99,10 +90,13 @@ def scrape_repository(repo_path):
     """
     owner, repo_name = repo_path.split("/")
     local_path = f"repos/{owner}_{repo_name}"
-    if not os.path.exists(local_path):
-        print(f"Cloning {repo_path}...")
-        clone_repository(repo_path)
-    os.chdir(local_path)
+    try:
+        if not os.path.exists(local_path):
+            print(f"Cloning {repo_path}...")
+            clone_repository(repo_path)
+        os.chdir(local_path)
+    except Exception as e:
+        raise Exception(f"Failed to clone {repo_path}") from e
     # TODO lmao - maybe checkout HEAD instead?
     try:
         run_command("git checkout main")
@@ -170,15 +164,31 @@ def scrape_repository(repo_path):
 
 
 if __name__ == "__main__":
-    CWD = os.getcwd()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("start_index", type=int, help="Start index for repos")
+    parser.add_argument("end_index", type=int, help="End index for repos")
+    args = parser.parse_args()
+
     # repos = ["siddharth-gandhi/refpred"]
-    repos = ["karpathy/nanoGPT", "karpathy/llama2.c", "siddharth-gandhi/refpred"]
+    # repos = ["karpathy/nanoGPT", "karpathy/llama2.c", "siddharth-gandhi/refpred"]
     # repos = ["ggerganov/llama.cpp"]
     if not os.path.exists("data_local"):
         os.makedirs("data_local")
+    repo_file_name = "test_repos.txt"
+    # repo_file_name = "top_repos.txt"
+    with open(repo_file_name, "r") as f:
+        repos = f.read().splitlines()[args.start_index : args.end_index + 1]
+    CWD = os.getcwd()
+    print(f"Scraping {len(repos)} repositories...")
+    print(f"Current working directory: {CWD}")
     for repo in repos:
         owner, repo_name = repo.split("/")
-        data = scrape_repository(repo)
+        try:
+            data = scrape_repository(repo)
+        except Exception as e:
+            print(f"Failed to scrape {repo}")
+            print(e)
+            continue
         # reset path to cur_dir after each repo
         os.chdir(CWD)
         with open(f"data_local/{owner}_{repo_name}_commit_data_local.json", "w") as f:

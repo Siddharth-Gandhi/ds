@@ -1,0 +1,5 @@
+karpathy/nanoGPT
+karpathy/llama2.c
+siddharth-gandhi/refpred
+ggerganov/llama.cpp
+ggerganov/whisper
