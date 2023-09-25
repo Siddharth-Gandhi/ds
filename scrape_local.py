@@ -176,29 +176,28 @@ def scrape_repository(repo_path):
 
 
 if __name__ == "__main__":
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument(
-    #     "file_path", type=str, help="File path for the .txt file containing the list of repos"
-    # )
-    # parser.add_argument("start_index", type=int, help="Start index for repos")
-    # parser.add_argument("end_index", type=int, help="End index for repos")
-    # args = parser.parse_args()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "file_path", type=str, help="File path for the .txt file containing the list of repos"
+    )
+    parser.add_argument("start_index", type=int, help="Start index for repos")
+    parser.add_argument("end_index", type=int, help="End index for repos")
+    args = parser.parse_args()
 
     # repos = ["siddharth-gandhi/refpred"]
-    repos = [
-        "karpathy/nanoGPT",
-        "karpathy/llama2.c",
-        "siddharth-gandhi/refpred",
-        "ggerganov/llama.cpp",
-    ]
-    # repos = ["ggerganov/llama.cpp"]
+    # repos = [
+    #     "karpathy/nanoGPT",
+    #     "karpathy/llama2.c",
+    #     "siddharth-gandhi/refpred",
+    #     "ggerganov/llama.cpp",
+    # ]
     if not os.path.exists("data"):
         os.makedirs("data")
     # repo_file_name = "test_repos.txt"
     # repo_file_name = "top_repos.txt"
-    # repo_file_name = args.file_path
-    # with open(os.path.join(BASE_DIR, repo_file_name), "r") as f:
-    #     repos = f.read().splitlines()[args.start_index : args.end_index + 1]
+    repo_file_name = args.file_path
+    with open(os.path.join(BASE_DIR, repo_file_name), "r") as f:
+        repos = f.read().splitlines()[args.start_index : args.end_index + 1]
     CWD = os.getcwd()
     print(f"Scraping {len(repos)} repositories...")
     print(f"Current working directory: {CWD}")
