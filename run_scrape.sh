@@ -5,8 +5,8 @@
 #SBATCH --nodes=1                      # Number of nodes
 #SBATCH --ntasks=8                     # Number of CPUs
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=4G                       # Memory per node (e.g., 4GB)
-#SBATCH --time=60:00
+#SBATCH --mem=8G                       # Memory per node (e.g., 4GB)
+#SBATCH --time=24:00:00
 #SBATCH --array=0-7
 #SBATCH --exclude=boston-2-34
 # Activate the conda environment
@@ -31,7 +31,7 @@ REMAINING_ITEMS=$(( $TOTAL_ITEMS % $TOTAL_TASKS ))
 START_INDEX=$(( $SLURM_ARRAY_TASK_ID * $ITEMS_PER_TASK ))
 END_INDEX=$(( $START_INDEX + $ITEMS_PER_TASK - 1 ))
 
-echo "Task ID: $SLURM_ARRAY_TASK_ID, Start Index: $START_INDEX, End Index: $END_INDEX"
+# echo "Task ID: $SLURM_ARRAY_TASK_ID, Start Index: $START_INDEX, End Index: $END_INDEX"
 
 # Adjust for remainder
 if [ $SLURM_ARRAY_TASK_ID -eq $(( $TOTAL_TASKS - 1 )) ]; then
@@ -39,4 +39,4 @@ if [ $SLURM_ARRAY_TASK_ID -eq $(( $TOTAL_TASKS - 1 )) ]; then
 fi
 # ...
 
-# srun -N1 python3 scrape_local.py $FILE_PATH $START_INDEX $END_INDEX
+srun -N1 python3 scrape_local.py $FILE_PATH $START_INDEX $END_INDEX
