@@ -24,12 +24,7 @@ def run_command(command: str, cwd=None, timeout=60):
     result = subprocess.run(
         [command], timeout=timeout, capture_output=True, text=True, shell=True, cwd=cwd
     )
-    if result.returncode != 0:
-        # print(f"Command '{command}' failed with error:")
-        # print(result.stderr)
-        # raise Exception(f"Command '{command}' failed with error: {result.stderr}")
-        return "-1"  # or raise an exception
-    return result.stdout
+    return "" if result.returncode != 0 else result.stdout
 
 
 def get_all_commits():
@@ -56,15 +51,19 @@ def get_all_commits():
 # V3
 def get_files_changed_in_commit(commit_sha):
     num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}").split())
-    if num_parents > 1:
-        # It's a merge commit
-        parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}").split()
-        # Find the common ancestor of the two parents
-        base = run_command(f"git merge-base {parents[0]} {parents[1]}").strip()
-        # Get changes introduced by the merged branch
-        return run_command(f"git diff --name-only {base} {parents[1]}").splitlines()
-    else:
-        return run_command(f"git show {commit_sha} --pretty='' --name-only").splitlines()
+    is_merge_request = False
+    if num_parents <= 1:
+        return (
+            run_command(f"git show {commit_sha} --pretty='' --name-only").splitlines(),
+            is_merge_request,
+        )
+    # It's a merge commit
+    is_merge_request = True
+    parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}").split()
+    # Find the common ancestor of the two parents
+    base = run_command(f"git merge-base {parents[0]} {parents[1]}").strip()
+    # Get changes introduced by the merged branch
+    return run_command(f"git diff --name-only {base} {parents[1]}").splitlines(), is_merge_request
 
 
 def get_commit_message(commit_sha):
@@ -101,12 +100,13 @@ def scrape_repository(repo_path):
     owner, repo_name = repo_path.split("/")
     local_path = f"repos/{owner}_{repo_name}"
     if not os.path.exists(local_path):
+        print(f"Cloning {repo_path}...")
         clone_repository(repo_path)
     os.chdir(local_path)
-    # TODO lmao
+    # TODO lmao - maybe checkout HEAD instead?
     try:
         run_command("git checkout main")
-    except:
+    except Exception:
         run_command("git checkout master")
     # Ensure the repository is cloned locally
     local_path = clone_repository(repo_path)
@@ -116,9 +116,7 @@ def scrape_repository(repo_path):
     data = []
 
     for commit in all_commits:
-        if commit == "ed7887c888270d9b7724556658c1e2bf0e0b628e":
-            print("hi")
-        files_changed = get_files_changed_in_commit(commit)
+        files_changed, is_merge_request = get_files_changed_in_commit(commit)
         commit_message = get_commit_message(commit)
         commit_date = get_date(commit)
         for file in files_changed:
@@ -126,20 +124,30 @@ def scrape_repository(repo_path):
             file_extension = file.split(".")[-1]
             if f".{file_extension}" not in code_extensions:
                 continue
-            # TODO bad code, need to fix
+            # TODO bad code, might need to fix
             try:
                 previous_content = get_file_content_at_commit(commit, file, parent=True)
                 prev_commit = get_previous_commit(commit)
-            except:
+            except Exception:
                 previous_content = None
                 prev_commit = None
             try:
                 new_content = get_file_content_at_commit(commit, file, parent=False)
-            except:
+            except Exception:
                 new_content = None
             diff = None
             if previous_content is not None and new_content is not None:
                 diff = get_diff(commit, f"{commit}^", file)
+
+            status = None
+            if previous_content is None and new_content is not None:
+                status = "added"
+            elif previous_content is not None and new_content is None:
+                status = "deleted"
+            elif previous_content is not None and new_content is not None:
+                status = "modified"
+            else:
+                status = "unknown"
 
             data.append(
                 {
@@ -153,6 +161,8 @@ def scrape_repository(repo_path):
                     "previous_file_content": previous_content,
                     "cur_file_content": new_content,
                     "diff": diff,
+                    "status": status,
+                    "is_merge_request": is_merge_request,
                 }
             )
 
@@ -162,9 +172,8 @@ def scrape_repository(repo_path):
 if __name__ == "__main__":
     CWD = os.getcwd()
     # repos = ["siddharth-gandhi/refpred"]
-    # repos = ["karpathy/nanoGPT"]
-    repos = ["karpathy/llama2.c"]
-    # commit_data = extract_commits_info("repos/makemore")
+    repos = ["karpathy/nanoGPT", "karpathy/llama2.c", "siddharth-gandhi/refpred"]
+    # repos = ["ggerganov/llama.cpp"]
     if not os.path.exists("data_local"):
         os.makedirs("data_local")
     for repo in repos:
@@ -174,6 +183,3 @@ if __name__ == "__main__":
         os.chdir(CWD)
         with open(f"data_local/{owner}_{repo_name}_commit_data_local.json", "w") as f:
             json.dump(data, f)
-    # Save or process the data as required
-    # with open("commit_data_local.json", "w") as f:
-    #     json.dump(commit_data, f)
