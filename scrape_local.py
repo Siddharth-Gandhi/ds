@@ -172,8 +172,8 @@ if __name__ == "__main__":
     # repos = ["siddharth-gandhi/refpred"]
     # repos = ["karpathy/nanoGPT", "karpathy/llama2.c", "siddharth-gandhi/refpred"]
     # repos = ["ggerganov/llama.cpp"]
-    if not os.path.exists("data_local"):
-        os.makedirs("data_local")
+    if not os.path.exists("data"):
+        os.makedirs("data")
     repo_file_name = "test_repos.txt"
     # repo_file_name = "top_repos.txt"
     with open(repo_file_name, "r") as f:
@@ -191,5 +191,5 @@ if __name__ == "__main__":
             continue
         # reset path to cur_dir after each repo
         os.chdir(CWD)
-        with open(f"data_local/{owner}_{repo_name}_commit_data_local.json", "w") as f:
+        with open(f"data/{owner}_{repo_name}_commit_data.json", "w") as f:
             json.dump(data, f)
