@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import subprocess
+import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 code_extensions = set(json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r")))
@@ -14,8 +15,7 @@ def clone_repository(repo_path):
     owner, repo_name = repo_path.split("/")
     # local_path = f"repos/{owner}_{repo_name}"
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
-    # print current working directory
-    print(os.getcwd())
+    print(f"Cloning {repo_path} to {local_path}...")
     if not os.path.exists(local_path):
         os.makedirs(local_path)
         # subprocess.run(["git", "clone", f"https://github.com/{repo_path}.git", local_path])
@@ -23,7 +23,7 @@ def clone_repository(repo_path):
     return local_path
 
 
-def run_command(command: str, cwd=None, timeout=60):
+def run_command(command: str, cwd=None, timeout=None):
     result = subprocess.run(
         [command], timeout=timeout, capture_output=True, text=True, shell=True, cwd=cwd
     )
@@ -97,19 +97,22 @@ def scrape_repository(repo_path):
     """
     owner, repo_name = repo_path.split("/")
     local_path = f"repos/{owner}_{repo_name}"
+    print(f"Local path of {repo_path}: {local_path}")
     try:
         if not os.path.exists(local_path) or not os.listdir(local_path):
             print(f"Cloning {repo_path}...")
             clone_repository(repo_path)
+            print(f"Finished cloning {repo_path} to {local_path}")
         # os.chdir(local_path)
         # run_command("git checkout main", cwd=local_path)
     except Exception as e:
+        print(e)
         raise Exception(f"Failed to clone {repo_path}") from e
-    # TODO lmao - maybe checkout HEAD instead?
-    try:
-        run_command("git checkout main", cwd=local_path)
-    except Exception:
-        run_command("git checkout master", cwd=local_path)
+    # # TODO - maybe checkout HEAD instead?
+    # try:
+    #     run_command("git checkout main", cwd=local_path)
+    # except Exception:
+    #     run_command("git checkout master", cwd=local_path)
     # Ensure the repository is cloned locally
     # local_path = clone_repository(repo_path)
     all_commits = get_all_commits(local_path)
@@ -184,13 +187,14 @@ if __name__ == "__main__":
     parser.add_argument("end_index", type=int, help="End index for repos")
     args = parser.parse_args()
 
-    # repos = ["siddharth-gandhi/refpred"]
+    repos = ["facebook/react"]
     # repos = [
     #     "karpathy/nanoGPT",
     #     "karpathy/llama2.c",
     #     "siddharth-gandhi/refpred",
     #     "ggerganov/llama.cpp",
     # ]
+    # repos = ["ggerganov/llama.cpp"]
     if not os.path.exists("data"):
         os.makedirs("data")
     # repo_file_name = "test_repos.txt"
@@ -203,12 +207,17 @@ if __name__ == "__main__":
     print(f"Current working directory: {CWD}")
     for repo in repos:
         owner, repo_name = repo.split("/")
+        start_time = time.perf_counter()
         try:
             data = scrape_repository(repo)
         except Exception as e:
             print(f"Failed to scrape {repo}")
             print(e)
             continue
+        end_time = time.perf_counter()
+        # in minutes
+        elapsed_time = (end_time - start_time) / 60
+        print(f"Scraped {repo} in {elapsed_time:.2f} minutes storing {len(data)} commits")
         # reset path to cur_dir after each repo
         # os.chdir(CWD)
         with open(os.path.join(BASE_DIR, f"data/{owner}_{repo_name}_commit_data.json"), "w") as f:
