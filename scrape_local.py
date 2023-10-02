@@ -1,8 +1,8 @@
 import argparse
 import json
+import time
 import os
 import subprocess
-import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 code_extensions = set(json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r")))
@@ -12,10 +12,10 @@ def clone_repository(repo_path):
     """
     Clone a repository if it doesn't exist locally.
     """
-    owner, repo_name = repo_path.split("/")
+    owner, repo_name = repo_path.lower().split("/")
     # local_path = f"repos/{owner}_{repo_name}"
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
-    print(f"Cloning {repo_path} to {local_path}...")
+    print(f'Cloning {repo_path} to {local_path}...')
     if not os.path.exists(local_path):
         os.makedirs(local_path)
         # subprocess.run(["git", "clone", f"https://github.com/{repo_path}.git", local_path])
@@ -95,19 +95,17 @@ def scrape_repository(repo_path):
     """
     Scrape all commits and their details from a local repository.
     """
-    owner, repo_name = repo_path.split("/")
+    owner, repo_name = repo_path.lower().split("/")
     local_path = f"repos/{owner}_{repo_name}"
-    print(f"Local path of {repo_path}: {local_path}")
-    try:
-        if not os.path.exists(local_path) or not os.listdir(local_path):
-            print(f"Cloning {repo_path}...")
-            clone_repository(repo_path)
-            print(f"Finished cloning {repo_path} to {local_path}")
-        # os.chdir(local_path)
+    print(f'Local path of {repo_path}: {local_path}')
+    if not os.path.exists(local_path) or not os.listdir(local_path):
+        # print(f"Cloning {repo_path}...")
+        # clone_repository(repo_path)
+        # print(f"Finished cloning {repo_path} to {local_path}")
+        print(f'{repo_path} does not exist/is empty in the repos folder. Please clone')
+        return []
+    # os.chdir(local_path)
         # run_command("git checkout main", cwd=local_path)
-    except Exception as e:
-        print(e)
-        raise Exception(f"Failed to clone {repo_path}") from e
     # # TODO - maybe checkout HEAD instead?
     # try:
     #     run_command("git checkout main", cwd=local_path)
@@ -115,12 +113,15 @@ def scrape_repository(repo_path):
     #     run_command("git checkout master", cwd=local_path)
     # Ensure the repository is cloned locally
     # local_path = clone_repository(repo_path)
+    print(f'Processing commits for {repo_path}')
     all_commits = get_all_commits(local_path)
     print(f"Found {len(all_commits)} commits in {repo_path}")
 
     data = []
 
     for commit in all_commits:
+        if len(data) % 1000 == 0:
+            print(f'{len(data)} commits finished')
         files_changed, is_merge_request = get_files_changed_in_commit(commit, local_path)
         commit_message = get_commit_message(commit, local_path)
         commit_date = get_date(commit, local_path)
@@ -175,6 +176,7 @@ def scrape_repository(repo_path):
                 }
             )
 
+
     return data
 
 
@@ -187,7 +189,7 @@ if __name__ == "__main__":
     parser.add_argument("end_index", type=int, help="End index for repos")
     args = parser.parse_args()
 
-    repos = ["facebook/react"]
+    # repos = ["facebook/react"]
     # repos = [
     #     "karpathy/nanoGPT",
     #     "karpathy/llama2.c",
@@ -206,10 +208,12 @@ if __name__ == "__main__":
     print(f"Scraping {len(repos)} repositories...")
     print(f"Current working directory: {CWD}")
     for repo in repos:
-        owner, repo_name = repo.split("/")
+        owner, repo_name = repo.lower().split("/")
         start_time = time.perf_counter()
+        done = False
         try:
             data = scrape_repository(repo)
+            done = True
         except Exception as e:
             print(f"Failed to scrape {repo}")
             print(e)
@@ -217,7 +221,8 @@ if __name__ == "__main__":
         end_time = time.perf_counter()
         # in minutes
         elapsed_time = (end_time - start_time) / 60
-        print(f"Scraped {repo} in {elapsed_time:.2f} minutes storing {len(data)} commits")
+        if done:
+            print(f"Scraped {repo} in {elapsed_time:.2f} minutes storing {len(data)} commits")
         # reset path to cur_dir after each repo
         # os.chdir(CWD)
         with open(os.path.join(BASE_DIR, f"data/{owner}_{repo_name}_commit_data.json"), "w") as f:

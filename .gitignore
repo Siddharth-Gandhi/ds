@@ -14,6 +14,8 @@ view.py
 data/
 data_local/
 data_api/
+github_id_rsa
+*.pub
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
