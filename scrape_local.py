@@ -1,11 +1,15 @@
 import argparse
 import json
-import time
 import os
 import subprocess
+import time
+
+import pandas as pd
+from tqdm import tqdm
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 code_extensions = set(json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r")))
+CHUNK_SIZE = 1000
 
 
 def clone_repository(repo_path):
@@ -15,7 +19,7 @@ def clone_repository(repo_path):
     owner, repo_name = repo_path.lower().split("/")
     # local_path = f"repos/{owner}_{repo_name}"
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
-    print(f'Cloning {repo_path} to {local_path}...')
+    print(f"Cloning {repo_path} to {local_path}...")
     if not os.path.exists(local_path):
         os.makedirs(local_path)
         # subprocess.run(["git", "clone", f"https://github.com/{repo_path}.git", local_path])
@@ -87,100 +91,225 @@ def get_previous_commit(commit_sha, local_path=None):
 
 
 def get_date(commit_sha, local_paths=None):
-    cmd = f"git show -s --format=%ci {commit_sha}"
+    cmd = f"git show -s --format=%cI {commit_sha}"
     return run_command(cmd, cwd=local_paths)
 
 
+def process_commit(commit, local_path, owner, repo_name):
+    files_changed, is_merge_request = get_files_changed_in_commit(commit, local_path)
+    commit_message = get_commit_message(commit, local_path)
+    commit_date = get_date(commit, local_path)
+    data_list = []
+    for file in files_changed:
+        file_extension = file.split(".")[-1]
+        if f".{file_extension}" not in code_extensions:
+            continue
+        try:
+            previous_content = get_file_content_at_commit(
+                commit, file, parent=True, local_path=local_path
+            )
+            prev_commit = get_previous_commit(commit, local_path=local_path)
+        except Exception:
+            previous_content = None
+            prev_commit = None
+        try:
+            new_content = get_file_content_at_commit(
+                commit, file, parent=False, local_path=local_path
+            )
+        except Exception:
+            new_content = None
+        diff = None
+        if previous_content and new_content:
+            diff = get_diff(commit, f"{commit}^", file, local_path=local_path)
+        status = determine_status(previous_content, new_content)
+
+        data_list.append(
+            {
+                "owner": owner,
+                "repo_name": repo_name,
+                "commit_date": commit_date,
+                "commit_id": commit,
+                "commit_message": commit_message,
+                "file_path": file,
+                "previous_commit_id": prev_commit,
+                "previous_file_content": previous_content,
+                "cur_file_content": new_content,
+                "diff": diff,
+                "status": status,
+                "is_merge_request": is_merge_request,
+            }
+        )
+    return data_list
+
+
+def determine_status(previous_content, new_content):
+    if not previous_content and new_content:
+        return "added"
+    elif previous_content and not new_content:
+        return "deleted"
+    elif previous_content and new_content:
+        return "modified"
+    else:
+        return "unknown"
+
+
+def set_dtype(df):
+    df["owner"] = df["owner"].astype("string")
+    df["repo_name"] = df["repo_name"].astype("string")
+    df["commit_date"] = pd.to_datetime(df["commit_date"], format="ISO8601")
+    df["commit_id"] = df["commit_id"].astype("string")
+    df["commit_message"] = df["commit_message"].astype("string")
+    df["file_path"] = df["file_path"].astype("string")
+    df["previous_commit_id"] = df["previous_commit_id"].astype("string")
+    df["previous_file_content"] = df["previous_file_content"].astype("string")
+    df["cur_file_content"] = df["cur_file_content"].astype("string")
+    df["diff"] = df["diff"].astype("string")
+    df["status"] = df["status"].astype("category")
+    df["is_merge_request"] = df["is_merge_request"].astype("bool")
+    return df
+
+
+def save_to_parquet(data, owner, repo_name, batch_num, dir_path):
+    """
+    Save a list of data to a Parquet file.
+    """
+    df = pd.DataFrame(data)
+    df = set_dtype(df)
+    # convert empty strings to None
+    df = df.replace(r"^\s*$", None, regex=True)
+    parquet_file = os.path.join(dir_path, f"{owner}_{repo_name}_commit_data_{batch_num}.parquet")
+    df.to_parquet(parquet_file, index=False)
+
+
 def scrape_repository(repo_path):
-    """
-    Scrape all commits and their details from a local repository.
-    """
-    owner, repo_name = repo_path.lower().split("/")
+    owner, repo_name = repo_path.split("/")
     local_path = f"repos/{owner}_{repo_name}"
-    print(f'Local path of {repo_path}: {local_path}')
-    if not os.path.exists(local_path) or not os.listdir(local_path):
-        # print(f"Cloning {repo_path}...")
-        # clone_repository(repo_path)
-        # print(f"Finished cloning {repo_path} to {local_path}")
-        print(f'{repo_path} does not exist/is empty in the repos folder. Please clone')
-        return []
-    # os.chdir(local_path)
-        # run_command("git checkout main", cwd=local_path)
-    # # TODO - maybe checkout HEAD instead?
-    # try:
-    #     run_command("git checkout main", cwd=local_path)
-    # except Exception:
-    #     run_command("git checkout master", cwd=local_path)
-    # Ensure the repository is cloned locally
-    # local_path = clone_repository(repo_path)
-    print(f'Processing commits for {repo_path}')
+
+    # Create a directory for each repository
+    dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}")
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+
+    # ... [rest of your code in scrape_repository function]
     all_commits = get_all_commits(local_path)
     print(f"Found {len(all_commits)} commits in {repo_path}")
+    data_batch = []
+    batch_num = 0
+    for idx, commit in tqdm(enumerate(all_commits), total=len(all_commits)):
+        # print based on size of all_commits
+        # if it's less than 1000, print every 100
+        # if it's more than 1000, print every 1000
+        if (
+            len(all_commits) < 1000
+            and idx
+            and idx % 100 == 0
+            or len(all_commits) >= 1000
+            and idx
+            and idx % 1000 == 0
+        ):
+            print(f"{idx} commits processed out of {len(all_commits)}")
+        if idx and idx % CHUNK_SIZE == 0:
+            save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
+            data_batch = []
+            batch_num += 1
+            print(f"{idx} commits processed and saved to Parquet out of {len(all_commits)}.")
 
-    data = []
+        data_batch.extend(process_commit(commit, local_path, owner, repo_name))
 
-    for commit in all_commits:
-        if len(data) % 1000 == 0:
-            print(f'{len(data)} commits finished')
-        files_changed, is_merge_request = get_files_changed_in_commit(commit, local_path)
-        commit_message = get_commit_message(commit, local_path)
-        commit_date = get_date(commit, local_path)
-        for file in files_changed:
-            # Skip files that are not code
-            file_extension = file.split(".")[-1]
-            if f".{file_extension}" not in code_extensions:
-                continue
-            # TODO bad code, might need to fix
-            try:
-                previous_content = get_file_content_at_commit(
-                    commit, file, parent=True, local_path=local_path
-                )
-                prev_commit = get_previous_commit(commit, local_path=local_path)
-            except Exception:
-                previous_content = None
-                prev_commit = None
-            try:
-                new_content = get_file_content_at_commit(
-                    commit, file, parent=False, local_path=local_path
-                )
-            except Exception:
-                new_content = None
-            diff = None
-            if previous_content is not None and new_content is not None:
-                diff = get_diff(commit, f"{commit}^", file, local_path=local_path)
-
-            status = None
-            if previous_content is None and new_content is not None:
-                status = "added"
-            elif previous_content is not None and new_content is None:
-                status = "deleted"
-            elif previous_content is not None and new_content is not None:
-                status = "modified"
-            else:
-                status = "unknown"
-
-            data.append(
-                {
-                    "owner": owner,
-                    "repo_name": repo_name,
-                    "commit_date": commit_date,
-                    "commit_id": commit,
-                    "commit_message": commit_message,
-                    "file_path": file,
-                    "previous_commit_id": prev_commit,
-                    "previous_file_content": previous_content,
-                    "cur_file_content": new_content,
-                    "diff": diff,
-                    "status": status,
-                    "is_merge_request": is_merge_request,
-                }
-            )
+    # Save remaining data to Parquet
+    if data_batch:
+        save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
 
 
-    return data
+# def scrape_repository(repo_path):
+#     """
+#     Scrape all commits and their details from a local repository.
+#     """
+#     owner, repo_name = repo_path.lower().split("/")
+#     local_path = f"repos/{owner}_{repo_name}"
+#     print(f"Local path of {repo_path}: {local_path}")
+#     if not os.path.exists(local_path) or not os.listdir(local_path):
+#         # print(f"Cloning {repo_path}...")
+#         # clone_repository(repo_path)
+#         # print(f"Finished cloning {repo_path} to {local_path}")
+#         print(f"{repo_path} does not exist/is empty in the repos folder. Please clone")
+#         return []
+#     # os.chdir(local_path)
+#     # run_command("git checkout main", cwd=local_path)
+#     # # TODO - maybe checkout HEAD instead?
+#     # try:
+#     #     run_command("git checkout main", cwd=local_path)
+#     # except Exception:
+#     #     run_command("git checkout master", cwd=local_path)
+#     # Ensure the repository is cloned locally
+#     # local_path = clone_repository(repo_path)
+#     print(f"Processing commits for {repo_path}")
+#     all_commits = get_all_commits(local_path)
+#     print(f"Found {len(all_commits)} commits in {repo_path}")
+
+#     data = []
+
+#     for commit in all_commits:
+#         if len(data) % 1000 == 0:
+#             print(f"{len(data)} commits finished")
+#         files_changed, is_merge_request = get_files_changed_in_commit(commit, local_path)
+#         commit_message = get_commit_message(commit, local_path)
+#         commit_date = get_date(commit, local_path)
+#         for file in files_changed:
+#             # Skip files that are not code
+#             file_extension = file.split(".")[-1]
+#             if f".{file_extension}" not in code_extensions:
+#                 continue
+#             # TODO bad code, might need to fix
+#             try:
+#                 previous_content = get_file_content_at_commit(
+#                     commit, file, parent=True, local_path=local_path
+#                 )
+#                 prev_commit = get_previous_commit(commit, local_path=local_path)
+#             except Exception:
+#                 previous_content = None
+#                 prev_commit = None
+#             try:
+#                 new_content = get_file_content_at_commit(
+#                     commit, file, parent=False, local_path=local_path
+#                 )
+#             except Exception:
+#                 new_content = None
+#             diff = None
+#             if previous_content is not None and new_content is not None:
+#                 diff = get_diff(commit, f"{commit}^", file, local_path=local_path)
+
+#             status = None
+#             if previous_content is None and new_content is not None:
+#                 status = "added"
+#             elif previous_content is not None and new_content is None:
+#                 status = "deleted"
+#             elif previous_content is not None and new_content is not None:
+#                 status = "modified"
+#             else:
+#                 status = "unknown"
+
+#             data.append(
+#                 {
+#                     "owner": owner,
+#                     "repo_name": repo_name,
+#                     "commit_date": commit_date,
+#                     "commit_id": commit,
+#                     "commit_message": commit_message,
+#                     "file_path": file,
+#                     "previous_commit_id": prev_commit,
+#                     "previous_file_content": previous_content,
+#                     "cur_file_content": new_content,
+#                     "diff": diff,
+#                     "status": status,
+#                     "is_merge_request": is_merge_request,
+#                 }
+#             )
+
+#     return data
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "file_path", type=str, help="File path for the .txt file containing the list of repos"
@@ -189,41 +318,82 @@ if __name__ == "__main__":
     parser.add_argument("end_index", type=int, help="End index for repos")
     args = parser.parse_args()
 
-    # repos = ["facebook/react"]
-    # repos = [
-    #     "karpathy/nanoGPT",
-    #     "karpathy/llama2.c",
-    #     "siddharth-gandhi/refpred",
-    #     "ggerganov/llama.cpp",
-    # ]
-    # repos = ["ggerganov/llama.cpp"]
     if not os.path.exists("data"):
         os.makedirs("data")
-    # repo_file_name = "test_repos.txt"
-    # repo_file_name = "top_repos.txt"
-    repo_file_name = args.file_path
-    with open(os.path.join(BASE_DIR, repo_file_name), "r") as f:
+
+    with open(os.path.join(BASE_DIR, args.file_path), "r") as f:
         repos = f.read().splitlines()[args.start_index : args.end_index + 1]
-    CWD = os.getcwd()
-    print(f"Scraping {len(repos)} repositories...")
-    print(f"Current working directory: {CWD}")
+
     for repo in repos:
+        # check if repo exists
         owner, repo_name = repo.lower().split("/")
-        start_time = time.perf_counter()
-        done = False
+        local_path = f"repos/{owner}_{repo_name}"
+        if not os.path.exists(local_path) or not os.listdir(local_path):
+            print(f"{repo} does not exist/is empty in the repos folder. Please clone")
+            continue
         try:
-            data = scrape_repository(repo)
-            done = True
+            start_time = time.perf_counter()
+            scrape_repository(repo)
+            end_time = time.perf_counter()
+            elapsed_time = (end_time - start_time) / 60
+            print(f"Scraped {repo} in {elapsed_time:.2f} minutes")
         except Exception as e:
             print(f"Failed to scrape {repo}")
             print(e)
-            continue
-        end_time = time.perf_counter()
-        # in minutes
-        elapsed_time = (end_time - start_time) / 60
-        if done:
-            print(f"Scraped {repo} in {elapsed_time:.2f} minutes storing {len(data)} commits")
-        # reset path to cur_dir after each repo
-        # os.chdir(CWD)
-        with open(os.path.join(BASE_DIR, f"data/{owner}_{repo_name}_commit_data.json"), "w") as f:
-            json.dump(data, f)
+
+
+if __name__ == "__main__":
+    import cProfile
+    import pstats
+
+    with cProfile.Profile() as pr:
+        main()
+    stats = pstats.Stats(pr)
+    stats.sort_stats(pstats.SortKey.TIME)
+    stats.dump_stats("scrape_local.prof")
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument(
+    #     "file_path", type=str, help="File path for the .txt file containing the list of repos"
+    # )
+    # parser.add_argument("start_index", type=int, help="Start index for repos")
+    # parser.add_argument("end_index", type=int, help="End index for repos")
+    # args = parser.parse_args()
+
+    # # repos = ["facebook/react"]
+    # # repos = [
+    # #     "karpathy/nanoGPT",
+    # #     "karpathy/llama2.c",
+    # #     "siddharth-gandhi/refpred",
+    # #     "ggerganov/llama.cpp",
+    # # ]
+    # # repos = ["ggerganov/llama.cpp"]
+    # if not os.path.exists("data"):
+    #     os.makedirs("data")
+    # # repo_file_name = "test_repos.txt"
+    # # repo_file_name = "top_repos.txt"
+    # repo_file_name = args.file_path
+    # with open(os.path.join(BASE_DIR, repo_file_name), "r") as f:
+    #     repos = f.read().splitlines()[args.start_index : args.end_index + 1]
+    # CWD = os.getcwd()
+    # print(f"Scraping {len(repos)} repositories...")
+    # print(f"Current working directory: {CWD}")
+    # for repo in repos:
+    #     owner, repo_name = repo.lower().split("/")
+    #     start_time = time.perf_counter()
+    #     done = False
+    #     try:
+    #         data = scrape_repository(repo)
+    #         done = True
+    #     except Exception as e:
+    #         print(f"Failed to scrape {repo}")
+    #         print(e)
+    #         continue
+    #     end_time = time.perf_counter()
+    #     # in minutes
+    #     elapsed_time = (end_time - start_time) / 60
+    #     if done:
+    #         print(f"Scraped {repo} in {elapsed_time:.2f} minutes storing {len(data)} commits")
+    #     # reset path to cur_dir after each repo
+    #     # os.chdir(CWD)
+    #     with open(os.path.join(BASE_DIR, f"data/{owner}_{repo_name}_commit_data.json"), "w") as f:
+    #         json.dump(data, f)
