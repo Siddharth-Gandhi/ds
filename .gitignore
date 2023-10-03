@@ -1,3 +1,5 @@
+bm25_index/
+bm25_index_tiktoken/
 data_test/
 misc/
 repos/

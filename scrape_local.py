@@ -174,8 +174,8 @@ def save_to_parquet(data, owner, repo_name, batch_num, dir_path):
     """
     df = pd.DataFrame(data)
     df = set_dtype(df)
-    # convert empty strings to None
-    df = df.replace(r"^\s*$", None, regex=True)
+    # convert empty strings to None -> BAD IDEA, pyserini can't handle None
+    # df = df.replace(r"^\s*$", None, regex=True)
     parquet_file = os.path.join(dir_path, f"{owner}_{repo_name}_commit_data_{batch_num}.parquet")
     df.to_parquet(parquet_file, index=False)
     print(f"Saved {len(df)} rows to {parquet_file}")
