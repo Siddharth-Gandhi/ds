@@ -1,6 +1,0 @@
-Repo: karpathy/llama2.c - Total Commits: 462, Stored Commits: 401, Total Number of requests: 1196 - Time Taken: 354.02s
-Repo: karpathy/micrograd - Total Commits: 24, Stored Commits: 14, Total Number of requests: 48 - Time Taken: 12.79s
-Repo: karpathy/makemore - Total Commits: 21, Stored Commits: 31, Total Number of requests: 55 - Time Taken: 13.04s
-Repo: siddharth-gandhi/refpred - Total Commits: 23, Stored Commits: 71, Total Number of requests: 140 - Time Taken: 33.02s
-Repo: karpathy/nanoGPT - Total Commits: 195, Stored Commits: 189, Total Number of requests: 560 - Time Taken: 136.30s
-Repo: ggerganov/whisper.cpp - Total Commits: 722, Stored Commits: 1125, Total Number of requests: 2785 - Time Taken: 823.13s

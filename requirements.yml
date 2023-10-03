@@ -1,6 +1,0 @@
-name: ds
-channels:
-  - defaults
-dependencies:
-  - python=3.9.12
-prefix: /opt/homebrew/Caskroom/miniconda/base/envs/ds

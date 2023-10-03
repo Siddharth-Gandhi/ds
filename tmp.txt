@@ -1,1 +1,1 @@
-ggerganov/llama.cpp
+karpathy/llama2.c
