@@ -190,6 +190,11 @@ def scrape_repository(repo_path):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
+    # Create a stats directory for each repository
+    stats_dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}/stats")
+    if not os.path.exists(stats_dir_path):
+        os.makedirs(stats_dir_path)
+
     # ... [rest of your code in scrape_repository function]
     # Start from the batch specified
     start_commit_idx = args.resume_batch * CHUNK_SIZE
@@ -221,6 +226,13 @@ def scrape_repository(repo_path):
             data_batch = []
             batch_num += 1
             print(f"{idx} commits processed and saved to Parquet out of {len(all_commits)}.")
+
+            # dump the stats file too at the currennt state in case of failure in owner_repo/stats
+
+            stats_file = os.path.join(stats_dir_path, f"{owner}_{repo_name}_stats_{batch_num}.prof")
+            stats = pstats.Stats(pr)
+            stats.sort_stats(pstats.SortKey.TIME)
+            stats.dump_stats(stats_file)
 
         data_batch.extend(process_commit(commit, local_path, owner, repo_name))
 
