@@ -1,29 +1,39 @@
 #!/bin/bash
-#SBATCH --job-name=git_clone
-#SBATCH --output=logs/git_clone_output_%A_%a.log
-#SBATCH --error=logs/git_clone_error_%A_%a.log
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=4G
-#SBATCH --time=06:00:00
-#SBATCH --array=0-63
+#SBATCH --job-name=test_clone
+#SBATCH -p ssd
+#SBATCH --nodelist=boston-2-7
+#SBATCH --output=logs/test_clone_output.log
 
-# Activate the conda environment
+# list current files
+# check if hostname is correct and only then proceed
+
+if [ "$HOSTNAME" != "boston-2-7" ]; then
+    echo "Wrong host $HOSTNAME, exiting"
+    exit 1
+fi
+
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ds
 
-FILE_PATH=top_repos.txt
-TOTAL_ITEMS=$(grep -v "^[[:space:]]*$" $FILE_PATH | wc -l)
-TOTAL_TASKS=$SLURM_ARRAY_TASK_COUNT
-ITEMS_PER_TASK=$(( $TOTAL_ITEMS / $TOTAL_TASKS ))
-START_INDEX=$(( $SLURM_ARRAY_TASK_ID * $ITEMS_PER_TASK ))
-END_INDEX=$(( $START_INDEX + $ITEMS_PER_TASK - 1 ))
+echo "($HOSTNAME) Current directory: $PWD"
+# ls -l
 
-# Adjust for any remaining items
-if [ $SLURM_ARRAY_TASK_ID -eq $(( $TOTAL_TASKS - 1 )) ]; then
-    REMAINING_ITEMS=$(( $TOTAL_ITEMS % $TOTAL_TASKS ))
-    END_INDEX=$(( $END_INDEX + $REMAINING_ITEMS ))
-fi
+which python
 
-srun --wait=0 python -u clone_repos.py $FILE_PATH $START_INDEX $END_INDEX
+# copy clone_repo.py and test_repos.txt to /ssd/ssg2 (overwriting if necessary)
+cp clone_repos.py /ssd/ssg2
+cp test_repos.txt /ssd/ssg2
+
+echo "Changing directory to /ssd/ssg2"
+cd /ssd/ssg2
+echo "($HOSTNAME) Current directory: $PWD"
+echo "Current files: in $PWD"
+ls -l
+which python
+
+# get number of lines in test_repos.txt
+num_lines=$(wc -l < test_repos.txt)
+
+# run clone_repo.py
+echo "Running clone_repo.py"
+python clone_repos.py test_repos.txt 0 $num_lines

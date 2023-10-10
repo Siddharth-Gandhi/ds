@@ -1,33 +1,37 @@
 import argparse
-import asyncio
+
+# from asyncio.subprocess import PIPE, STDOUT
+import cProfile
 import json
 import os
+import pstats
 import subprocess
 import time
 import traceback
-from asyncio.subprocess import PIPE, STDOUT
 
 import pandas as pd
 from tqdm import tqdm
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-code_extensions = set(json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r")))
+code_extensions = set(
+    json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r"))
+)
 # CHUNK_SIZE = 1000
 
 
-def clone_repository(repo_path):
-    """
-    Clone a repository if it doesn't exist locally.
-    """
-    owner, repo_name = repo_path.lower().split("/")
-    # local_path = f"repos/{owner}_{repo_name}"
-    local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
-    print(f"Cloning {repo_path} to {local_path}...")
-    if not os.path.exists(local_path):
-        os.makedirs(local_path)
-        # subprocess.run(["git", "clone", f"https://github.com/{repo_path}.git", local_path])
-        run_command(f"git clone https://github.com/{repo_path}.git {local_path}")
-    return local_path
+# def clone_repository(repo_path):
+#     """
+#     Clone a repository if it doesn't exist locally.
+#     """
+#     owner, repo_name = repo_path.lower().split("/")
+#     # local_path = f"repos/{owner}_{repo_name}"
+#     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
+#     print(f"Cloning {repo_path} to {local_path}...")
+#     if not os.path.exists(local_path):
+#         os.makedirs(local_path)
+#         # subprocess.run(["git", "clone", f"https://github.com/{repo_path}.git", local_path])
+#         run_command(f"git clone https://github.com/{repo_path}.git {local_path}")
+#     return local_path
 
 
 def run_command(command: str, cwd=None, timeout=None):
@@ -44,7 +48,9 @@ def get_all_commits(local_path=None):
 
 # V3
 def get_files_changed_in_commit(commit_sha, local_path=None):
-    num_parents = len(run_command(f"git log --pretty=%P -n 1 {commit_sha}", cwd=local_path).split())
+    num_parents = len(
+        run_command(f"git log --pretty=%P -n 1 {commit_sha}", cwd=local_path).split()
+    )
     is_merge_request = False
     if num_parents <= 1:
         return (
@@ -55,12 +61,18 @@ def get_files_changed_in_commit(commit_sha, local_path=None):
         )
     # It's a merge commit
     is_merge_request = True
-    parents = run_command(f"git log --pretty=%P -n 1 {commit_sha}", cwd=local_path).split()
+    parents = run_command(
+        f"git log --pretty=%P -n 1 {commit_sha}", cwd=local_path
+    ).split()
     # Find the common ancestor of the two parents
-    base = run_command(f"git merge-base {parents[0]} {parents[1]}", cwd=local_path).strip()
+    base = run_command(
+        f"git merge-base {parents[0]} {parents[1]}", cwd=local_path
+    ).strip()
     # Get changes introduced by the merged branch
     return (
-        run_command(f"git diff --name-only {base} {parents[1]}", cwd=local_path).splitlines(),
+        run_command(
+            f"git diff --name-only {base} {parents[1]}", cwd=local_path
+        ).splitlines(),
         is_merge_request,
     )
 
@@ -176,65 +188,96 @@ def save_to_parquet(data, owner, repo_name, batch_num, dir_path):
     df = set_dtype(df)
     # convert empty strings to None -> BAD IDEA, pyserini can't handle None
     # df = df.replace(r"^\s*$", None, regex=True)
-    parquet_file = os.path.join(dir_path, f"{owner}_{repo_name}_commit_data_{batch_num}.parquet")
+    parquet_file = os.path.join(
+        dir_path, f"{owner}_{repo_name}_commit_data_{batch_num}.parquet"
+    )
     df.to_parquet(parquet_file, index=False)
     print(f"Saved {len(df)} rows to {parquet_file}")
 
 
 def scrape_repository(repo_path):
-    owner, repo_name = repo_path.split("/")
+    owner, repo_name = repo_path.lower().split("/")
     local_path = f"repos/{owner}_{repo_name}"
-
+    print(f"base dir: {BASE_DIR}")
     # Create a directory for each repository
     dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}")
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-
+    print(f"store data in {dir_path}")
     # Create a stats directory for each repository
-    stats_dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}/stats")
+    stats_dir_path = os.path.join(BASE_DIR, f"profiling/{owner}_{repo_name}/")
     if not os.path.exists(stats_dir_path):
         os.makedirs(stats_dir_path)
-
+    print(f"store stats in {stats_dir_path}")
     # ... [rest of your code in scrape_repository function]
     # Start from the batch specified
     start_commit_idx = args.resume_batch * CHUNK_SIZE
     if start_commit_idx:
-        print(f"Resuming from batch {args.resume_batch} (commit index: {start_commit_idx})")
+        print(
+            f"Resuming from batch {args.resume_batch} (commit index: {start_commit_idx})"
+        )
     all_commits = get_all_commits(local_path)
     print(f"Found {len(all_commits)} commits in {repo_path}")
     data_batch = []
     batch_num = args.resume_batch if start_commit_idx else 0
     # for idx, commit in tqdm(enumerate(all_commits), total=len(all_commits)):
-    for idx, commit in tqdm(
-        enumerate(all_commits[start_commit_idx:]), initial=start_commit_idx, total=len(all_commits)
-    ):
-        # print(f"Processing commit {idx} out of {len(all_commits)}")
-        # print based on size of all_commits
-        # if it's less than 1000, print every 100
-        # if it's more than 1000, print every 1000
-        if (
-            len(all_commits) < 1000
-            and idx
-            and idx % 100 == 0
-            or len(all_commits) >= 1000
-            and idx
-            and idx % 1000 == 0
+
+    # update_freq = 1000 if len(all_commits) >= 1000 else 100
+    update_freq = len(all_commits) // 100
+    if update_freq == 0:
+        update_freq = 1
+    # for idx, commit in tqdm(
+    #     enumerate(all_commits[start_commit_idx:]), initial=start_commit_idx, total=len(all_commits)
+    # ):
+    with tqdm(
+        total=len(all_commits),
+        initial=start_commit_idx,
+        miniters=update_freq,
+    ) as pbar:
+        for idx, commit in enumerate(
+            all_commits[start_commit_idx:], start=start_commit_idx
         ):
-            print(f"{idx} commits processed out of {len(all_commits)}")
-        if idx and idx % CHUNK_SIZE == 0:
-            save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
-            data_batch = []
-            batch_num += 1
-            print(f"{idx} commits processed and saved to Parquet out of {len(all_commits)}.")
+            # print(f"Processing commit {idx} out of {len(all_commits)}")
+            # print based on size of all_commits
+            # if it's less than 1000, print every 100
+            # if it's more than 1000, print every 1000
+            if idx % update_freq == 0:
+                pbar.set_postfix_str(
+                    f"Processing commit {idx} out of {len(all_commits)}"
+                )
+                pbar.update(update_freq)
+            if (
+                len(all_commits) < 1000
+                and idx
+                and idx % 100 == 0
+                or len(all_commits) >= 1000
+                and idx
+                and idx % 1000 == 0
+            ):
+                print(f"{idx} commits processed out of {len(all_commits)}")
+            if idx and idx % CHUNK_SIZE == 0 and data_batch:
+                save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
+                data_batch = []
+                # batch_num += 1
+                print(
+                    f"{idx} commits processed and saved to Parquet out of {len(all_commits)}."
+                )
 
-            # dump the stats file too at the currennt state in case of failure in owner_repo/stats
+                # dump the stats file too at the currennt state in case of failure in owner_repo/stats
 
-            stats_file = os.path.join(stats_dir_path, f"{owner}_{repo_name}_stats_{batch_num}.prof")
-            stats = pstats.Stats(pr)
-            stats.sort_stats(pstats.SortKey.TIME)
-            stats.dump_stats(stats_file)
+                stats_file = os.path.join(
+                    stats_dir_path, f"{owner}_{repo_name}_stats_{batch_num}.prof"
+                )
+                # with cProfile.Profile() as pr:
+                stats = pstats.Stats(pr)
+                stats.sort_stats(pstats.SortKey.TIME)
+                stats.dump_stats(stats_file)
+                print(
+                    f"Dumped stats to {stats_file} at commit {idx} out of {len(all_commits)} for batch {batch_num} out of {len(all_commits) // CHUNK_SIZE} for {repo_path}"
+                )
+                batch_num += 1
 
-        data_batch.extend(process_commit(commit, local_path, owner, repo_name))
+            data_batch.extend(process_commit(commit, local_path, owner, repo_name))
 
     # Save remaining data to Parquet
     if data_batch:
@@ -249,6 +292,7 @@ def main():
         repos = f.read().splitlines()[args.start_index : args.end_index + 1]
 
     print(f"Found {len(repos)} repos to scrape")
+    print(repos)
     print(
         f"Scraping repos {args.start_index} to {args.end_index} (inclusive)"
         f" from {args.file_path}"
@@ -263,6 +307,7 @@ def main():
         # check if repo exists
         owner, repo_name = repo.lower().split("/")
         local_path = f"repos/{owner}_{repo_name}"
+        print(local_path)
         if not os.path.exists(local_path) or not os.listdir(local_path):
             print(f"{repo} does not exist/is empty in the repos folder. Please clone")
             continue
@@ -283,12 +328,17 @@ if __name__ == "__main__":
     # print(args)
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--file_path", type=str, help="File path for the .txt file containing the list of repos"
+        "--file_path",
+        type=str,
+        help="File path for the .txt file containing the list of repos",
     )
     parser.add_argument("--start_index", type=int, help="Start index for repos")
     parser.add_argument("--end_index", type=int, help="End index for repos")
     parser.add_argument(
-        "--resume_batch", type=int, default=0, help="Batch number from where to resume (0 indexed)."
+        "--resume_batch",
+        type=int,
+        default=0,
+        help="Batch number from where to resume (0 indexed).",
     )
     parser.add_argument(
         "--chunk_size",
@@ -298,12 +348,26 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     CHUNK_SIZE = args.chunk_size
-    import cProfile
-    import pstats
 
-    with cProfile.Profile() as pr:
-        main()
+    # print working directory & all arguments
+    print("Working directory: ", os.getcwd())
+    print("All arguments: ", args)
+    pr = cProfile.Profile()
+    pr.enable()
+    main()
+    pr.disable()
+    # save stats to profiling/main_<start_index>_<end_index>.prof
+    stats_file = os.path.join(
+        BASE_DIR,
+        f"profiling/main_{args.start_index}_{args.end_index}.prof",
+    )
     stats = pstats.Stats(pr)
     stats.sort_stats(pstats.SortKey.TIME)
-    # stats.print_stats()
-    stats.dump_stats("karpathy_scrape_local.prof")
+    stats.dump_stats(stats_file)
+    print(f"Dumped final stats of this task to {stats_file}")
+    # with cProfile.Profile() as pr:
+    #     main()
+    # stats = pstats.Stats(pr)
+    # stats.sort_stats(pstats.SortKey.TIME)
+    # # stats.print_stats()
+    # stats.dump_stats("profiling/main.prof")
