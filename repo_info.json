@@ -1,0 +1,1082 @@
+[
+    {
+        "repo_name": "vscode",
+        "owner": "microsoft",
+        "number_of_stars": 151799,
+        "open_issue_count": 8190,
+        "language": "TypeScript",
+        "number_of_commits": 114429,
+        "num_pull_requests": 24552
+    },
+    {
+        "repo_name": "react",
+        "owner": "facebook",
+        "number_of_stars": 213923,
+        "open_issue_count": 1513,
+        "language": "JavaScript",
+        "number_of_commits": 16006,
+        "num_pull_requests": 13954
+    },
+    {
+        "repo_name": "tensorflow",
+        "owner": "tensorflow",
+        "number_of_stars": 178129,
+        "open_issue_count": 2030,
+        "language": "C++",
+        "number_of_commits": 154704,
+        "num_pull_requests": 23434
+    },
+    {
+        "repo_name": "electron",
+        "owner": "electron",
+        "number_of_stars": 109247,
+        "open_issue_count": 905,
+        "language": "C++",
+        "number_of_commits": 27745,
+        "num_pull_requests": 20553
+    },
+    {
+        "repo_name": "swift",
+        "owner": "apple",
+        "number_of_stars": 64192,
+        "open_issue_count": 6771,
+        "language": "C++",
+        "number_of_commits": 155481,
+        "num_pull_requests": 51229
+    },
+    {
+        "repo_name": "go",
+        "owner": "golang",
+        "number_of_stars": 114877,
+        "open_issue_count": 8710,
+        "language": "Go",
+        "number_of_commits": 58158,
+        "num_pull_requests": 3336
+    },
+    {
+        "repo_name": "bitcoin",
+        "owner": "bitcoin",
+        "number_of_stars": 71741,
+        "open_issue_count": 634,
+        "language": "C++",
+        "number_of_commits": 38961,
+        "num_pull_requests": 19729
+    },
+    {
+        "repo_name": "linux",
+        "owner": "torvalds",
+        "number_of_stars": 158625,
+        "open_issue_count": 310,
+        "language": "C",
+        "number_of_commits": 1216354,
+        "num_pull_requests": 761
+    },
+    {
+        "repo_name": "node",
+        "owner": "nodejs",
+        "number_of_stars": 98476,
+        "open_issue_count": 1916,
+        "language": "JavaScript",
+        "number_of_commits": 39863,
+        "num_pull_requests": 31643
+    },
+    {
+        "repo_name": "ruby",
+        "owner": "ruby",
+        "number_of_stars": 20844,
+        "open_issue_count": 392,
+        "language": "Ruby",
+        "number_of_commits": 80057,
+        "num_pull_requests": 8562
+    },
+    {
+        "repo_name": "cpython",
+        "owner": "python",
+        "number_of_stars": 56065,
+        "open_issue_count": 8618,
+        "language": "Python",
+        "number_of_commits": 119093,
+        "num_pull_requests": 44968
+    },
+    {
+        "repo_name": "core",
+        "owner": "dotnet",
+        "number_of_stars": 19326,
+        "open_issue_count": 394,
+        "language": "PowerShell",
+        "number_of_commits": 4192,
+        "num_pull_requests": 1881
+    },
+    {
+        "repo_name": "php-src",
+        "owner": "php",
+        "number_of_stars": 36101,
+        "open_issue_count": 797,
+        "language": "C",
+        "number_of_commits": 133533,
+        "num_pull_requests": 10310
+    },
+    {
+        "repo_name": "spark",
+        "owner": "apache",
+        "number_of_stars": 36872,
+        "open_issue_count": 248,
+        "language": "Scala",
+        "number_of_commits": 38368,
+        "num_pull_requests": 43255
+    },
+    {
+        "repo_name": "kafka",
+        "owner": "apache",
+        "number_of_stars": 25972,
+        "open_issue_count": 1068,
+        "language": "Java",
+        "number_of_commits": 11746,
+        "num_pull_requests": 14508
+    },
+    {
+        "repo_name": "mongo",
+        "owner": "mongodb",
+        "number_of_stars": 24493,
+        "open_issue_count": 75,
+        "language": "C++",
+        "number_of_commits": 75814,
+        "num_pull_requests": 1548
+    },
+    {
+        "repo_name": "jekyll",
+        "owner": "jekyll",
+        "number_of_stars": 47347,
+        "open_issue_count": 198,
+        "language": "Ruby",
+        "number_of_commits": 11679,
+        "num_pull_requests": 4396
+    },
+    {
+        "repo_name": "cassandra",
+        "owner": "apache",
+        "number_of_stars": 8224,
+        "open_issue_count": 361,
+        "language": "Java",
+        "number_of_commits": 29248,
+        "num_pull_requests": 2779
+    },
+    {
+        "repo_name": "wireshark",
+        "owner": "wireshark",
+        "number_of_stars": 6024,
+        "open_issue_count": 2,
+        "language": "C",
+        "number_of_commits": 89037,
+        "num_pull_requests": 77
+    },
+    {
+        "repo_name": "babel",
+        "owner": "babel",
+        "number_of_stars": 42538,
+        "open_issue_count": 820,
+        "language": "TypeScript",
+        "number_of_commits": 16045,
+        "num_pull_requests": 6696
+    },
+    {
+        "repo_name": "postcss",
+        "owner": "postcss",
+        "number_of_stars": 27831,
+        "open_issue_count": 18,
+        "language": "TypeScript",
+        "number_of_commits": 3979,
+        "num_pull_requests": 882
+    },
+    {
+        "repo_name": "TypeScript",
+        "owner": "microsoft",
+        "number_of_stars": 94501,
+        "open_issue_count": 6001,
+        "language": "TypeScript",
+        "number_of_commits": 35250,
+        "num_pull_requests": 16707
+    },
+    {
+        "repo_name": "git",
+        "owner": "git",
+        "number_of_stars": 47547,
+        "open_issue_count": 153,
+        "language": "C",
+        "number_of_commits": 71201,
+        "num_pull_requests": 1351
+    },
+    {
+        "repo_name": "vue",
+        "owner": "vuejs",
+        "number_of_stars": 205452,
+        "open_issue_count": 649,
+        "language": "TypeScript",
+        "number_of_commits": 3547,
+        "num_pull_requests": 2448
+    },
+    {
+        "repo_name": "jest",
+        "owner": "jestjs",
+        "number_of_stars": 42798,
+        "open_issue_count": 436,
+        "language": "TypeScript",
+        "number_of_commits": 7001,
+        "num_pull_requests": 6961
+    },
+    {
+        "repo_name": "react-native",
+        "owner": "facebook",
+        "number_of_stars": 112309,
+        "open_issue_count": 1629,
+        "language": "Java",
+        "number_of_commits": 29273,
+        "num_pull_requests": 14284
+    },
+    {
+        "repo_name": "d3",
+        "owner": "d3",
+        "number_of_stars": 106386,
+        "open_issue_count": 7,
+        "language": "Shell",
+        "number_of_commits": 4472,
+        "num_pull_requests": 1151
+    },
+    {
+        "repo_name": "pandas",
+        "owner": "pandas-dev",
+        "number_of_stars": 39938,
+        "open_issue_count": 3640,
+        "language": "Python",
+        "number_of_commits": 33411,
+        "num_pull_requests": 30097
+    },
+    {
+        "repo_name": "numpy",
+        "owner": "numpy",
+        "number_of_stars": 24689,
+        "open_issue_count": 2187,
+        "language": "Python",
+        "number_of_commits": 33734,
+        "num_pull_requests": 13000
+    },
+    {
+        "repo_name": "three.js",
+        "owner": "mrdoob",
+        "number_of_stars": 94875,
+        "open_issue_count": 530,
+        "language": "JavaScript",
+        "number_of_commits": 42181,
+        "num_pull_requests": 14790
+    },
+    {
+        "repo_name": "terraform",
+        "owner": "hashicorp",
+        "number_of_stars": 38981,
+        "open_issue_count": 1902,
+        "language": "Go",
+        "number_of_commits": 31669,
+        "num_pull_requests": 13504
+    },
+    {
+        "repo_name": "transformers",
+        "owner": "huggingface",
+        "number_of_stars": 112960,
+        "open_issue_count": 903,
+        "language": "Python",
+        "number_of_commits": 14146,
+        "num_pull_requests": 13391
+    },
+    {
+        "repo_name": "grafana",
+        "owner": "grafana",
+        "number_of_stars": 57427,
+        "open_issue_count": 4000,
+        "language": "TypeScript",
+        "number_of_commits": 45645,
+        "num_pull_requests": 41367
+    },
+    {
+        "repo_name": "notebook",
+        "owner": "jupyter",
+        "number_of_stars": 10552,
+        "open_issue_count": 1996,
+        "language": "Jupyter Notebook",
+        "number_of_commits": 13454,
+        "num_pull_requests": 2315
+    },
+    {
+        "repo_name": "WordPress",
+        "owner": "WordPress",
+        "number_of_stars": 18024,
+        "open_issue_count": 2,
+        "language": "PHP",
+        "number_of_commits": 48425,
+        "num_pull_requests": 653
+    },
+    {
+        "repo_name": "obs-studio",
+        "owner": "obsproject",
+        "number_of_stars": 50624,
+        "open_issue_count": 608,
+        "language": "C",
+        "number_of_commits": 13467,
+        "num_pull_requests": 5961
+    },
+    {
+        "repo_name": "FFmpeg",
+        "owner": "FFmpeg",
+        "number_of_stars": 38738,
+        "open_issue_count": 3,
+        "language": "C",
+        "number_of_commits": 112395,
+        "num_pull_requests": 382
+    },
+    {
+        "repo_name": "bootstrap",
+        "owner": "twbs",
+        "number_of_stars": 165527,
+        "open_issue_count": 492,
+        "language": "JavaScript",
+        "number_of_commits": 22586,
+        "num_pull_requests": 14858
+    },
+    {
+        "repo_name": "flutter",
+        "owner": "flutter",
+        "number_of_stars": 157170,
+        "open_issue_count": 11839,
+        "language": "Dart",
+        "number_of_commits": 37263,
+        "num_pull_requests": 47828
+    },
+    {
+        "repo_name": "AutoGPT",
+        "owner": "Significant-Gravitas",
+        "number_of_stars": 150111,
+        "open_issue_count": 243,
+        "language": "JavaScript",
+        "number_of_commits": 4524,
+        "num_pull_requests": 2548
+    },
+    {
+        "repo_name": "youtube-dl",
+        "owner": "ytdl-org",
+        "number_of_stars": 123804,
+        "open_issue_count": 4332,
+        "language": "Python",
+        "number_of_commits": 18782,
+        "num_pull_requests": 4871
+    },
+    {
+        "repo_name": "go",
+        "owner": "golang",
+        "number_of_stars": 114877,
+        "open_issue_count": 8710,
+        "language": "Go",
+        "number_of_commits": 58158,
+        "num_pull_requests": 3336
+    },
+    {
+        "repo_name": "next.js",
+        "owner": "vercel",
+        "number_of_stars": 112771,
+        "open_issue_count": 2559,
+        "language": "JavaScript",
+        "number_of_commits": 17826,
+        "num_pull_requests": 18078
+    },
+    {
+        "repo_name": "kubernetes",
+        "owner": "kubernetes",
+        "number_of_stars": 102142,
+        "open_issue_count": 2857,
+        "language": "Go",
+        "number_of_commits": 118724,
+        "num_pull_requests": 76813
+    },
+    {
+        "repo_name": "angular",
+        "owner": "angular",
+        "number_of_stars": 90586,
+        "open_issue_count": 1569,
+        "language": "TypeScript",
+        "number_of_commits": 28104,
+        "num_pull_requests": 25137
+    },
+    {
+        "repo_name": "webpack",
+        "owner": "webpack",
+        "number_of_stars": 63582,
+        "open_issue_count": 337,
+        "language": "JavaScript",
+        "number_of_commits": 16337,
+        "num_pull_requests": 6461
+    },
+    {
+        "repo_name": "yarn",
+        "owner": "yarnpkg",
+        "number_of_stars": 41272,
+        "open_issue_count": 1983,
+        "language": "JavaScript",
+        "number_of_commits": 2353,
+        "num_pull_requests": 2283
+    },
+    {
+        "repo_name": "ant-design",
+        "owner": "ant-design",
+        "number_of_stars": 87778,
+        "open_issue_count": 1008,
+        "language": "TypeScript",
+        "number_of_commits": 26262,
+        "num_pull_requests": 15376
+    },
+    {
+        "repo_name": "laravel",
+        "owner": "laravel",
+        "number_of_stars": 74894,
+        "open_issue_count": 32,
+        "language": "PHP",
+        "number_of_commits": 6919,
+        "num_pull_requests": 4591
+    },
+    {
+        "repo_name": "django",
+        "owner": "django",
+        "number_of_stars": 73411,
+        "open_issue_count": 144,
+        "language": "Python",
+        "number_of_commits": 32063,
+        "num_pull_requests": 17292
+    },
+    {
+        "repo_name": "llama",
+        "owner": "facebookresearch",
+        "number_of_stars": 43134,
+        "open_issue_count": 291,
+        "language": "Python",
+        "number_of_commits": 99,
+        "num_pull_requests": 138
+    },
+    {
+        "repo_name": "svelte",
+        "owner": "sveltejs",
+        "number_of_stars": 72970,
+        "open_issue_count": 904,
+        "language": "JavaScript",
+        "number_of_commits": 7521,
+        "num_pull_requests": 3752
+    },
+    {
+        "repo_name": "gin",
+        "owner": "gin-gonic",
+        "number_of_stars": 71874,
+        "open_issue_count": 756,
+        "language": "Go",
+        "number_of_commits": 1699,
+        "num_pull_requests": 1629
+    },
+    {
+        "repo_name": "pytorch",
+        "owner": "pytorch",
+        "number_of_stars": 71409,
+        "open_issue_count": 12785,
+        "language": "Python",
+        "number_of_commits": 64895,
+        "num_pull_requests": 73773
+    },
+    {
+        "repo_name": "nvm",
+        "owner": "nvm-sh",
+        "number_of_stars": 70641,
+        "open_issue_count": 400,
+        "language": "Shell",
+        "number_of_commits": 2146,
+        "num_pull_requests": 1041
+    },
+    {
+        "repo_name": "tauri",
+        "owner": "tauri-apps",
+        "number_of_stars": 69062,
+        "open_issue_count": 609,
+        "language": "Rust",
+        "number_of_commits": 3933,
+        "num_pull_requests": 3782
+    },
+    {
+        "repo_name": "json-server",
+        "owner": "typicode",
+        "number_of_stars": 68738,
+        "open_issue_count": 671,
+        "language": "JavaScript",
+        "number_of_commits": 875,
+        "num_pull_requests": 373
+    },
+    {
+        "repo_name": "moby",
+        "owner": "moby",
+        "number_of_stars": 66747,
+        "open_issue_count": 3299,
+        "language": "Go",
+        "number_of_commits": 47684,
+        "num_pull_requests": 24062
+    },
+    {
+        "repo_name": "elasticsearch",
+        "owner": "elastic",
+        "number_of_stars": 65342,
+        "open_issue_count": 4494,
+        "language": "Java",
+        "number_of_commits": 72451,
+        "num_pull_requests": 67013
+    },
+    {
+        "repo_name": "node",
+        "owner": "base-org",
+        "number_of_stars": 63698,
+        "open_issue_count": 3,
+        "language": "Shell",
+        "number_of_commits": 66,
+        "num_pull_requests": 69
+    },
+    {
+        "repo_name": "fastapi",
+        "owner": "tiangolo",
+        "number_of_stars": 63251,
+        "open_issue_count": 529,
+        "language": "Python",
+        "number_of_commits": 3249,
+        "num_pull_requests": 2686
+    },
+    {
+        "repo_name": "redis",
+        "owner": "redis",
+        "number_of_stars": 61731,
+        "open_issue_count": 2505,
+        "language": "C",
+        "number_of_commits": 11863,
+        "num_pull_requests": 6177
+    },
+    {
+        "repo_name": "redux",
+        "owner": "reduxjs",
+        "number_of_stars": 59970,
+        "open_issue_count": 51,
+        "language": "TypeScript",
+        "number_of_commits": 3808,
+        "num_pull_requests": 2469
+    },
+    {
+        "repo_name": "apollo-client",
+        "owner": "apollographql",
+        "number_of_stars": 18954,
+        "open_issue_count": 515,
+        "language": "TypeScript",
+        "number_of_commits": 12021,
+        "num_pull_requests": 5961
+    },
+    {
+        "repo_name": "Signal-Android",
+        "owner": "signalapp",
+        "number_of_stars": 24098,
+        "open_issue_count": 314,
+        "language": "Java",
+        "number_of_commits": 13463,
+        "num_pull_requests": 2701
+    },
+    {
+        "repo_name": "jitsi-meet",
+        "owner": "jitsi",
+        "number_of_stars": 20408,
+        "open_issue_count": 289,
+        "language": "TypeScript",
+        "number_of_commits": 11793,
+        "num_pull_requests": 8006
+    },
+    {
+        "repo_name": "tmux",
+        "owner": "tmux",
+        "number_of_stars": 30535,
+        "open_issue_count": 34,
+        "language": "C",
+        "number_of_commits": 10136,
+        "num_pull_requests": 555
+    },
+    {
+        "repo_name": "neovim",
+        "owner": "neovim",
+        "number_of_stars": 69987,
+        "open_issue_count": 1666,
+        "language": "Vim Script",
+        "number_of_commits": 27320,
+        "num_pull_requests": 15077
+    },
+    {
+        "repo_name": "vault",
+        "owner": "hashicorp",
+        "number_of_stars": 28486,
+        "open_issue_count": 1244,
+        "language": "Go",
+        "number_of_commits": 18329,
+        "num_pull_requests": 17731
+    },
+    {
+        "repo_name": "express",
+        "owner": "expressjs",
+        "number_of_stars": 62037,
+        "open_issue_count": 187,
+        "language": "JavaScript",
+        "number_of_commits": 5779,
+        "num_pull_requests": 1191
+    },
+    {
+        "repo_name": "spring-boot",
+        "owner": "spring-projects",
+        "number_of_stars": 69591,
+        "open_issue_count": 656,
+        "language": "Java",
+        "number_of_commits": 45478,
+        "num_pull_requests": 5885
+    },
+    {
+        "repo_name": "hugo",
+        "owner": "gohugoio",
+        "number_of_stars": 69308,
+        "open_issue_count": 652,
+        "language": "Go",
+        "number_of_commits": 7895,
+        "num_pull_requests": 4655
+    },
+    {
+        "repo_name": "jquery",
+        "owner": "jquery",
+        "number_of_stars": 57863,
+        "open_issue_count": 90,
+        "language": "JavaScript",
+        "number_of_commits": 6647,
+        "num_pull_requests": 2901
+    },
+    {
+        "repo_name": "gatsby",
+        "owner": "gatsbyjs",
+        "number_of_stars": 54752,
+        "open_issue_count": 300,
+        "language": "JavaScript",
+        "number_of_commits": 21551,
+        "num_pull_requests": 21908
+    },
+    {
+        "repo_name": "strapi",
+        "owner": "strapi",
+        "number_of_stars": 56481,
+        "open_issue_count": 506,
+        "language": "JavaScript",
+        "number_of_commits": 32967,
+        "num_pull_requests": 8961
+    },
+    {
+        "repo_name": "excalidraw",
+        "owner": "excalidraw",
+        "number_of_stars": 55944,
+        "open_issue_count": 1262,
+        "language": "TypeScript",
+        "number_of_commits": 3212,
+        "num_pull_requests": 4100
+    },
+    {
+        "repo_name": "fzf",
+        "owner": "junegunn",
+        "number_of_stars": 54672,
+        "open_issue_count": 349,
+        "language": "Go",
+        "number_of_commits": 2446,
+        "num_pull_requests": 785
+    },
+    {
+        "repo_name": "syncthing",
+        "owner": "syncthing",
+        "number_of_stars": 54659,
+        "open_issue_count": 326,
+        "language": "Go",
+        "number_of_commits": 7255,
+        "num_pull_requests": 3902
+    },
+    {
+        "repo_name": "superset",
+        "owner": "apache",
+        "number_of_stars": 54699,
+        "open_issue_count": 1540,
+        "language": "TypeScript",
+        "number_of_commits": 14014,
+        "num_pull_requests": 14169
+    },
+    {
+        "repo_name": "spring-framework",
+        "owner": "spring-projects",
+        "number_of_stars": 53316,
+        "open_issue_count": 862,
+        "language": "Java",
+        "number_of_commits": 28195,
+        "num_pull_requests": 4431
+    },
+    {
+        "repo_name": "Semantic-UI",
+        "owner": "Semantic-Org",
+        "number_of_stars": 50783,
+        "open_issue_count": 1078,
+        "language": "JavaScript",
+        "number_of_commits": 6747,
+        "num_pull_requests": 879
+    },
+    {
+        "repo_name": "imgui",
+        "owner": "ocornut",
+        "number_of_stars": 50861,
+        "open_issue_count": 918,
+        "language": "C++",
+        "number_of_commits": 7570,
+        "num_pull_requests": 1170
+    },
+    {
+        "repo_name": "obs-studio",
+        "owner": "obsproject",
+        "number_of_stars": 50624,
+        "open_issue_count": 608,
+        "language": "C",
+        "number_of_commits": 13467,
+        "num_pull_requests": 5961
+    },
+    {
+        "repo_name": "requests",
+        "owner": "psf",
+        "number_of_stars": 50388,
+        "open_issue_count": 261,
+        "language": "Python",
+        "number_of_commits": 6191,
+        "num_pull_requests": 2433
+    },
+    {
+        "repo_name": "prometheus",
+        "owner": "prometheus",
+        "number_of_stars": 50160,
+        "open_issue_count": 908,
+        "language": "Go",
+        "number_of_commits": 11691,
+        "num_pull_requests": 7300
+    },
+    {
+        "repo_name": "ionic-framework",
+        "owner": "ionic-team",
+        "number_of_stars": 49487,
+        "open_issue_count": 444,
+        "language": "TypeScript",
+        "number_of_commits": 13205,
+        "num_pull_requests": 6846
+    },
+    {
+        "repo_name": "scrapy",
+        "owner": "scrapy",
+        "number_of_stars": 48746,
+        "open_issue_count": 714,
+        "language": "Python",
+        "number_of_commits": 10143,
+        "num_pull_requests": 3154
+    },
+    {
+        "repo_name": "bulma",
+        "owner": "jgthms",
+        "number_of_stars": 47569,
+        "open_issue_count": 381,
+        "language": "CSS",
+        "number_of_commits": 1742,
+        "num_pull_requests": 1135
+    },
+    {
+        "repo_name": "rustdesk",
+        "owner": "rustdesk",
+        "number_of_stars": 47955,
+        "open_issue_count": 74,
+        "language": "Rust",
+        "number_of_commits": 7735,
+        "num_pull_requests": 2146
+    },
+    {
+        "repo_name": "Real-Time-Voice-Cloning",
+        "owner": "CorentinJ",
+        "number_of_stars": 47901,
+        "open_issue_count": 170,
+        "language": "Python",
+        "number_of_commits": 296,
+        "num_pull_requests": 123
+    },
+    {
+        "repo_name": "kotlin",
+        "owner": "JetBrains",
+        "number_of_stars": 45958,
+        "open_issue_count": 165,
+        "language": "Kotlin",
+        "number_of_commits": 105121,
+        "num_pull_requests": 5165
+    },
+    {
+        "repo_name": "etcd",
+        "owner": "etcd-io",
+        "number_of_stars": 44635,
+        "open_issue_count": 235,
+        "language": "Go",
+        "number_of_commits": 20356,
+        "num_pull_requests": 10101
+    },
+    {
+        "repo_name": "Ghost",
+        "owner": "TryGhost",
+        "number_of_stars": 44154,
+        "open_issue_count": 139,
+        "language": "JavaScript",
+        "number_of_commits": 36884,
+        "num_pull_requests": 11740
+    },
+    {
+        "repo_name": "DeepFaceLab",
+        "owner": "iperov",
+        "number_of_stars": 42760,
+        "open_issue_count": 541,
+        "language": "Python",
+        "number_of_commits": 1313,
+        "num_pull_requests": 130
+    },
+    {
+        "repo_name": "retrofit",
+        "owner": "square",
+        "number_of_stars": 42041,
+        "open_issue_count": 190,
+        "language": "Java",
+        "number_of_commits": 2093,
+        "num_pull_requests": 1234
+    },
+    {
+        "repo_name": "yolov5",
+        "owner": "ultralytics",
+        "number_of_stars": 42057,
+        "open_issue_count": 222,
+        "language": "Python",
+        "number_of_commits": 2710,
+        "num_pull_requests": 2539
+    },
+    {
+        "repo_name": "hyper",
+        "owner": "vercel",
+        "number_of_stars": 41585,
+        "open_issue_count": 877,
+        "language": "TypeScript",
+        "number_of_commits": 3815,
+        "num_pull_requests": 3697
+    },
+    {
+        "repo_name": "marktext",
+        "owner": "marktext",
+        "number_of_stars": 41634,
+        "open_issue_count": 1047,
+        "language": "JavaScript",
+        "number_of_commits": 1605,
+        "num_pull_requests": 1061
+    },
+    {
+        "repo_name": "bypass-paywalls-chrome",
+        "owner": "iamadamdev",
+        "number_of_stars": 41535,
+        "open_issue_count": 0,
+        "language": "JavaScript",
+        "number_of_commits": 624,
+        "num_pull_requests": 194
+    },
+    {
+        "repo_name": "llama.cpp",
+        "owner": "ggerganov",
+        "number_of_stars": 41890,
+        "open_issue_count": 609,
+        "language": "C",
+        "number_of_commits": 1354,
+        "num_pull_requests": 1514
+    },
+    {
+        "repo_name": "PowerShell",
+        "owner": "PowerShell",
+        "number_of_stars": 41068,
+        "open_issue_count": 3549,
+        "language": "C#",
+        "number_of_commits": 10300,
+        "num_pull_requests": 8024
+    },
+    {
+        "repo_name": "rclone",
+        "owner": "rclone",
+        "number_of_stars": 40637,
+        "open_issue_count": 912,
+        "language": "Go",
+        "number_of_commits": 7416,
+        "num_pull_requests": 2244
+    },
+    {
+        "repo_name": "pandas",
+        "owner": "pandas-dev",
+        "number_of_stars": 39938,
+        "open_issue_count": 3640,
+        "language": "Python",
+        "number_of_commits": 33411,
+        "num_pull_requests": 30097
+    },
+    {
+        "repo_name": "Alamofire",
+        "owner": "Alamofire",
+        "number_of_stars": 39831,
+        "open_issue_count": 36,
+        "language": "Swift",
+        "number_of_commits": 1610,
+        "num_pull_requests": 1053
+    },
+    {
+        "repo_name": "dubbo",
+        "owner": "apache",
+        "number_of_stars": 39425,
+        "open_issue_count": 1012,
+        "language": "Java",
+        "number_of_commits": 7125,
+        "num_pull_requests": 6540
+    },
+    {
+        "repo_name": "huginn",
+        "owner": "huginn",
+        "number_of_stars": 39466,
+        "open_issue_count": 701,
+        "language": "Ruby",
+        "number_of_commits": 3669,
+        "num_pull_requests": 1240
+    },
+    {
+        "repo_name": "hackingtool",
+        "owner": "Z4nzu",
+        "number_of_stars": 39361,
+        "open_issue_count": 22,
+        "language": "Python",
+        "number_of_commits": 323,
+        "num_pull_requests": 98
+    },
+    {
+        "repo_name": "meilisearch",
+        "owner": "meilisearch",
+        "number_of_stars": 39091,
+        "open_issue_count": 143,
+        "language": "Rust",
+        "number_of_commits": 8504,
+        "num_pull_requests": 1699
+    },
+    {
+        "repo_name": "materialize",
+        "owner": "Dogfalo",
+        "number_of_stars": 38836,
+        "open_issue_count": 798,
+        "language": "JavaScript",
+        "number_of_commits": 3878,
+        "num_pull_requests": 1442
+    },
+    {
+        "repo_name": "mastodon",
+        "owner": "mastodon",
+        "number_of_stars": 44252,
+        "open_issue_count": 4241,
+        "language": "Ruby",
+        "number_of_commits": 14486,
+        "num_pull_requests": 15368
+    },
+    {
+        "repo_name": "pdf.js",
+        "owner": "mozilla",
+        "number_of_stars": 44015,
+        "open_issue_count": 356,
+        "language": "JavaScript",
+        "number_of_commits": 18020,
+        "num_pull_requests": 7803
+    },
+    {
+        "repo_name": "meteor",
+        "owner": "meteor",
+        "number_of_stars": 43772,
+        "open_issue_count": 275,
+        "language": "JavaScript",
+        "number_of_commits": 34020,
+        "num_pull_requests": 3657
+    },
+    {
+        "repo_name": "go-ethereum",
+        "owner": "ethereum",
+        "number_of_stars": 43754,
+        "open_issue_count": 365,
+        "language": "Go",
+        "number_of_commits": 14561,
+        "num_pull_requests": 9278
+    },
+    {
+        "repo_name": "act",
+        "owner": "nektos",
+        "number_of_stars": 43890,
+        "open_issue_count": 177,
+        "language": "Go",
+        "number_of_commits": 1004,
+        "num_pull_requests": 923
+    },
+    {
+        "repo_name": "pi-hole",
+        "owner": "pi-hole",
+        "number_of_stars": 43602,
+        "open_issue_count": 46,
+        "language": "Shell",
+        "number_of_commits": 5760,
+        "num_pull_requests": 2347
+    },
+    {
+        "repo_name": "julia",
+        "owner": "JuliaLang",
+        "number_of_stars": 43312,
+        "open_issue_count": 4844,
+        "language": "Julia",
+        "number_of_commits": 55381,
+        "num_pull_requests": 27523
+    },
+    {
+        "repo_name": "drawio-desktop",
+        "owner": "jgraph",
+        "number_of_stars": 43061,
+        "open_issue_count": 152,
+        "language": "JavaScript",
+        "number_of_commits": 694,
+        "num_pull_requests": 31
+    },
+    {
+        "repo_name": "parcel",
+        "owner": "parcel-bundler",
+        "number_of_stars": 42727,
+        "open_issue_count": 747,
+        "language": "JavaScript",
+        "number_of_commits": 3019,
+        "num_pull_requests": 2919
+    },
+    {
+        "repo_name": "openpilot",
+        "owner": "commaai",
+        "number_of_stars": 42339,
+        "open_issue_count": 307,
+        "language": "Python",
+        "number_of_commits": 10838,
+        "num_pull_requests": 10725
+    },
+    {
+        "repo_name": "x64dbg",
+        "owner": "x64dbg",
+        "number_of_stars": 41725,
+        "open_issue_count": 567,
+        "language": "C++",
+        "number_of_commits": 5228,
+        "num_pull_requests": 804
+    }
+]

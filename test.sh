@@ -12,6 +12,8 @@ if [ "$HOSTNAME" != "boston-2-7" ]; then
     exit 1
 fi
 
+ll
+
 cd /ssd/ssg2
 echo "($HOSTNAME) Current directory: $PWD"
 echo "Current files: in $PWD"

@@ -1,3 +1,5 @@
+logs/
+profiling/
 test/
 tmp/
 index/
