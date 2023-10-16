@@ -38,7 +38,7 @@ def fetch_most_starred_repos(page_number, star_range):
 
 
 def is_valid_language(repo):
-    with open("programming_languages.json", "r") as file:
+    with open("../misc/programming_languages.json", "r") as file:
         valid_languages = json.load(file)
     return repo["language"] and repo["language"].lower() in valid_languages
 

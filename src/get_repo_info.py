@@ -74,14 +74,14 @@ def fetch_repo_details(repo_name):
 
 
 def main():
-    with open("top_repos.txt", "r") as file:
+    with open("../misc/top_repos.txt", "r") as file:
         repo_list = file.read().splitlines()
 
     repo_details_list = []
     for repo in tqdm(repo_list, desc="Fetching repo details"):
         repo_details_list.append(fetch_repo_details(repo))
 
-    with open("repo_info.json", "w") as json_file:
+    with open("../misc/repo_info.json", "w") as json_file:
         json.dump(repo_details_list, json_file, indent=4)
 
 

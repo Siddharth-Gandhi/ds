@@ -4,7 +4,6 @@ test/
 tmp/
 index/
 data_test/
-misc/
 repos/
 repos/*
 repos/**/*

@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 code_extensions = set(
-    json.load(open(os.path.join(BASE_DIR, "code_extensions.json"), "r"))
+    json.load(open(os.path.join(BASE_DIR, "../misc/code_extensions.json"), "r"))
 )
 # CHUNK_SIZE = 1000
 
@@ -285,8 +285,8 @@ def scrape_repository(repo_path):
 
 
 def main():
-    if not os.path.exists("data"):
-        os.makedirs("data")
+    if not os.path.exists("../data"):
+        os.makedirs("../data")
 
     with open(os.path.join(BASE_DIR, args.file_path), "r") as f:
         repos = f.read().splitlines()[args.start_index : args.end_index + 1]

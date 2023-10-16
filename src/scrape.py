@@ -23,7 +23,7 @@ request_count = 0
 total_commit_count = 0
 stored_commit_count = 0
 
-code_extensions = set(json.load(open("code_extensions.json", "r")))
+code_extensions = set(json.load(open("../misc/code_extensions.json", "r")))
 
 
 # def get_commits(repo_path):
@@ -235,8 +235,8 @@ def scrape_repository(repo_path):
     owner, repo_name = repo_path.split("/")
 
     # Ensure the 'data' directory exists
-    if not os.path.exists("data"):
-        os.makedirs("data")
+    if not os.path.exists("../data"):
+        os.makedirs("../data")
 
     commits = get_commits(repo_path)
     data = []
