@@ -62,16 +62,50 @@ def get_all_files_from_tree(tree):
             files.extend(get_all_files_from_tree(item))
     return files
 
+# def get_files_changed_in_commit(commit):
+#     is_merge_request = len(commit.parents) > 1
+
+#     # Check if it's the initial commit
+#     if not commit.parents:
+#         return get_all_files_from_tree(commit.tree), is_merge_request
+
+#     # For other commits, compare with the first parent to get the diff
+#     diff_index = commit.diff(commit.parents[0])
+#     files_changed = [diff.b_path for diff in diff_index]
+
+#     return files_changed, is_merge_request
+
+# def get_files_changed_in_commit(commit):
+#     is_merge_request = len(commit.parents) > 1
+
+#     # If it's the initial commit
+#     if not commit.parents:
+#         return [(file, 'added') for file in get_all_files_from_tree(commit.tree)], is_merge_request
+
+#     # For other commits, compare with the first parent to get the diff
+#     diff_index = commit.diff(commit.parents[0])
+#     files_changed = [(diff.b_path if diff.change_type != 'D' else diff.a_path, diff.change_type) for diff in diff_index]
+
+#     return files_changed, is_merge_request
+
 def get_files_changed_in_commit(commit):
     is_merge_request = len(commit.parents) > 1
 
-    # Check if it's the initial commit
+    # If it's the initial commit
     if not commit.parents:
-        return get_all_files_from_tree(commit.tree), is_merge_request
+        return [(file, 'A') for file in get_all_files_from_tree(commit.tree)], is_merge_request
 
     # For other commits, compare with the first parent to get the diff
-    diff_index = commit.diff(commit.parents[0])
-    files_changed = [diff.b_path for diff in diff_index]
+    # diff_index = commit.diff(commit.parents[0])
+    diff_index = commit.parents[0].diff(commit)
+
+    files_changed = []
+    for diff in diff_index:
+        if diff.change_type == 'R':
+            files_changed.append(((diff.a_path, diff.b_path), diff.change_type))
+        else:
+            path = diff.b_path if diff.change_type != 'D' else diff.a_path
+            files_changed.append((path, diff.change_type))
 
     return files_changed, is_merge_request
 
@@ -98,9 +132,10 @@ def set_dtype(df):
         "commit_id": "string",
         "commit_message": "string",
         "file_path": "string",
-        "previous_commit_id": "string",
-        "previous_file_content": "string",
         "cur_file_content": "string",
+        "previous_commit_id": "string",
+        "previous_file_path": "string",
+        "previous_file_content": "string",
         "diff": "string",
         "status": "category",
         "is_merge_request": "bool",
@@ -130,78 +165,127 @@ def extract_diff_from_at_symbol(diff_string):
     return ""
 
 
-def scrape_repository(repo_path, CHUNK_SIZE):
+def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
     owner, repo_name = repo_path.lower().split("/")
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
     repo = git.Repo(local_path)
 
-    repo.git.checkout("b440ef8c96bb5175b44c275a7b4ed450061e9bae")
-    print(f"Checking out {repo_path} at b440ef8c96bb5175b44c275a7b4ed450061e9bae")
     dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}")
     os.makedirs(dir_path, exist_ok=True)
 
     all_commits = get_all_commits(repo)
-    print('b0a11594aec50892a02cd8d129eee2dfe93a8bb8' in all_commits)
-    data_batch = []
-    batch_num = 0
+    print(f'Found {len(all_commits)} commits in {repo_path}')
 
-    for idx, commit_sha in tqdm(enumerate(all_commits), total=len(all_commits)):
-        if commit_sha == 'b0a11594aec50892a02cd8d129eee2dfe93a8bb8':
-            print('HELLO WORKSDLKN KLSMDFKLSMKLSFMDKLFMSDFLKM')
-        commit = repo.commit(commit_sha)
-        files_changed, is_merge_request = get_files_changed_in_commit(commit)
-        for file_path in files_changed:
-            file_extension = file_path.split(".")[-1]
-            if f".{file_extension}" not in code_extensions:
-                continue
-            try:
-                previous_content = get_file_content_at_commit(
-                    commit, file_path, parent=True
-                )
-                prev_commit = commit.parents[0].hexsha
-            except Exception:
+
+    data_batch = []
+    start_commit_idx = resume_index * CHUNK_SIZE
+    batch_num = resume_index if start_commit_idx != 0 else 0
+
+    if start_commit_idx != 0:
+        print(
+            f"Resuming from batch {batch_num} (commit index: {start_commit_idx})"
+        )
+
+    # set update settings
+    # if total commits < 100, update every 1 commit
+    # if total commits < 1000, update every 10 commits
+    # else update every 100 commits
+
+    update_freq = 1
+    # if len(all_commits) >= 100:
+    #     update_freq = 10
+    # if len(all_commits) >= 1000:
+    #     update_freq = 100
+
+    total_rows = 0
+
+    with tqdm(
+        total=len(all_commits),
+        initial=start_commit_idx,
+        miniters=update_freq,
+    ) as pbar:
+
+        for idx, commit_sha in enumerate(all_commits[start_commit_idx:], start=start_commit_idx):
+            if idx % update_freq == 0:
+                pbar.update(update_freq)
+            commit = repo.commit(commit_sha)
+            files_changed, is_merge_request = get_files_changed_in_commit(commit)
+            for file_info, change_type in files_changed:
+
+                if change_type == 'R':
+                    old_file_path, file_path = file_info
+                else:
+                    old_file_path = None
+                    file_path = file_info
+
+                file_extension = file_path.split(".")[-1]
+                if f".{file_extension}" not in code_extensions:
+                    continue
+
                 previous_content = None
+                new_content = None
                 prev_commit = None
 
-            try:
-                new_content = get_file_content_at_commit(
-                    commit, file_path, parent=False
+                # For added files, we don't need previous content
+                if change_type == 'A':
+                    new_content = get_file_content_at_commit(commit, file_path)
+
+                # For deleted files, we only need the previous content
+                elif change_type == 'D':
+                    previous_content = get_file_content_at_commit(commit, file_path, parent=True)
+                    prev_commit = commit.parents[0].hexsha
+
+                # For modified files, we need both current and previous content
+                elif change_type == 'M':
+                    previous_content = get_file_content_at_commit(commit, file_path, parent=True)
+                    new_content = get_file_content_at_commit(commit, file_path)
+                    prev_commit = commit.parents[0].hexsha
+
+                # For renamed files, handle according to your needs. Here, it assumes content might have changed.
+                elif change_type == 'R':
+                    previous_content = get_file_content_at_commit(commit, old_file_path, parent=True)
+                    new_content = get_file_content_at_commit(commit, file_path)
+                    prev_commit = commit.parents[0].hexsha
+
+                # Calculate diff if previous and new content are available
+                diff = None
+                if previous_content and new_content:
+                    diff = repo.git.diff(commit.parents[0].hexsha, commit.hexsha, "--", file_path)
+                    diff = extract_diff_from_at_symbol(diff)
+
+                # Map the change_type to the appropriate status
+                status_mapping = {'A': 'added', 'D': 'deleted', 'M': 'modified', 'R': 'renamed'}
+                status = status_mapping.get(change_type, 'unknown')
+
+                data_batch.append(
+                    {
+                        "owner": owner,
+                        "repo_name": repo_name,
+                        "commit_date": commit.committed_datetime,
+                        "commit_id": commit.hexsha,
+                        "commit_message": commit.message,
+                        "file_path": file_path,
+                        "cur_file_content": new_content,
+                        "previous_commit_id": prev_commit,
+                        "previous_file_path": old_file_path,
+                        "previous_file_content": previous_content,
+                        "diff": diff,
+                        "status": status,
+                        "is_merge_request": is_merge_request,
+                        "file_extension": file_extension,
+                    }
                 )
-            except Exception:
-                new_content = None
 
-            diff = None
-            if previous_content and new_content:
-                diff = repo.git.diff(commit.parents[0].hexsha, commit.hexsha, "--", file_path)
-                diff = extract_diff_from_at_symbol(diff)
-
-            status = determine_status(previous_content, new_content)
-
-            data_batch.append(
-                {
-                    "owner": owner,
-                    "repo_name": repo_name,
-                    "commit_date": commit.committed_datetime,
-                    "commit_id": commit.hexsha,
-                    "commit_message": commit.message,
-                    "file_path": file_path,
-                    "previous_commit_id": prev_commit,
-                    "previous_file_content": previous_content,
-                    "cur_file_content": new_content,
-                    "diff": diff,
-                    "status": status,
-                    "is_merge_request": is_merge_request,
-                    "file_extension": file_extension,
-                }
-            )
-
-        if (idx + 1) % CHUNK_SIZE == 0:
-            save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
-            data_batch = []
-            batch_num += 1
+            if (idx + 1) % CHUNK_SIZE == 0 and data_batch:
+                save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
+                total_rows += len(data_batch)
+                data_batch = []
+                batch_num += 1
 
     if data_batch:
         save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
+        total_rows += len(data_batch)
+    print(f'Saved {total_rows} rows in total')
 
 
 def main(args):
@@ -220,7 +304,7 @@ def main(args):
             continue
 
         try:
-            scrape_repository(repo, args.chunk_size)
+            scrape_repository(repo, args.chunk_size, args.resume_index)
         except Exception as e:
             print(f"Failed to scrape {repo}")
             print(e)
@@ -248,6 +332,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--chunk_size", type=int, default=1000, help="Number of rows per parquet file"
+    )
+    parser.add_argument(
+        "--resume_index",
+        type=int,
+        default=0,
+        help="Index of the batch to resume from",
     )
 
     args = parser.parse_args()
