@@ -24,15 +24,54 @@ def get_all_commits(repo):
     return [commit.hexsha for commit in repo.iter_commits()]
 
 
+# def get_files_changed_in_commit(commit):
+#     files_changed = []
+#     is_merge_request = len(commit.parents) > 1
+
+#     # If the commit has a parent, compare it with its first parent
+#     if commit.parents:
+#         diff_index = commit.diff(commit.parents[0])
+#         for diff in diff_index:
+#             files_changed.append(diff.b_path)
+
+#     return files_changed, is_merge_request
+
+
+# V2
+# def get_files_changed_in_commit(commit):
+#     files_changed = []
+#     is_merge_request = len(commit.parents) > 1
+
+#     # Check if it's the initial commit
+#     if not commit.parents:
+#         return [item.path for item in commit.tree], is_merge_request
+
+#     # For other commits, compare with the first parent to get the diff
+#     diff_index = commit.diff(commit.parents[0])
+#     for diff in diff_index:
+#         files_changed.append(diff.b_path)
+
+#     return files_changed, is_merge_request
+
+def get_all_files_from_tree(tree):
+    files = []
+    for item in tree:
+        if item.type == 'blob':
+            files.append(item.path)
+        elif item.type == 'tree':
+            files.extend(get_all_files_from_tree(item))
+    return files
+
 def get_files_changed_in_commit(commit):
-    files_changed = []
     is_merge_request = len(commit.parents) > 1
 
-    # If the commit has a parent, compare it with its first parent
-    if commit.parents:
-        diff_index = commit.diff(commit.parents[0])
-        for diff in diff_index:
-            files_changed.append(diff.b_path)
+    # Check if it's the initial commit
+    if not commit.parents:
+        return get_all_files_from_tree(commit.tree), is_merge_request
+
+    # For other commits, compare with the first parent to get the diff
+    diff_index = commit.diff(commit.parents[0])
+    files_changed = [diff.b_path for diff in diff_index]
 
     return files_changed, is_merge_request
 
@@ -96,16 +135,19 @@ def scrape_repository(repo_path, CHUNK_SIZE):
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
     repo = git.Repo(local_path)
 
+    repo.git.checkout("b440ef8c96bb5175b44c275a7b4ed450061e9bae")
+    print(f"Checking out {repo_path} at b440ef8c96bb5175b44c275a7b4ed450061e9bae")
     dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}")
     os.makedirs(dir_path, exist_ok=True)
 
     all_commits = get_all_commits(repo)
+    print('b0a11594aec50892a02cd8d129eee2dfe93a8bb8' in all_commits)
     data_batch = []
     batch_num = 0
 
     for idx, commit_sha in tqdm(enumerate(all_commits), total=len(all_commits)):
-        if commit_sha == 'eff1c1b425fca99cfacb8fcfda0a51277588e3ac':
-            print('hello')
+        if commit_sha == 'b0a11594aec50892a02cd8d129eee2dfe93a8bb8':
+            print('HELLO WORKSDLKN KLSMDFKLSMKLSFMDKLFMSDFLKM')
         commit = repo.commit(commit_sha)
         files_changed, is_merge_request = get_files_changed_in_commit(commit)
         for file_path in files_changed:

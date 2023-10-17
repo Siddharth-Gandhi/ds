@@ -23,6 +23,8 @@ source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ds
 
 echo "($HOSTNAME) Current directory: $PWD"
+
+pwd
 # ls -l
 
 which python
@@ -31,9 +33,10 @@ which python
 # cp clone_repos.py /ssd/ssg2
 
 # copy dependencies to /ssd/ssg2 (overwriting if necessary) for scrape_local.py
-cp test_repos.txt /ssd/ramdisk
-cp scrape_local.py /ssd/ramdisk
-cp code_extensions.json /ssd/ramdisk
+# cp misc/test.txt /ssd/ramdisk
+cp src/scrape_local_v2.py /ssd/ramdisk
+# cp misc/code_extensions.json /ssd/ramdisk
+cp misc/ /ssd/ramdisk -r
 
 echo "Changing directory to /ssd/ramdisk"
 cd /ssd/ramdisk
@@ -51,7 +54,7 @@ echo "Running scrape_local.py"
 # Check resources allocated to this job (CPU, memory, disk space)
 # scontrol show job $SLURM_JOB_ID
 # sleep for 10 seconds
-FILE_PATH=test_repos.txt
+FILE_PATH=test.txt
 TOTAL_ITEMS=$(grep -v "^[[:space:]]*$" $FILE_PATH | wc -l)
 
 
@@ -76,4 +79,4 @@ echo "Task ID: $SLURM_ARRAY_TASK_ID, Start Index: $START_INDEX, End Index: $END_
 
 
 # python clone_repos.py test_repos.txt 0 $num_lines (chunk size is 1000 by default)
-srun --wait=0 python -u scrape_local.py --file_path $FILE_PATH --start_index $START_INDEX --end_index $END_INDEX
+srun --wait=0 python -u scrape_local_v2.py $FILE_PATH  $START_INDEX $END_INDEX
