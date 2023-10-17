@@ -110,14 +110,14 @@ def process_commit(commit, local_path, owner, repo_name):
                 commit, file, parent=True, local_path=local_path
             )
             prev_commit = get_previous_commit(commit, local_path=local_path)
-        except FileNotFoundError:
+        except Exception:
             previous_content = None
             prev_commit = None
         try:
             new_content = get_file_content_at_commit(
                 commit, file, parent=False, local_path=local_path
             )
-        except FileNotFoundError:
+        except Exception:
             new_content = None
         diff = None
         if previous_content and new_content:
