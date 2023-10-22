@@ -1,11 +1,6 @@
 import argparse
-import cProfile
 import json
 import os
-import pstats
-
-# import subprocess
-# import time
 import traceback
 
 import git
@@ -176,12 +171,14 @@ def extract_diff_from_at_symbol(diff_string):
     return ""
 
 
-def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
+def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0, save_dir=None):
     owner, repo_name = repo_path.lower().split("/")
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
     repo = git.Repo(local_path)
 
     dir_path = os.path.join(BASE_DIR, f"data/{owner}_{repo_name}")
+    if save_dir:
+        dir_path = os.path.join(BASE_DIR, save_dir)
     os.makedirs(dir_path, exist_ok=True)
 
     all_commits = get_all_commits(repo)
@@ -209,6 +206,7 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
         update_freq = 100
 
     total_rows = 0
+    fileCount = 0
 
     with tqdm(
         total=len(all_commits),
@@ -219,8 +217,6 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
         for idx, commit_sha in enumerate(all_commits[start_commit_idx:], start=start_commit_idx):
             if idx % update_freq == 0:
                 pbar.update(update_freq)
-            if commit_sha == 'a63d9edcfb8a714a17492517927aa114dea8fea0':
-                print('debug')
             commit = repo.commit(commit_sha)
             files_changed, is_merge_request = get_files_changed_in_commit(commit)
             for file_info, change_type in files_changed:
@@ -234,6 +230,8 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
                 file_extension = file_path.split(".")[-1]
                 if f".{file_extension}" not in code_extensions:
                     continue
+
+                fileCount += 1
 
                 previous_content = None
                 new_content = None
@@ -302,6 +300,7 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
         save_to_parquet(data_batch, owner, repo_name, batch_num, dir_path)
         total_rows += len(data_batch)
     print(f'Saved {total_rows} rows in total')
+    print(f'Found {fileCount} files in total')
 
 
 def main(args):
@@ -320,7 +319,7 @@ def main(args):
             continue
 
         try:
-            scrape_repository(repo, args.chunk_size, args.resume_index)
+            scrape_repository(repo, args.chunk_size, args.resume_index, args.save_dir)
         except Exception as e:
             print(f"Failed to scrape {repo}")
             print(e)
@@ -354,6 +353,13 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="Index of the batch to resume from",
+    )
+
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default=None,
+        help="Directory to save the parquet files",
     )
 
     args = parser.parse_args()
