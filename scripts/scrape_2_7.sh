@@ -7,7 +7,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=3
 #SBATCH --mem=8G
-#SBATCH --array=0-3
+#SBATCH --array=0-1
 #SBATCH --nodelist=boston-2-7
 #SBATCH --time=12:00:00
 
@@ -31,9 +31,12 @@ which python
 # cp clone_repos.py /ssd/ssg2
 
 # copy dependencies to /ssd/ssg2 (overwriting if necessary) for scrape_local.py
-cp test_repos.txt /ssd/ssg2
-cp scrape_local.py /ssd/ssg2
-cp code_extensions.json /ssd/ssg2
+# cp test_repos.txt /ssd/ssg2
+# cp scrape_local.py /ssd/ssg2
+# cp code_extensions.json /ssd/ssg2
+
+cp misc/ /ssd/ssg2 -r
+cp src/ /ssd/ssg2 -r
 
 echo "Changing directory to /ssd/ssg2"
 cd /ssd/ssg2
@@ -51,7 +54,7 @@ echo "Running scrape_local.py"
 # Check resources allocated to this job (CPU, memory, disk space)
 # scontrol show job $SLURM_JOB_ID
 # sleep for 10 seconds
-FILE_PATH=test_repos.txt
+FILE_PATH=misc/test_repos.txt
 TOTAL_ITEMS=$(grep -v "^[[:space:]]*$" $FILE_PATH | wc -l)
 
 
@@ -76,4 +79,4 @@ echo "Task ID: $SLURM_ARRAY_TASK_ID, Start Index: $START_INDEX, End Index: $END_
 
 
 # python clone_repos.py test_repos.txt 0 $num_lines (chunk size is 1000 by default)
-srun --wait=0 python -u scrape_local.py --file_path $FILE_PATH --start_index $START_INDEX --end_index $END_INDEX
+srun --wait=0 python -u src/scrape_local_v3.py $FILE_PATH $START_INDEX $END_INDEX

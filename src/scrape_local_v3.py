@@ -109,9 +109,20 @@ def get_files_changed_in_commit(commit):
 
     return files_changed, is_merge_request
 
+# def get_file_content_at_commit(commit, file_path, parent=False):
+#     target_commit = commit.parents[0] if parent else commit
+#     return target_commit.tree[file_path].data_stream.read().decode()
+
 def get_file_content_at_commit(commit, file_path, parent=False):
     target_commit = commit.parents[0] if parent else commit
-    return target_commit.tree[file_path].data_stream.read().decode()
+    byte_content = target_commit.tree[file_path].data_stream.read()
+
+    try:
+        decoded_content = byte_content.decode('utf-8')
+        return decoded_content
+    except Exception:
+        print(f"Skipping {file_path} at commit {commit.hexsha} as it's not UTF-8 encoded.")
+        return None
 
 def determine_status(previous_content, new_content):
     if not previous_content and new_content:
@@ -192,10 +203,10 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
     # else update every 100 commits
 
     update_freq = 1
-    # if len(all_commits) >= 100:
-    #     update_freq = 10
-    # if len(all_commits) >= 1000:
-    #     update_freq = 100
+    if len(all_commits) >= 100:
+        update_freq = 10
+    if len(all_commits) >= 1000:
+        update_freq = 100
 
     total_rows = 0
 
@@ -252,6 +263,9 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
                 if previous_content and new_content:
                     diff = repo.git.diff(commit.parents[0].hexsha, commit.hexsha, "--", file_path)
                     diff = extract_diff_from_at_symbol(diff)
+
+                if not new_content and not previous_content:
+                    continue
 
                 # Map the change_type to the appropriate status
                 status_mapping = {'A': 'added', 'D': 'deleted', 'M': 'modified', 'R': 'renamed'}
