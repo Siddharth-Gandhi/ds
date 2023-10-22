@@ -109,9 +109,40 @@ def get_files_changed_in_commit(commit):
 
     return files_changed, is_merge_request
 
+# def get_file_content_at_commit(commit, file_path, parent=False):
+#     target_commit = commit.parents[0] if parent else commit
+#     return target_commit.tree[file_path].data_stream.read().decode()
+
 def get_file_content_at_commit(commit, file_path, parent=False):
     target_commit = commit.parents[0] if parent else commit
-    return target_commit.tree[file_path].data_stream.read().decode()
+    byte_content = target_commit.tree[file_path].data_stream.read()
+
+    try:
+        decoded_content = byte_content.decode('utf-8')
+        return decoded_content
+    except Exception:
+        print(f"Skipping {file_path} at commit {commit.hexsha} as it's not UTF-8 encoded.")
+        return None
+
+# def get_file_content_at_commit(commit, file_path, parent=False):
+#     target_commit = commit.parents[0] if parent else commit
+#     byte_content = target_commit.tree[file_path].data_stream.read()
+#
+#     encodings_to_try = ['utf-8', 'latin-1', 'utf-16', 'cp1252', 'cp1251', 'iso-8859-5',
+#                         'iso-8859-15', 'ascii', 'gb2312', 'shift-jis', 'euc-kr'] # Add other encodings to this list as needed
+#
+#     for encoding in encodings_to_try:
+#         try:
+#             decoded_content = byte_content.decode(encoding)
+#             if encoding != 'utf-8':
+#                 print(f'Warning: {file_path} at commit {commit.hexsha} is not UTF-8 encoded but instead using {encoding}')
+#                 decoded_content = decoded_content.encode('utf-8', errors='replace').decode('utf-8')
+#             return decoded_content
+#         except UnicodeDecodeError:
+#             pass
+#
+#     print(f"Skipping {file_path} at commit {commit.hexsha} as it could not be decoded with tried encodings.")
+#     return None
 
 def determine_status(previous_content, new_content):
     if not previous_content and new_content:
@@ -208,6 +239,8 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
         for idx, commit_sha in enumerate(all_commits[start_commit_idx:], start=start_commit_idx):
             if idx % update_freq == 0:
                 pbar.update(update_freq)
+            if commit_sha == 'a63d9edcfb8a714a17492517927aa114dea8fea0':
+                print('debug')
             commit = repo.commit(commit_sha)
             files_changed, is_merge_request = get_files_changed_in_commit(commit)
             for file_info, change_type in files_changed:
@@ -252,6 +285,10 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
                 if previous_content and new_content:
                     diff = repo.git.diff(commit.parents[0].hexsha, commit.hexsha, "--", file_path)
                     diff = extract_diff_from_at_symbol(diff)
+
+                if not new_content and not previous_content:
+                    # happens when the file is not UTF-8 encoded or something else goes wrong.
+                    continue
 
                 # Map the change_type to the appropriate status
                 status_mapping = {'A': 'added', 'D': 'deleted', 'M': 'modified', 'R': 'renamed'}
