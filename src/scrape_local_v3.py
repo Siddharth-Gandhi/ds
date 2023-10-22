@@ -219,6 +219,8 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0):
         for idx, commit_sha in enumerate(all_commits[start_commit_idx:], start=start_commit_idx):
             if idx % update_freq == 0:
                 pbar.update(update_freq)
+            if commit_sha == 'a63d9edcfb8a714a17492517927aa114dea8fea0':
+                print('debug')
             commit = repo.commit(commit_sha)
             files_changed, is_merge_request = get_files_changed_in_commit(commit)
             for file_info, change_type in files_changed:
