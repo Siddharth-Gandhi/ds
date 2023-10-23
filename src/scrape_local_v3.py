@@ -110,7 +110,28 @@ def get_files_changed_in_commit(commit):
 
 def get_file_content_at_commit(commit, file_path, parent=False):
     target_commit = commit.parents[0] if parent else commit
-    byte_content = target_commit.tree[file_path].data_stream.read()
+
+    # if file_path not in target_commit.tree:
+    #     print(f"[WARNING] File '{file_path}' not found in commit {target_commit.hexsha} (cur_commit: {commit.hexsha}).")
+    #     return None
+
+    # THIS SHOULD NOT HAPPEN
+    # THIS SHOULD NOT HAPPEN
+    # THIS SHOULD NOT HAPPEN
+
+    # IT RAISES THE EXCEPTION MEANING THAT THE FILE IS NOT IN THE COMMIT TREE AND YET IT STORES IT!
+    # ONLY GOD KNOWS WHAT IS GOING ON HERE
+    # BUT IT IS NOT A PROBLEM FOR US, AS LONG AS IT WORKS
+
+    # Problematic commit: https://github.com/pytorch/pytorch/commit/232faeacf8ada21d4dbbcb9cd296a67a99dccf9e
+    # Index: 20789
+
+    try:
+        byte_content = target_commit.tree[file_path].data_stream.read()
+    except Exception:
+        print(f"[WARNING] Skipping {file_path} at commit {target_commit.hexsha} (current commit: {commit.hexsha}) as something went wrong reading from the tree (but not really, its magically present in the return and IDK why :D).")
+        print(traceback.print_exc())
+        return None
 
     try:
         decoded_content = byte_content.decode('utf-8')
@@ -171,7 +192,7 @@ def extract_diff_from_at_symbol(diff_string):
     return ""
 
 
-def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0, save_dir=None):
+def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0, save_dir=None, debug=False):
     owner, repo_name = repo_path.lower().split("/")
     local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
     repo = git.Repo(local_path)
@@ -205,9 +226,14 @@ def scrape_repository(repo_path, CHUNK_SIZE, resume_index=0, save_dir=None):
     if len(all_commits) >= 1000:
         update_freq = 100
 
+    if debug:
+        update_freq = 1
+
     total_rows = 0
     fileCount = 0
 
+    if debug:
+        start_commit_idx = 20789
     with tqdm(
         total=len(all_commits),
         initial=start_commit_idx,
@@ -319,7 +345,7 @@ def main(args):
             continue
 
         try:
-            scrape_repository(repo, args.chunk_size, args.resume_index, args.save_dir)
+            scrape_repository(repo, args.chunk_size, args.resume_index, args.save_dir, args.debug)
         except Exception as e:
             print(f"Failed to scrape {repo}")
             print(e)
@@ -360,6 +386,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Directory to save the parquet files",
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Debug mode",
     )
 
     args = parser.parse_args()

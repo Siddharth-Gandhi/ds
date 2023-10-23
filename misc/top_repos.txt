@@ -4,10 +4,10 @@
 !ggerganov/llama.cpp
 !ggerganov/whisper.cpp
 !apache/kafka
--- apache/cassandra
--- apache/spark
--- facebook/react-native
--- nodejs/node
+!apache/cassandra
+!apache/spark
+!facebook/react-native
+!nodejs/node
 !spring-projects/spring-framework
 !angular/angular
 !electron/electron
