@@ -2,6 +2,9 @@ import os
 import subprocess
 import sys
 import time
+import traceback
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def clone_repository(repo_path, destination_dir):
@@ -30,14 +33,21 @@ def run_command(command: str, cwd=None, capture_output=True):
     except subprocess.CalledProcessError as e:
         print(f"Command failed: {command}")
         return False
+    except Exception as e:
+        print(f"Unknown exception: {e}")
+        print(traceback.format_exc())
+        return False
 
 
 def main(file_name, start_index, end_index, destination_dir="repos"):
+    destination_dir = os.path.join(BASE_DIR, destination_dir)
     if not os.path.exists(destination_dir):
         os.makedirs(destination_dir)
 
     with open(file_name, "r") as f:
         repos = [line.strip() for line in f.readlines()][start_index : end_index + 1]
+
+    print(f'Processing {repos}...')
 
     for repo_path in repos:
         clone_repository(repo_path, destination_dir)
