@@ -1,20 +1,18 @@
 #!/bin/bash
-#SBATCH --job-name=resume_2_7_scrape
+#SBATCH --job-name=resume_scrape
 #SBATCH -p ssd
-#SBATCH --nodelist=boston-2-7
-#SBATCH --output=logs/resume_2_7_scrape_%A_%a.log
+#SBATCH --nodelist=boston-2-8
+#SBATCH --output=logs/resume_scrape_%A_%N_%a.log
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=3
-#SBATCH --mem=8G
+#SBATCH --mem=16G
 #SBATCH --array=0
-#SBATCH --nodelist=boston-2-7
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 
 # list current files
 # check if hostname is correct and only then proceed
-
-if [ "$HOSTNAME" != "boston-2-7" ]; then
+if [ "$HOSTNAME" != "boston-2-7" ] && [ "$HOSTNAME" != "boston-2-8" ] && [ "$HOSTNAME" != "boston-2-9" ] && [ "$HOSTNAME" != "boston-2-10" ]; then
     echo "Wrong host $HOSTNAME, exiting"
     exit 1
 fi
@@ -55,7 +53,7 @@ echo "Running scrape_local.py for resuming scrape"
 # Check resources allocated to this job (CPU, memory, disk space)
 # scontrol show job $SLURM_JOB_ID
 # sleep for 10 seconds
-FILE_PATH=misc/test.txt
+FILE_PATH=misc/resume_test_repos.txt
 TOTAL_ITEMS=$(grep -v "^[[:space:]]*$" $FILE_PATH | wc -l)
 
 
@@ -79,7 +77,7 @@ echo "Task ID: $SLURM_ARRAY_TASK_ID, Start Index: $START_INDEX, End Index: $END_
 # sleep 10
 
 
-RESUME_BATCH_ID=11
+RESUME_BATCH_ID=20
 # python clone_repos.py test_repos.txt 0 $num_lines (chunk size is 1000 by default)
 # if [ $RESUME_BATCH_ID -gt 0 ]; then
 srun --wait=0 python -u src/scrape_local_v3.py $FILE_PATH $START_INDEX $END_INDEX --resume_index $RESUME_BATCH_ID

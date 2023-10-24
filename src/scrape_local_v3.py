@@ -336,6 +336,9 @@ def main(args):
     with open(os.path.join(BASE_DIR, args.file_path), "r", encoding="utf-8") as f:
         repos = f.read().splitlines()[args.start_index : args.end_index + 1]
 
+    print(f'Processing {repos}...')
+    # return
+
     for repo in repos:
         owner, repo_name = repo.lower().split("/")
         local_path = os.path.join(BASE_DIR, f"repos/{owner}_{repo_name}")
