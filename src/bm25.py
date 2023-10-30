@@ -48,7 +48,7 @@ def mean_reciprocal_rank(relevant):
             return 1 / (idx + 1)
     return 0
 
-def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metrics.txt'):
+def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metrics.txt', filter_merge_requests=False):
     if not os.path.exists(idx_path):
         print(f"Index at {idx_path} does not exist! Exiting...")
         return
@@ -63,6 +63,12 @@ def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metri
     index_stats = index_reader.stats()
     # print(index_reader.stats())
     total_commits = count_commits(repo_dir)
+
+    # filter out commits that are merge_requests by checking is_merge_request column
+
+    if filter_merge_requests:
+        print("Filtering out merge requests during sampling...")
+        combined_df = combined_df[combined_df['is_merge_request'] == False]
 
     sampled_commits = combined_df.drop_duplicates(subset='commit_id').sample(n, replace=False, random_state=42)
     results = [
@@ -99,6 +105,7 @@ if __name__ == "__main__":
     # parser.add_argument("--use_tokenizer", action="store_true", help="Whether to use the tokenizer.")
     # parser.add_argument("--content_option", choices=["commit", "code", "both"], required=True, help="Content option: commit, code, or both.")
     parser.add_argument("--output", default='bm25_metrics.txt', help="Output file path (default: path/to/repo/bm25_metrics.txt)")
+    parser.add_argument("--filter_merge_requests", action="store_true", help="Whether to filter out merge requests.")
     args = parser.parse_args()
 
     # check if content_option was not passed, if so raise warning that we use commit as default
@@ -114,4 +121,4 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     # print(args)
     # print(idx_string)
-    evaluate_sampling(args.repo_path, args.index_path, args.n, args.k, args.output)
+    evaluate_sampling(args.repo_path, args.index_path, args.n, args.k, args.output, args.filter_merge_requests)
