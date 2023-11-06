@@ -34,7 +34,17 @@ fi
 for REPO_PATH in "$DATA_PATH"/*; do
     if [ -d "$REPO_PATH" ]; then
         echo "Processing $REPO_PATH"
+
+        # If REPO_PATH is data/microsoft/vscode or data/microsoft/typescript, then skip those 2 for now
+
+        if [ "$REPO_PATH" = "data/microsoft_vscode" ] || [ "$REPO_PATH" = "data/microsoft_typescript" ]; then
+            echo "[WARNING] Skipping $REPO_PATH"
+            continue
+        fi
+
         REPO_NAME=$(basename "$REPO_PATH")
+
+        #
 
         # Construct directory names
         INDEX_DIR_NAME=$(get_dir_name "index" "$CONTENT_OPTION" "$USE_TOKENIZER")
@@ -45,6 +55,6 @@ for REPO_PATH in "$DATA_PATH"/*; do
             continue
         fi
 
-        python "$SCRIPT_FILE" "$REPO_PATH" "$INDEX_DIR" --n "$NUM_SAMPLES" --k "$TOP_K"
+        python "$SCRIPT_FILE" "$REPO_PATH" "$INDEX_DIR" --n "$NUM_SAMPLES" --k "$TOP_K" --skip_existing
     fi
 done
