@@ -48,7 +48,7 @@ def mean_reciprocal_rank(relevant):
             return 1 / (idx + 1)
     return 0
 
-def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metrics.txt', filter_merge_requests=False):
+def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metrics.txt', skip_existing=False):
     if not os.path.exists(idx_path):
         print(f"Index at {idx_path} does not exist! Exiting...")
         return
@@ -56,6 +56,12 @@ def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metri
     total_commits = combined_df.commit_id.nunique()
     if total_commits < n:
         print(f'Not enough commits to sample for {repo_dir}, skipping...')
+        return
+    output_dir = os.path.join(repo_dir, output_file)
+
+    # check if output file already exists, if so skip
+    if os.path.exists(output_dir):
+        print(f'Output file {output_dir} already exists, skipping...')
         return
 
     searcher = LuceneSearcher(idx_path)
@@ -82,7 +88,7 @@ def evaluate_sampling(repo_dir, idx_path, n=100, k=1000, output_file='bm25_metri
         for metric in results[0]
     }
 
-    with open(os.path.join(repo_dir, output_file), "w") as file:
+    with open(output_dir, "w") as file:
         file.write(f"Repo Path: {repo_dir}\n")
         file.write(f'Total Commits Stored: {total_commits}\n')
         file.write(f'Total Rows Stored: {combined_df.shape[0]}\n')
@@ -105,7 +111,7 @@ if __name__ == "__main__":
     # parser.add_argument("--use_tokenizer", action="store_true", help="Whether to use the tokenizer.")
     # parser.add_argument("--content_option", choices=["commit", "code", "both"], required=True, help="Content option: commit, code, or both.")
     parser.add_argument("--output", default='bm25_metrics.txt', help="Output file path (default: path/to/repo/bm25_metrics.txt)")
-    parser.add_argument("--filter_merge_requests", action="store_true", help="Whether to filter out merge requests.")
+    parser.add_argument("--skip_existing", action="store_true", help="Whether to skip existing output files.")
     args = parser.parse_args()
 
     # check if content_option was not passed, if so raise warning that we use commit as default
@@ -121,4 +127,4 @@ if __name__ == "__main__":
     # args = parser.parse_args()
     # print(args)
     # print(idx_string)
-    evaluate_sampling(args.repo_path, args.index_path, args.n, args.k, args.output, args.filter_merge_requests)
+    evaluate_sampling(args.repo_path, args.index_path, args.n, args.k, args.output, args.skip_existing)

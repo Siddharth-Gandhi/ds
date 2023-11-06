@@ -14,6 +14,10 @@ import tiktoken
 
 from utils import count_commits, get_combined_df, tokenize
 
+# create logs directory if it doesn't exist
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
 
 def set_log_filename(config_file, log_filename):
     """
@@ -36,6 +40,8 @@ def set_log_filename(config_file, log_filename):
 set_log_filename('logging.conf', 'convert_to_jsonl.log')
 logging.config.fileConfig(fname="logging.conf", disable_existing_loggers=False)
 logger = logging.getLogger(__name__)
+
+
 
 # Configuration for tiktoken encoding
 # ENCODING = 'p50k_base'
@@ -67,6 +73,11 @@ def convert_repo_to_jsonl(repo_dir, output_file, content_option='commit', use_to
     combined_df['cur_file_content'] = combined_df['cur_file_content'].fillna('')
 
     logging.info('Combined Memory Usage: %0.2f MB for %d rows', combined_df.memory_usage(deep=True).sum() / 1024 ** 2, len(combined_df))
+
+    # check if output file already exists, if so, return
+    # if os.path.exists(output_file):
+    #     logging.info(f'Output file already exists for {repo_dir}, skipping')
+    #     return
 
     with open(output_file, 'x', encoding='utf-8') as f:
         for index, row in combined_df.iterrows():

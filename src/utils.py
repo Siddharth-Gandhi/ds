@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import tiktoken
 
+os.environ['TIKTOKEN_CACHE_DIR'] = ""
 ENCODING = 'p50k_base'
 enc = tiktoken.get_encoding(ENCODING)
 assert enc.decode(enc.encode("hello world")) == "hello world"
@@ -26,12 +27,6 @@ def count_commits(repo_dir):
     combined_df = get_combined_df(repo_dir)
     return combined_df.commit_id.nunique()
 
-# def reverse_tokenize(text):
-#     text = json.loads(text)
-#     # print(list(text['contents'].split(' ')))
-#     text['contents'] = enc.decode([int(i) for i in text['contents'].split(' ')])
-#     # return string
-#     return json.dumps(text, indent=2)
 
 def reverse_tokenize(text):
-    return enc.decode([int(i) for i in text.split(' ')])
+    return enc.decode(list(map(int, text.split(' '))))
