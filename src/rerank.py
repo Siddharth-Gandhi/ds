@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import sys
 
 import numpy as np
@@ -16,7 +15,7 @@ from tqdm import tqdm
 from transformers import RobertaModel, RobertaTokenizer
 
 from bm25 import average_precision_score, mean_reciprocal_rank, precision_at_k, search
-from utils import get_combined_df, reverse_tokenize, tokenize
+from utils import get_combined_df, reverse_tokenize
 
 
 def sample_query(df, seed=42):
