@@ -21,6 +21,7 @@ import pandas as pd
 import torch
 from pyserini.index.lucene import IndexReader
 from pyserini.search.lucene import LuceneSearcher
+from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from utils import count_commits, get_combined_df, reverse_tokenize, tokenize
@@ -219,9 +220,13 @@ class ModelEvaluator:
     def sample_commits(self, n):
         if self.combined_df.commit_id.nunique() < n:
             raise ValueError(f'Not enough commits to sample. Required: {n}, available: {self.combined_df.commit_id.nunique()}')
-        return self.combined_df.drop_duplicates(subset='commit_id').sample(n=n, replace=False, random_state=self.seed)
 
-    def evaluate_sampling(self, n=100, k=1000, output_file='metrics.txt', skip_existing=False, evaluation_strategy='commit', aggregation_strategy=None, rerankers=None):
+        midpoint_date = np.median(self.combined_df['commit_date'])
+        recent_df = self.combined_df[self.combined_df['commit_date'] > midpoint_date]
+
+        return recent_df.drop_duplicates(subset='commit_id').sample(n=n, replace=False, random_state=self.seed)
+
+    def evaluate_sampling(self, n=100, k=1000, output_file='metrics.txt', skip_existing=False, aggregation_strategy=None, rerankers=None):
         if rerankers is None:
             rerankers = []
 
@@ -236,21 +241,16 @@ class ModelEvaluator:
         sampled_commits = self.sample_commits(n)
 
         results = []
-        for _, row in sampled_commits.iterrows():
+        # for _, row in sampled_commits.iterrows():
+        for _, row in tqdm(sampled_commits.iterrows(), total=sampled_commits.shape[0]):
             # search_results = self.model.search(row['commit_message'], row['commit_date'], ranking_depth=k)
             # TODO: Add ChatGPT based query modification here
             cur_query = row['commit_message']
             search_results = self.model.pipeline(cur_query, row['commit_date'], ranking_depth=k, aggregation_method=aggregation_strategy)
-            # if evaluation_strategy == 'commit':
             for reranker in rerankers:
                 search_results = reranker.rerank_pipeline(cur_query, search_results)
             evaluation = self.eval_model.evaluate(search_results,
                                                        self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist())
-            # elif evaluation_strategy == 'file':
-            #     evaluation = self.eval_model.evaluate_file_based(search_results,
-            #                                                       self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist(), aggregation_strategy=aggregation_strategy)
-            # else:
-            #     raise ValueError(f'Invalid evaluation strategy: {evaluation_strategy}')
             results.append(evaluation)
 
         avg_scores = {metric: round(np.mean([result[metric] for result in results]), 4) for metric in results[0]}
@@ -278,19 +278,27 @@ class BERTReranker:
         self.model.to(self.device)
         self.model.eval()  # Set the model to evaluation mode
 
+        print(f'Using device: {self.device}')
+
         if torch.cuda.is_available() and parameters['use_gpu']:
             # print GPU info
             print(f"Using GPU: {torch.cuda.get_device_name(0)}")
+            print(f'GPU Device Count: {torch.cuda.device_count()}')
+            print(f"GPU Memory Usage: {torch.cuda.memory_allocated(0) / 1024 ** 2:.2f} MB")
 
 
         self.psg_len = parameters['psg_len']
         self.psg_cnt = parameters.get('psg_cnt', None)
-        self.psg_stride = parameters.get('psg_stride', self.psg_len)
+        # self.psg_stride = parameters.get('psg_stride', self.psg_len)
         self.aggregation_strategy = parameters['aggregation_strategy']
         self.batch_size = parameters['batch_size']
-        self.max_title_len = parameters.get('max_title_len', 0)
-        self.use_title = self.max_title_len > 0
+        # self.max_title_len = parameters.get('max_title_len', 0)
+        # self.use_title = self.max_title_len > 0
         self.rerank_depth = parameters.get('rerank_depth', 100)
+        # self.max_seq_length = parameters.get('max_seq_length', 512)
+        self.max_seq_length = self.tokenizer.model_max_length
+
+        print(f"Initialized BERT reranker with parameters: {parameters}")
 
     def rerank(self, query, aggregated_results: List[AggregatedSearchResult]):
         """
@@ -299,68 +307,82 @@ class BERTReranker:
         query: The issue query string.
         aggregated_results: A list of AggregatedSearchResult objects from BM25 search.
         """
-        aggregated_results = aggregated_results[:self.rerank_depth]  # Limit the number of results to rerank
-        reranked_results = []
-        all_passage_scores = []
+        aggregated_results = aggregated_results[:self.rerank_depth]
+        print(f'Reranking {len(aggregated_results)} results')
 
-        # Prepare data for BERT scoring
+        # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
+        query_passage_pairs = []
         for agg_result in aggregated_results:
-            passages = self.split_into_passages(query, agg_result.contributing_results)
-            passage_scores = self.score_passages(query, passages)
-            all_passage_scores.append((agg_result, passage_scores))
+            for result in agg_result.contributing_results[:self.psg_cnt]:
+                query_passage_pairs.append((query, result.commit_msg))
 
-        # Aggregate and rerank based on BERT scores
-        for agg_result, passage_scores in all_passage_scores:
-            agg_score = self.aggregate_scores(passage_scores)
-            reranked_results.append(AggregatedSearchResult(agg_result.file_path, agg_score, agg_result.contributing_results))
+        print(f'Flattened query passage pairs: {len(query_passage_pairs)}')
+        # query_passage_pairs = [(query, result.commit_msg) for aggregated_result in aggregated_results for result in aggregated_result.contributing_results]
+
+        # print('Flattened query passage pairs')
+
+        # tokenize the query passage pairs
+        encoded_pairs = [self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True) for query, passage in query_passage_pairs]
+
+        # print('Encoded query passage pairs')
+
+        # create tensors for the input ids, attention masks, and token type ids
+        input_ids = torch.cat([encoded_pair['input_ids'] for encoded_pair in encoded_pairs], dim=0)
+        attention_masks = torch.cat([encoded_pair['attention_mask'] for encoded_pair in encoded_pairs], dim=0)
+
+        # Create a dataloader for feeding the data to the model
+        dataset = torch.utils.data.TensorDataset(input_ids, attention_masks)
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=self.batch_size)
+
+        # print('Created dataloader')
+
+        def get_scores(dataloader, model):
+            scores = []
+            with torch.no_grad():
+                for batch in dataloader:
+                    # Unpack the batch and move it to GPU
+                    b_input_ids, b_attention_mask = batch
+                    b_input_ids = b_input_ids.to('cuda')
+                    b_attention_mask = b_attention_mask.to('cuda')
+
+                    # Forward pass, get logit predictions
+                    outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+                    logits = outputs.logits.data.cpu().numpy()
+
+                    # Move logits to CPU and convert to probabilities (optional)
+                    # probs = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()
+
+                    # Collect the scores
+                    scores.extend(logits)
+
+            return scores
+
+        scores = get_scores(dataloader, self.model)
+        # print('Got scores')
+        # original_structure_scores = reconstruct(scores, mapping_info)
+
+        # reshape the scores to match the shape of the aggregated results
+
+        # aggregate scores
+        # Re-assemble scores back into the structure of aggregated_results
+        score_index = 0
+        for agg_result in aggregated_results:
+            # Each aggregated result gets a slice of the scores equal to the number of contributing results it has
+            end_index = score_index + len(agg_result.contributing_results)
+            cur_passage_scores = scores[score_index:end_index]
+            score_index = end_index
+
+            # Aggregate the scores for the current aggregated result
+            agg_score = self.aggregate_scores(cur_passage_scores)
+            agg_result.score = agg_score  # Assign the aggregated score
+
+        # print('Aggregated scores')
 
         # Sort by the new aggregated score
-        reranked_results.sort(key=lambda res: res.score, reverse=True)
-        return reranked_results
+        aggregated_results.sort(key=lambda res: res.score, reverse=True)
+        # print('Sorted aggregated results')
 
-    def split_into_passages(self, query: str, search_results: List[SearchResult]):
-        """
-        Split the contributing results into passages based on BERT's max sequence length.
-        """
-        passages = []
-        for result in search_results:
-            # Use the commit message as passage and combine with query
-            passage = f"{query} {result.commit_msg}"
-            tokens = self.tokenizer.tokenize(passage)
-            for i in range(0, len(tokens), self.psg_stride):
-                # Select passage tokens and convert to string
-                passage_tokens = tokens[i:i+self.psg_len]
-                passages.append(self.tokenizer.convert_tokens_to_string(passage_tokens))
-                if self.psg_cnt and len(passages) >= self.psg_cnt:
-                    break  # Limit the number of passages if psg_cnt is set
-        return passages
-
-    def score_passages(self, query: str, passages: List[str]):
-        """
-        Score passages using the BERT model with query and passages combined.
-        """
-        passage_scores = []
-        # Process passages in batches
-        for i in range(0, len(passages), self.batch_size):
-            batch_passages = passages[i:i + self.batch_size]
-            # Combine the query with each passage
-            encoded_inputs = self.tokenizer(
-                [query] * len(batch_passages),  # Query is repeated for each passage in the batch
-                batch_passages,
-                padding='max_length',
-                # truncation='only_second',  # Only truncate the passage, not the query
-                truncation=True,
-                max_length=self.psg_len,
-                return_tensors='pt'
-            )
-            # Move batch to the appropriate device
-            encoded_inputs = {key: val.to(self.device) for key, val in encoded_inputs.items()}
-            with torch.no_grad():
-                outputs = self.model(**encoded_inputs)
-                logits = outputs.logits.squeeze().tolist()
-                # Extend the list of scores with the logits from the model
-                passage_scores.extend(logits if isinstance(logits, list) else [logits])
-        return passage_scores
+        return aggregated_results
 
     def aggregate_scores(self, passage_scores):
         """
@@ -404,7 +426,7 @@ if __name__ == "__main__":
     bm25_searcher = BM25Search(index_path)
     evaluator = SearchEvaluator(metrics)
     model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
-    bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file='bm25_metrics.txt', evaluation_strategy='file', aggregation_strategy=bm25_aggregation_strategy)
+    bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file='bm25_metrics.txt', aggregation_strategy=bm25_aggregation_strategy)
 
     print("BM25 Baseline Evaluation")
     print(bm25_baseline_eval)
@@ -418,14 +440,15 @@ if __name__ == "__main__":
     'psg_cnt': 1,
     'psg_stride': 32,
     'aggregation_strategy': 'sump',
-    'batch_size': 8,
+    'batch_size': 512,
     'use_gpu': True,
     'rerank_depth': 1000,
+    # 'max_seq_length': 512,
     }
     bert_reranker = BERTReranker(parameters)
     rerankers = [bert_reranker]
 
-    bert_reranker_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file='bert_reranker_metrics.txt', evaluation_strategy='commit', aggregation_strategy='sump', rerankers=rerankers)
+    bert_reranker_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file='bert_reranker_metrics.txt', aggregation_strategy='sump', rerankers=rerankers)
 
     print("BERT Reranker Evaluation")
     print(bert_reranker_eval)
