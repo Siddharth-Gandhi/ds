@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
@@ -78,7 +78,7 @@ class BERTReranker:
         self.model_name = parameters['model_name']
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         # self.model = AutoModel.from_pretrained(self.model_name, num_labels=1)
-        self.model = AutoModel.from_pretrained(self.model_name)
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1)
         self.device = torch.device("cuda" if torch.cuda.is_available() and parameters['use_gpu'] else "cpu")
         self.model.to(self.device)
         self.model.eval()  # Set the model to evaluation mode
@@ -185,25 +185,25 @@ class BERTReranker:
                 b_attention_mask = b_attention_mask.to(self.device)
 
                 # # Forward pass, get logit predictions
-                # outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-                # # logits = outputs.logits.data.cpu().numpy()
-                # logits = outputs.logits.data.cpu().numpy().flatten()
+                outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+                # logits = outputs.logits.data.cpu().numpy()
+                logits = outputs.logits.data.cpu().numpy().flatten()
 
-                # # Move logits to CPU and convert to probabilities (optional)
-                # # probs = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()
+                # Move logits to CPU and convert to probabilities (optional)
+                # probs = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()
 
-                # # Collect the scores
-                # scores.extend(logits)
+                # Collect the scores
+                scores.extend(logits)
 
 
                 # Get the pooled output from BERT's [CLS] token
-                pooled_output = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+                # pooled_output = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
 
-                # Pass the pooled output through the MLP to get the scores
-                logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
+                # # Pass the pooled output through the MLP to get the scores
+                # logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
 
-                # Collect the scores (detach them from the computation graph and move to CPU)
-                scores.extend(logits.detach().cpu().numpy())
+                # # Collect the scores (detach them from the computation graph and move to CPU)
+                # scores.extend(logits.detach().cpu().numpy())
 
         return scores
 
@@ -374,60 +374,58 @@ if __name__ == "__main__":
     rerankers = [bert_reranker]
 
 
-    df = get_combined_df(repo_path)
-    print(df.info())
+    # df = get_combined_df(repo_path)
+    # print(df.info())
 
-    # Step 1: Filter necessary columns
-    filtered_df = df[['commit_date', 'commit_message', 'commit_id', 'file_path']]
+    # # Step 1: Filter necessary columns
+    # filtered_df = df[['commit_date', 'commit_message', 'commit_id', 'file_path']]
 
-    # Step 2: Group by commit_id
-    grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
-    grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
+    # # Step 2: Group by commit_id
+    # grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
+    # grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
 
-    # Step 3: Determine midpoint and filter dataframe
-    midpoint_date = np.median(grouped_df['commit_date'])
-    recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
-    print(f'Number of commits after midpoint date: {len(recent_df)}')
-    # sys.exit(0)
+    # # Step 3: Determine midpoint and filter dataframe
+    # midpoint_date = np.median(grouped_df['commit_date'])
+    # recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
+    # print(f'Number of commits after midpoint date: {len(recent_df)}')
+    # # sys.exit(0)
 
-    recent_df = recent_df.head(1000)
+    # recent_df = recent_df.head(1000)
 
-    # Step 4: Split recent dataframe and prepare data
-    df_train, df_temp = train_test_split(recent_df, test_size=0.2, random_state=42)
-    df_val, df_test = train_test_split(df_temp, test_size=0.5, random_state=42)
+    # # Step 4: Split recent dataframe and prepare data
+    # df_train, df_temp = train_test_split(recent_df, test_size=0.2, random_state=42)
+    # df_val, df_test = train_test_split(df_temp, test_size=0.5, random_state=42)
 
-    print('Preparing data...')
+    # print('Preparing data...')
 
-    train_depth = 1000
-    train_data = prepare_data_from_df(df_train, bm25_searcher, depth=train_depth)
-    val_data = prepare_data_from_df(df_val, bm25_searcher, depth=train_depth)
-    test_data = prepare_data_from_df(df_test, bm25_searcher, depth=train_depth)
+    # train_depth = 1000
+    # train_data = prepare_data_from_df(df_train, bm25_searcher, depth=train_depth)
+    # val_data = prepare_data_from_df(df_val, bm25_searcher, depth=train_depth)
+    # test_data = prepare_data_from_df(df_test, bm25_searcher, depth=train_depth)
 
-    # get distribution of labels
-    train_labels = [label for _, _, label in train_data]
-    val_labels = [label for _, _, label in val_data]
-    test_labels = [label for _, _, label in test_data]
+    # # get distribution of labels
+    # train_labels = [label for _, _, label in train_data]
+    # val_labels = [label for _, _, label in val_data]
+    # test_labels = [label for _, _, label in test_data]
 
-    # print size of data
-    print(f'Train data size: {len(train_data)}')
-    print(f'Val data size: {len(val_data)}')
-    print(f'Test data size: {len(test_data)}')
+    # # print size of data
+    # print(f'Train data size: {len(train_data)}')
+    # print(f'Val data size: {len(val_data)}')
+    # print(f'Test data size: {len(test_data)}')
 
-    print(f'Train data sample: {train_data[0]}')
+    # print(f'Train data sample: {train_data[0]}')
 
-    print(f'Train label distribution: {np.unique(train_labels, return_counts=True)}')
-    print(f'Val label distribution: {np.unique(val_labels, return_counts=True)}')
-    print(f'Test label distribution: {np.unique(test_labels, return_counts=True)}')
+    # print(f'Train label distribution: {np.unique(train_labels, return_counts=True)}')
+    # print(f'Val label distribution: {np.unique(val_labels, return_counts=True)}')
+    # print(f'Test label distribution: {np.unique(test_labels, return_counts=True)}')
 
-    # Step 5: train the MLP
-    train_dataloader = DataLoader(train_data, batch_size=params['batch_size'], shuffle=True)
-    val_dataloader = DataLoader(val_data, batch_size=params['batch_size'], shuffle=True)
+    # # Step 5: train the MLP
+    # train_dataloader = DataLoader(train_data, batch_size=params['batch_size'], shuffle=True)
+    # val_dataloader = DataLoader(val_data, batch_size=params['batch_size'], shuffle=True)
 
-    bert_reranker.train_mlp(train_dataloader, val_dataloader)
+    # bert_reranker.train_mlp(train_dataloader, val_dataloader)
 
     bert_reranker_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file='bert_reranker_metrics.txt', aggregation_strategy='sump', rerankers=rerankers, repo_path=repo_path)
 
     print("BERT Reranker Evaluation")
     print(bert_reranker_eval)
-
-
