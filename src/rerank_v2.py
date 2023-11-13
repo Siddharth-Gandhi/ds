@@ -252,7 +252,7 @@ class BERTReranker:
                 # Forward pass
                 with torch.no_grad():  # No need to calculate gradients for BERT
                     pooled_output = self.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
-                logits = self.mlp(pooled_output).squeeze(-1)
+                logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
 
                 # Compute loss
                 loss = criterion(logits, b_labels.float())
@@ -292,7 +292,7 @@ class BERTReranker:
 
                 with torch.no_grad():
                     pooled_output = self.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
-                    logits = self.mlp(pooled_output).squeeze(-1)
+                    logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
 
                 # Compute loss
                 loss = criterion(logits, b_labels.float())
@@ -328,16 +328,8 @@ class BERTReranker:
         reranked_results = self.rerank(query, aggregated_results)
         return reranked_results
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Run BM25 and BERT Reranker evaluation.')
-    parser.add_argument('index_path', type=str, help='Path to the index directory.')
-    parser.add_argument('repo_path', type=str, help='Path to the repository directory.')
-    parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
-    parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
-
-
+def main(args):
     metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
-    args = parser.parse_args()
     repo_path = args.repo_path
     index_path = args.index_path
     K = args.k
@@ -431,3 +423,12 @@ if __name__ == "__main__":
     print(bert_reranker_eval)
 
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Run BM25 and BERT Reranker evaluation.')
+    parser.add_argument('index_path', type=str, help='Path to the index directory.')
+    parser.add_argument('repo_path', type=str, help='Path to the repository directory.')
+    parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
+    parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
+    args = parser.parse_args()
+    print(args)
+    main(args)
