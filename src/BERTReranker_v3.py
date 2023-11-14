@@ -1,14 +1,16 @@
 import argparse
 import os
-import pickle
+
+# import pickle
 from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import torch.nn.init as init
 from sklearn.model_selection import train_test_split
 from torch import nn
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
 
@@ -26,15 +28,26 @@ from utils import (
 class MLP(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(MLP, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        self.fc1 = nn.Linear(input_dim, output_dim)
+        # self.fc1 = nn.Linear(input_dim, hidden_dim)
+        # self.relu = nn.ReLU()
+        # self.fc2 = nn.Linear(hidden_dim, output_dim)
         self.sigmoid = nn.Sigmoid()
+        # Initialize weights
+    #     self.init_weights()
+
+    # def init_weights(self):
+    #     init.xavier_uniform_(self.fc1.weight)
+    #     init.xavier_uniform_(self.fc2.weight)
+
+
+        # init.zeros_(self.fc1.bias)
+        # init.zeros_(self.fc2.bias)
 
     def forward(self, x):
         x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
+        # x = self.relu(x)
+        # x = self.fc2(x)
         x = self.sigmoid(x)
         return x
 
@@ -104,8 +117,8 @@ class BERTReranker:
         encoded_pairs = [self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True) for query, passage in query_passage_pairs]
 
         # create tensors for the input ids, attention masks
-        input_ids = torch.stack([encoded_pair['input_ids'].squeeze() for encoded_pair in encoded_pairs], dim=0)
-        attention_masks = torch.stack([encoded_pair['attention_mask'].squeeze() for encoded_pair in encoded_pairs], dim=0)
+        input_ids = torch.stack([encoded_pair['input_ids'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
+        attention_masks = torch.stack([encoded_pair['attention_mask'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
 
         # Create a dataloader for feeding the data to the model
         dataset = TensorDataset(input_ids, attention_masks)
@@ -144,10 +157,13 @@ class BERTReranker:
                 b_attention_mask = b_attention_mask.to(self.device)
 
                 # Get the pooled output from BERT's [CLS] token
-                pooled_output = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+                # pooled_output = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+
+                cls_output = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
 
                 # Pass the pooled output through the MLP to get the scores
-                logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
+                # logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
+                logits = self.mlp(cls_output).squeeze(-1) # type: ignore
 
                 # Collect the scores (detach them from the computation graph and move to CPU)
                 scores.extend(logits.detach().cpu().numpy())
@@ -197,13 +213,6 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
     for param in bertranker.model.parameters():
         param.requires_grad = False if freeze_bert else True
 
-    # if not freeze_bert:
-    #     optimizer = torch.optim.Adam([
-    #         {'params': bertranker.model.parameters(), 'lr': bertranker.parameters['bert_lr']},
-    #         {'params': bertranker.mlp.parameters(), 'lr': bertranker.parameters['mlp_lr']}
-    #             ], lr=bertranker.parameters['mlp_lr'])
-    # else:
-    #     optimizer = torch.optim.Adam(bertranker.mlp.parameters(), lr=bertranker.parameters['mlp_lr'])
 
     if freeze_bert:
         optimizer = torch.optim.Adam(bertranker.mlp.parameters(), lr=bertranker.parameters['mlp_lr'])
@@ -212,6 +221,9 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
             {'params': bertranker.model.parameters(), 'lr': bertranker.parameters['bert_lr']},
             {'params': bertranker.mlp.parameters(), 'lr': bertranker.parameters['mlp_lr']}
                 ], lr=bertranker.parameters['mlp_lr'])
+
+    # one optimizer for both BERT and MLP with same learning rate
+
 
     print(f'Optimizer: {optimizer}')
 
@@ -226,6 +238,11 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
     print(f'Val dataloader size: {len(validation_dataloader)}')
     # Training loop
     print('Starting training loop')
+
+    if freeze_bert:
+        print('BERT is frozen, training only MLP')
+    else:
+        print('BERT is unfrozen, training BERT and MLP')
     train_losses = []
     val_losses = []
     best_val_loss = float('inf')
@@ -234,31 +251,32 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
     for epoch in tqdm(range(num_epochs)):
         # self.model.eval()  # Make sure the BERT model is in evaluation mode
         if freeze_bert:
-            print('Freezing BERT layers')
             bertranker.model.eval()  # BERT finetuning should be in eval mode
         else:
-            print('Not freezing BERT layers')
             bertranker.model.train()  # BERT finetuning should be in train mode
         bertranker.mlp.train()  # MLP should be in training mode
         total_loss = 0
 
         for batch in train_dataloader:
+            # breakpoint()
             b_input_ids, b_attention_mask, b_labels = batch
             b_input_ids = b_input_ids.to(bertranker.device)
             b_attention_mask = b_attention_mask.to(bertranker.device)
             b_labels = b_labels.float().to(bertranker.device)
 
             # Forward pass
-            if freeze_bert:
-                with torch.no_grad():
-                    pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
-            else:
-                pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+            # if freeze_bert:
+            #     with torch.no_grad():
+            #         # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+            #         cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
 
-            logits = bertranker.mlp(pooled_output).squeeze(-1) # type: ignore
+            # else:
+                # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+            cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
 
+            logits = bertranker.mlp(cls_output).squeeze(-1) # type: ignore
             # Compute loss
-            loss = criterion(logits, b_labels.float())
+            loss = criterion(logits, b_labels)
             total_loss += loss.item()
 
             # Backward pass and optimization
@@ -280,8 +298,9 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
             b_labels = b_labels.float().to(bertranker.device)
 
             with torch.no_grad():
-                pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
-                logits = bertranker.mlp(pooled_output).squeeze(-1) # type: ignore
+                # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+                cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
+                logits = bertranker.mlp(cls_output).squeeze(-1) # type: ignore
 
             # Compute loss
             loss = criterion(logits, b_labels.float())
@@ -300,6 +319,7 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
         print(f"Validation Loss: {avg_val_loss}")
         print(f'Best validation loss: {best_val_loss}')
 
+        # save graph of losses
         plt.plot(train_losses, label='Training loss', color='blue', linestyle='dashed', linewidth=1, marker='o', markerfacecolor='blue', markersize=3)
         plt.plot(val_losses, label='Validation loss', color='red', linestyle='dashed', linewidth=1, marker='o', markerfacecolor='red', markersize=3)
         plt.legend(frameon=False)
@@ -323,11 +343,11 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
         # Here you can add early stopping based on validation loss
 
     print("Training complete!")
-    # save graph of losses
 
 
 
 def main(args):
+    # magic seed
     set_seed(42)
     metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
     repo_path = args.repo_path
@@ -362,14 +382,15 @@ def main(args):
         'psg_cnt': 5,
         # 'psg_stride': 32,
         'aggregation_strategy': 'sump',
-        # 'batch_size': 32,
-        'batch_size': 512,
+        'batch_size': 32,
+        # 'batch_size': 512,
         # 'batch_size': 1,
         'use_gpu': True,
         'rerank_depth': 100,
-        'num_epochs': 10,
-        'mlp_lr': 1e-2,
-        'bert_lr': 2e-5,
+        'num_epochs': 4,
+        # 'mlp_lr': 1e-2,
+        'mlp_lr': 3e-5,
+        'bert_lr': 3e-5,
         'hidden_dim': 100,
         'num_positives': 10,
         'num_negatives': 10,
@@ -401,6 +422,7 @@ def main(args):
     recent_df = recent_df.head(1000)
 
     # Step 4: Split recent dataframe and prepare data
+    # TODO remove magic numbers
     df_train, df_temp = train_test_split(recent_df, test_size=0.2, random_state=42)
     df_val, df_test = train_test_split(df_temp, test_size=0.5, random_state=42)
 

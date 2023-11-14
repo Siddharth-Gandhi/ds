@@ -94,6 +94,8 @@ class ModelEvaluator:
 
     def evaluate_df(self, df, k=1000, aggregation_strategy=None, rerankers=None):
         results = []
+        if rerankers is None:
+            rerankers = []
         for _, row in tqdm(df.iterrows(), total=df.shape[0]):
             cur_query = row['commit_message']
             search_results = self.model.pipeline(cur_query, row['commit_date'], ranking_depth=k, aggregation_method=aggregation_strategy)
@@ -108,8 +110,7 @@ class ModelEvaluator:
         if repo_path is None:
             print("Repo path not provided, using current working directory")
             repo_path = os.getcwd()
-        if rerankers is None:
-            rerankers = []
+
 
         if output_file_path is None:
             print("WARNING: Output file path not provided, using default")
