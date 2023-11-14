@@ -92,35 +92,38 @@ class ModelEvaluator:
 
         return recent_df.drop_duplicates(subset='commit_id').sample(n=n, replace=False, random_state=self.seed)
 
-    def evaluate_sampling(self, n=100, k=1000, output_file='metrics.txt', skip_existing=False, aggregation_strategy=None, rerankers=None, repo_path=None):
+    def evaluate_df(self, df, k=1000, aggregation_strategy=None, rerankers=None):
+        results = []
+        for _, row in tqdm(df.iterrows(), total=df.shape[0]):
+            cur_query = row['commit_message']
+            search_results = self.model.pipeline(cur_query, row['commit_date'], ranking_depth=k, aggregation_method=aggregation_strategy)
+            for reranker in rerankers:
+                search_results = reranker.rerank_pipeline(cur_query, search_results)
+            evaluation = self.eval_model.evaluate(search_results,
+                                                   self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist())
+            results.append(evaluation)
+        return results
+
+    def evaluate_sampling(self, n=100, k=1000, output_file_path=None, skip_existing=False, aggregation_strategy=None, rerankers=None, repo_path=None):
         if repo_path is None:
             print("Repo path not provided, using current working directory")
             repo_path = os.getcwd()
         if rerankers is None:
             rerankers = []
 
-        output_file_path = os.path.join(repo_path, output_file)
-        model_name = self.model.__class__.__name__
-        # output_file = f"{output_dir}/{model_name}_metrics.txt"
+        if output_file_path is None:
+            print("WARNING: Output file path not provided, using default")
+            output_file_path = os.path.join(repo_path, f'{self.model.__class__.__name__}_results.txt')
 
-        if skip_existing and os.path.exists(output_file):
-            print(f'Output file {output_file} already exists, skipping...')
+        # output_file_path = os.path.join(repo_path, output_file)
+        model_name = self.model.__class__.__name__
+
+        if skip_existing and os.path.exists(output_file_path):
+            print(f'Output file {output_file_path} already exists, skipping...')
             return
 
         sampled_commits = self.sample_commits(n)
-
-        results = []
-        # for _, row in sampled_commits.iterrows():
-        for _, row in tqdm(sampled_commits.iterrows(), total=sampled_commits.shape[0]):
-            # search_results = self.model.search(row['commit_message'], row['commit_date'], ranking_depth=k)
-            # TODO: Add ChatGPT based query modification here
-            cur_query = row['commit_message']
-            search_results = self.model.pipeline(cur_query, row['commit_date'], ranking_depth=k, aggregation_method=aggregation_strategy)
-            for reranker in rerankers:
-                search_results = reranker.rerank_pipeline(cur_query, search_results)
-            evaluation = self.eval_model.evaluate(search_results,
-                                                       self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist())
-            results.append(evaluation)
+        results = self.evaluate_df(sampled_commits, k, aggregation_strategy, rerankers)
 
         avg_scores = {metric: round(np.mean([result[metric] for result in results]), 4) for metric in results[0]}
 

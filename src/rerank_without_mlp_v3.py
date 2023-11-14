@@ -195,10 +195,17 @@ def main(args):
     combined_df = get_combined_df(repo_path)
     BM25_AGGR_STRAT = 'sump'
 
+    eval_path = os.path.join(repo_path, 'eval')
+    if not os.path.exists(eval_path):
+        os.makedirs(eval_path)
+
     bm25_searcher = BM25Searcher(index_path)
     evaluator = SearchEvaluator(metrics)
     model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
-    bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file='BM25_metrics.txt', aggregation_strategy=BM25_AGGR_STRAT, repo_path=repo_path)
+
+    bm25_output_path = os.path.join(eval_path, f'bm25_baseline_N{n}_K{K}_metrics.txt')
+    print(f'BM25 output path: {bm25_output_path}')
+    bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=BM25_AGGR_STRAT, repo_path=repo_path)
 
     print("BM25 Baseline Evaluation")
     print(bm25_baseline_eval)
@@ -234,8 +241,12 @@ def main(args):
 
 
     # print(combined_df.info())
+    save_model_name = params['model_name'].replace('/', '_')
 
-    bert_reranker_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file=f"bert_reranker_{params['model_name']}_without_mlp_metrics.txt", aggregation_strategy='sump', rerankers=rerankers, repo_path=repo_path)
+    reranker_output_file = f"bert_reranker_{save_model_name}_N{args.n}_K{args.k}_without_mlp_metrics.txt"
+    reranker_output_path = os.path.join(eval_path, reranker_output_file)
+
+    bert_reranker_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=reranker_output_path, aggregation_strategy='sump', rerankers=rerankers, repo_path=repo_path)
 
     print("BERT Reranker Evaluation")
     print(bert_reranker_eval)

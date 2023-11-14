@@ -1,9 +1,14 @@
 import glob
 import json
 import os
+import pickle
+import random
 
+import numpy as np
 import pandas as pd
 import tiktoken
+import torch
+from torch.utils.data import Dataset
 
 os.environ['TIKTOKEN_CACHE_DIR'] = ""
 ENCODING = 'p50k_base'
@@ -13,6 +18,13 @@ assert enc.decode(enc.encode("hello world")) == "hello world"
 def tokenize(text):
     return ' '.join(map(str, enc.encode(text, disallowed_special=())))
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 def get_combined_df(repo_dir):
     all_files = glob.glob(os.path.join(repo_dir, '*.parquet'))
@@ -66,3 +78,80 @@ class AggregatedSearchResult:
         class_name = self.__class__.__name__
         return f"{class_name}(file_path={self.file_path!r}, score={self.score}, " \
                f"contributing_results={self.contributing_results})"
+
+
+
+
+class TripletDataset(Dataset):
+    def __init__(self, data, tokenizer, max_seq_length):
+        self.data = data
+        self.tokenizer = tokenizer
+        self.max_seq_length = max_seq_length
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        query, passage, label = self.data[index]
+
+        # tokenize the query passage pairs and create tensors for the input ids, attention masks, and token type ids
+        encoded_pair = self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True)
+
+        input_ids = encoded_pair['input_ids'].squeeze(0)
+        attention_mask = encoded_pair['attention_mask'].squeeze(0)
+
+        return input_ids, attention_mask, label
+
+
+
+def prepare_triplet_data_from_df(df, searcher, depth, n_positive, n_negative, cache_file, overwrite=False):
+    # Check if cache file exists
+    if os.path.exists(cache_file) and not overwrite:
+        print(f"Loading data from cache file: {cache_file}")
+        with open(cache_file, 'rb') as file:
+            return pickle.load(file)
+
+
+    data = []
+    print(f'Preparing data from dataframe of size: {len(df)} with depth: {depth}')
+
+    for _, row in df.iterrows():
+        commit_message = row['commit_message']
+        actual_files_modified = row['actual_files_modified']
+        # search_results = search(searcher, commit_message, row['commit_date'], 1000)
+
+        # search_results = searcher.search(commit_message, row['commit_date'], 100)
+        search_results = searcher.pipeline(commit_message, row['commit_date'], depth, 'sump')
+
+        # flatten the contributing results for each aggregated result
+        search_results = [result for agg_result in search_results for result in agg_result.contributing_results]
+
+        # efficiently get the top n_positive and n_negative samples
+        positive_samples = []
+        negative_samples = []
+
+        for result in search_results:
+            if result.file_path in actual_files_modified and len(positive_samples) < n_positive:
+                positive_samples.append(result.commit_msg)
+            elif result.file_path not in actual_files_modified and len(negative_samples) < n_negative:
+                negative_samples.append(result.commit_msg)
+
+            if len(positive_samples) == n_positive and len(negative_samples) == n_negative:
+                break
+
+        # Get positive and negative samples
+        # positive_samples = [res.commit_msg for res in search_results if res.file_path in actual_files_modified][:n_positive]
+        # negative_samples = [res.commit_msg for res in search_results if res.file_path not in actual_files_modified][:n_negative]
+
+        for sample_msg in positive_samples:
+            # sample_msg  = reverse_tokenize(json.loads(sample.raw)['contents'])
+            data.append((commit_message, sample_msg, 1))
+
+        for sample_msg in negative_samples:
+            # sample_msg  = reverse_tokenize(json.loads(sample.raw)['contents'])
+            data.append((commit_message, sample_msg, 0))
+    # Write data to cache file
+    with open(cache_file, 'wb') as file:
+        pickle.dump(data, file)
+        print(f"Saved data to cache file: {cache_file}")
+    return data
