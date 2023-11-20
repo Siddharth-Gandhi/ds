@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoModelForSequenceClassification, AutoTokenizer
 
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
@@ -24,30 +24,44 @@ from utils import (
     set_seed,
 )
 
+# class MLP(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, output_dim):
+#         super(MLP, self).__init__()
+#         self.fc1 = nn.Linear(input_dim, output_dim)
+#         # self.fc1 = nn.Linear(input_dim, hidden_dim)
+#         # self.relu = nn.ReLU()
+#         # self.fc2 = nn.Linear(hidden_dim, output_dim)
+#         self.sigmoid = nn.Sigmoid()
+#         # Initialize weights
+#     #     self.init_weights()
+
+#     # def init_weights(self):
+#     #     init.xavier_uniform_(self.fc1.weight)
+#     #     init.xavier_uniform_(self.fc2.weight)
+
+
+#         # init.zeros_(self.fc1.bias)
+#         # init.zeros_(self.fc2.bias)
+
+#     def forward(self, x):
+#         x = self.fc1(x)
+#         # x = self.relu(x)
+#         # x = self.fc2(x)
+#         x = self.sigmoid(x)
+#         return x
 
 class MLP(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim, hidden_dim, output_dim, dropout_rate):
         super(MLP, self).__init__()
-        self.fc1 = nn.Linear(input_dim, output_dim)
-        # self.fc1 = nn.Linear(input_dim, hidden_dim)
-        # self.relu = nn.ReLU()
-        # self.fc2 = nn.Linear(hidden_dim, output_dim)
+        self.fc1 = nn.Linear(input_dim, hidden_dim)  # Adding an intermediate layer
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc2 = nn.Linear(hidden_dim, output_dim)
         self.sigmoid = nn.Sigmoid()
-        # Initialize weights
-    #     self.init_weights()
-
-    # def init_weights(self):
-    #     init.xavier_uniform_(self.fc1.weight)
-    #     init.xavier_uniform_(self.fc2.weight)
-
-
-        # init.zeros_(self.fc1.bias)
-        # init.zeros_(self.fc2.bias)
 
     def forward(self, x):
         x = self.fc1(x)
-        # x = self.relu(x)
-        # x = self.fc2(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
         x = self.sigmoid(x)
         return x
 
@@ -59,6 +73,7 @@ class BERTReranker:
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         # self.model = AutoModel.from_pretrained(self.model_name, num_labels=1)
         self.model = AutoModel.from_pretrained(self.model_name)
+        # self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1)
         self.device = torch.device("cuda" if torch.cuda.is_available() and parameters['use_gpu'] else "cpu")
         self.model.to(self.device)
 
@@ -88,7 +103,7 @@ class BERTReranker:
         # hidden_dim = parameters['HIDDEN_DIM']   # Example hidden size
         # output_dim = parameters['OUTPUT_DIM']  # We want a single score as output
 
-        self.mlp = MLP(self.model.config.hidden_size, parameters['hidden_dim'], 1).to(self.device)
+        self.mlp = MLP(self.model.config.hidden_size, parameters['hidden_dim'], 1, parameters['dropout_prob']).to(self.device)
 
     def rerank(self, query, aggregated_results: List[AggregatedSearchResult]):
         """
@@ -161,12 +176,17 @@ class BERTReranker:
 
                 cls_output = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
 
-                # Pass the pooled output through the MLP to get the scores
+                # # Pass the pooled output through the MLP to get the scores
                 # logits = self.mlp(pooled_output).squeeze(-1) # type: ignore
                 logits = self.mlp(cls_output).squeeze(-1) # type: ignore
 
-                # Collect the scores (detach them from the computation graph and move to CPU)
+                # # Collect the scores (detach them from the computation graph and move to CPU)
                 scores.extend(logits.detach().cpu().numpy())
+
+
+                # outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+                # logits = outputs.logits
+                # scores.extend(logits.detach().cpu().numpy().squeeze(-1))
 
         return scores
 
@@ -210,24 +230,26 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
     save_dir = os.path.join(save_dir, 'models')
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
-    for param in bertranker.model.parameters():
-        param.requires_grad = False if freeze_bert else True
+    # for param in bertranker.model.parameters():
+    #     param.requires_grad = False if freeze_bert else True
 
 
-    if freeze_bert:
-        optimizer = torch.optim.Adam(bertranker.mlp.parameters(), lr=bertranker.parameters['mlp_lr'])
-    else:
-        optimizer = torch.optim.Adam([
-            {'params': bertranker.model.parameters(), 'lr': bertranker.parameters['bert_lr']},
-            {'params': bertranker.mlp.parameters(), 'lr': bertranker.parameters['mlp_lr']}
-                ], lr=bertranker.parameters['mlp_lr'])
+    # if freeze_bert:
+    #     optimizer = torch.optim.Adam(bertranker.mlp.parameters(), lr=bertranker.parameters['mlp_lr'], weight_decay=bertranker.parameters['weight_decay'])
+    # else:
+    #     optimizer = torch.optim.Adam([
+    #         {'params': bertranker.model.parameters(), 'lr': bertranker.parameters['bert_lr'], 'weight_decay': bertranker.parameters['weight_decay']},
+    #         {'params': bertranker.mlp.parameters(), 'lr': bertranker.parameters['mlp_lr'], 'weight_decay': bertranker.parameters['weight_decay']}
+    #             ], lr=bertranker.parameters['mlp_lr'])
+
+    optimizer = torch.optim.Adam(bertranker.model.parameters(), lr=bertranker.parameters['bert_lr'])
 
     # one optimizer for both BERT and MLP with same learning rate
 
 
     print(f'Optimizer: {optimizer}')
 
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
     # Set up the loss function
     criterion = nn.BCEWithLogitsLoss()  #
 
@@ -246,14 +268,19 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
     train_losses = []
     val_losses = []
     best_val_loss = float('inf')
-    model_name = 'bert_reranker_frozen' if freeze_bert else 'bert_reranker'
+    # model_name = 'bert_reranker_frozen' if freeze_bert else 'bert_reranker'
+    model_name = bertranker.parameters['model_name'].replace('/', '_') + '_frozen' if freeze_bert else bertranker.parameters['model_name'].replace('/', '_')
+    model_name += '_frozen' if freeze_bert else ''
+    print(f'Model name: {model_name}')
     # for epoch in range(epochs):
     for epoch in tqdm(range(num_epochs)):
         # self.model.eval()  # Make sure the BERT model is in evaluation mode
-        if freeze_bert:
-            bertranker.model.eval()  # BERT finetuning should be in eval mode
-        else:
-            bertranker.model.train()  # BERT finetuning should be in train mode
+        # if freeze_bert:
+        #     bertranker.model.eval()  # BERT finetuning should be in eval mode
+        # else:
+        #     bertranker.model.train()  # BERT finetuning should be in train mode
+
+        bertranker.model.train()  # BERT finetuning should be in train mode
         bertranker.mlp.train()  # MLP should be in training mode
         total_loss = 0
 
@@ -265,16 +292,20 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
             b_labels = b_labels.float().to(bertranker.device)
 
             # Forward pass
-            # if freeze_bert:
-            #     with torch.no_grad():
-            #         # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
-            #         cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
+            if freeze_bert:
+                with torch.no_grad():
+                    # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+                    cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
 
-            # else:
-                # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+            else:
+                pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
             cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
 
             logits = bertranker.mlp(cls_output).squeeze(-1) # type: ignore
+
+            # outputs = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+            # logits = bertranker.mlp(outputs.logits).squeeze(-1) # type: ignore
+            # logits = outputs.logits.squeeze(-1) # type: ignore
             # Compute loss
             loss = criterion(logits, b_labels)
             total_loss += loss.item()
@@ -291,24 +322,27 @@ def train_reranker(bertranker, train_dataloader, validation_dataloader, freeze_b
         bertranker.model.eval()
         bertranker.mlp.eval()
         total_eval_loss = 0
-        for batch in validation_dataloader:
-            b_input_ids, b_attention_mask, b_labels = batch
-            b_input_ids = b_input_ids.to(bertranker.device)
-            b_attention_mask = b_attention_mask.to(bertranker.device)
-            b_labels = b_labels.float().to(bertranker.device)
+        with torch.no_grad():
+            for batch in validation_dataloader:
+                b_input_ids, b_attention_mask, b_labels = batch
+                b_input_ids = b_input_ids.to(bertranker.device)
+                b_attention_mask = b_attention_mask.to(bertranker.device)
+                b_labels = b_labels.float().to(bertranker.device)
 
-            with torch.no_grad():
-                # pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
+                pooled_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).pooler_output
                 cls_output = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask).last_hidden_state[:, 0, :]
                 logits = bertranker.mlp(cls_output).squeeze(-1) # type: ignore
 
-            # Compute loss
-            loss = criterion(logits, b_labels.float())
-            total_eval_loss += loss.item()
+                # outputs = bertranker.model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+                # logits = outputs.logits.squeeze(-1) # type: ignore
+
+                # Compute loss
+                loss = criterion(logits, b_labels.float())
+                total_eval_loss += loss.item()
 
         avg_val_loss = total_eval_loss / len(validation_dataloader)
 
-        scheduler.step(avg_val_loss)
+        # scheduler.step(avg_val_loss)
         # Save losses
         train_losses.append(avg_train_loss)
         val_losses.append(avg_val_loss)
@@ -382,20 +416,22 @@ def main(args):
         'psg_cnt': 5,
         # 'psg_stride': 32,
         'aggregation_strategy': 'sump',
-        'batch_size': 32,
+        'batch_size': 16,
         # 'batch_size': 512,
         # 'batch_size': 1,
         'use_gpu': True,
-        'rerank_depth': 100,
-        'num_epochs': 4,
+        'rerank_depth': 250,
+        'num_epochs': 3,
         # 'mlp_lr': 1e-2,
-        'mlp_lr': 3e-5,
-        'bert_lr': 3e-5,
-        'hidden_dim': 100,
-        'num_positives': 10,
-        'num_negatives': 10,
+        'mlp_lr': 1e-3,
+        'bert_lr': 5e-5,
+        'hidden_dim': 128,
+        'num_positives': 20,
+        'num_negatives': 20,
         'train_depth': 1000,
-        'num_workers': 4,
+        'num_workers': 8,
+        # 'weight_decay': 0.01,
+        # 'dropout_prob': 0.5,
     }
 
 
@@ -419,7 +455,7 @@ def main(args):
     print(f'Number of commits after midpoint date: {len(recent_df)}')
     # sys.exit(0)
 
-    recent_df = recent_df.head(1000)
+    recent_df = recent_df.head(2000)
 
     # Step 4: Split recent dataframe and prepare data
     # TODO remove magic numbers
@@ -468,7 +504,7 @@ def main(args):
     # bert_reranker.train_mlp(train_dataloader, val_dataloader)
     train_reranker(bert_reranker, train_dataloader, val_dataloader, freeze_bert=args.freeze_bert, save_dir=repo_path)
 
-    reranker_output_file = f"bert_reranker_{save_model_name}_N{args.n}_K{args.k}_non_frozen_metrics.txt" if not args.freeze_bert else f"bert_reranker_{save_model_name}_N{args.n}_K{args.k}_frozen_metrics.txt"
+    reranker_output_file = f"925_bert_reranker_{save_model_name}_N{args.n}_K{args.k}_non_frozen_metrics.txt" if not args.freeze_bert else f"bert_reranker_{save_model_name}_N{args.n}_K{args.k}_frozen_metrics.txt"
 
     # reranker_output_file = f"bert_reranker_{save_model_name}_N{args.n}_K{args.k}_without_mlp_metrics.txt"
     reranker_output_path = os.path.join(eval_path, reranker_output_file)

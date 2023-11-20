@@ -1,0 +1,10 @@
+Model Name: BM25Searcher
+Sample Size: 100
+Evaluation Metrics:
+MAP: 0.2137
+P@10: 0.114
+P@100: 0.034
+P@1000: 0.0053
+MRR: 0.305
+Recall@100: 0.5517
+Recall@1000: 0.7426
