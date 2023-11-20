@@ -6,7 +6,13 @@ import numpy as np
 from pyserini.index.lucene import IndexReader
 from pyserini.search.lucene import LuceneSearcher
 
-from utils import AggregatedSearchResult, SearchResult, reverse_tokenize, tokenize
+from utils import (
+    AggregatedCommitResult,
+    AggregatedSearchResult,
+    SearchResult,
+    reverse_tokenize,
+    tokenize,
+)
 
 
 class BM25Searcher:
@@ -78,9 +84,39 @@ class BM25Searcher:
         aggregated_results.sort(key=lambda result: result.score, reverse=True)
         return aggregated_results
 
-    def pipeline(self, query, query_date, ranking_depth, aggregation_method):
+    def aggregate_commit_scores(self, search_results, aggregation_method='sump'):
+        commit_to_results = defaultdict(list)
+        for result in search_results:
+            commit_to_results[result.commit_id].append(result)
+
+        aggregated_results = []
+        for commit_id, results in commit_to_results.items():
+            # aggregated_score = sum(result.score for result in results)
+            if aggregation_method == 'sump':
+                aggregated_score = sum(result.score for result in results)
+            elif aggregation_method == 'maxp':
+                aggregated_score = max(result.score for result in results)
+            # elif aggregation_method == 'firstp':
+            #     aggregated_score = results[0].score
+            elif aggregation_method == 'avgp':
+                aggregated_score = np.mean([result.score for result in results])
+            else:
+                raise ValueError(f"Unknown aggregation method {aggregation_method}")
+
+            aggregated_results.append(AggregatedCommitResult(commit_id, aggregated_score, results))
+
+        aggregated_results.sort(key=lambda result: result.score, reverse=True)
+        return aggregated_results
+
+    def pipeline(self, query, query_date, ranking_depth, aggregation_method, aggregate_on='file'):
         search_results = self.search(query, query_date, ranking_depth)
         if aggregation_method is not None:
-            aggregated_results = self.aggregate_file_scores(search_results, aggregation_method)
+            if aggregate_on == 'file':
+                aggregated_results = self.aggregate_file_scores(search_results, aggregation_method)
+            elif aggregate_on == 'commit':
+                aggregated_results = self.aggregate_commit_scores(search_results, aggregation_method)
+            else:
+                raise ValueError(f"Unknown aggregation type {aggregate_on}")
+            # aggregated_results = self.aggregate_file_scores(search_results, aggregation_method)
             return aggregated_results
         return search_results

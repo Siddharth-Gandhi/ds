@@ -1,13 +1,16 @@
 import glob
 import json
+import math
 import os
 import pickle
 import random
+from turtle import pos
 
 import numpy as np
 import pandas as pd
 import tiktoken
 import torch
+import tqdm
 from torch.utils.data import Dataset
 
 os.environ['TIKTOKEN_CACHE_DIR'] = ""
@@ -45,12 +48,12 @@ def reverse_tokenize(text):
 
 
 class SearchResult:
-    def __init__(self, commit_id, file_path, score, commit_date, commit_msg):
+    def __init__(self, commit_id, file_path, score, commit_date, commit_message):
         self.commit_id = commit_id
         self.file_path = file_path
         self.score = score
         self.commit_date = commit_date
-        self.commit_msg = commit_msg
+        self.commit_message = commit_message
 
 
     def __repr__(self):
@@ -80,6 +83,18 @@ class AggregatedSearchResult:
                f"contributing_results={self.contributing_results})"
 
 
+class AggregatedCommitResult:
+    def __init__(self, commit_id, aggregated_score, contributing_results):
+        self.commit_id = commit_id
+        self.score = aggregated_score
+        self.contributing_results = contributing_results
+
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        return f"{class_name}(commit_id={self.commit_id!r}, score={self.score}, " \
+               f"contributing_results={self.contributing_results})"
+
+
 
 
 class TripletDataset(Dataset):
@@ -102,56 +117,130 @@ class TripletDataset(Dataset):
 
         return input_ids, attention_mask, label
 
-
-
-def prepare_triplet_data_from_df(df, searcher, depth, n_positive, n_negative, cache_file, overwrite=False):
+def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_negatives, cache_file, overwrite=False):
     # Check if cache file exists
-    if os.path.exists(cache_file) and not overwrite:
+    if cache_file and os.path.exists(cache_file) and not overwrite:
         print(f"Loading data from cache file: {cache_file}")
         with open(cache_file, 'rb') as file:
             return pickle.load(file)
 
 
     data = []
-    print(f'Preparing data from dataframe of size: {len(df)} with depth: {depth}')
-
-    for _, row in df.iterrows():
+    print(f'Preparing data from dataframe of size: {len(df)} with search_depth: {search_depth}')
+    # for _, row in df.iterrows():
+    total_positives, total_negatives = 0, 0
+    for _, row in tqdm.tqdm(df.iterrows(), total=len(df)):
+        cur_positives = 0
+        cur_negatives = 0
+        pos_commit_ids = set()
+        neg_commit_ids = set()
         commit_message = row['commit_message']
         actual_files_modified = row['actual_files_modified']
-        # search_results = search(searcher, commit_message, row['commit_date'], 1000)
 
-        # search_results = searcher.search(commit_message, row['commit_date'], 100)
-        search_results = searcher.pipeline(commit_message, row['commit_date'], depth, 'sump')
+        agg_search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump', aggregate_on='commit')
 
-        # flatten the contributing results for each aggregated result
-        search_results = [result for agg_result in search_results for result in agg_result.contributing_results]
+        # for each agg_result, find out how many files it has edited are in actual_files_modified and sort by score
 
-        # efficiently get the top n_positive and n_negative samples
-        positive_samples = []
-        negative_samples = []
+        for agg_result in agg_search_results:
+            agg_result_files = set([result.file_path for result in agg_result.contributing_results])
+            intersection = agg_result_files.intersection(actual_files_modified)
+            # TODO maybe try this for training
+            # agg_result.score = len(intersection) / len(agg_result_files) # how focused the commit is
+            agg_result.score = len(intersection) / len(agg_result_files) # how focused the commit is
+            # agg_result.score = math.log(cur_score+1)
+            # agg_result.score = len(intersection)
 
-        for result in search_results:
-            if result.file_path in actual_files_modified and len(positive_samples) < n_positive:
-                positive_samples.append(result.commit_msg)
-            elif result.file_path not in actual_files_modified and len(negative_samples) < n_negative:
-                negative_samples.append(result.commit_msg)
+        agg_search_results.sort(key=lambda res: res.score, reverse=True)
 
-            if len(positive_samples) == n_positive and len(negative_samples) == n_negative:
+        # go from top to bottom, first num_positives non-0 scores are positive samples and the next num_negatives are negative samples
+        for agg_result in agg_search_results:
+            cur_commit_msg = agg_result.contributing_results[0].commit_message
+            if cur_positives < num_positives and agg_result.score > 0:
+                # meaning there is at least one file in the agg_result that is in actual_files_modified
+                # pos_commits.append(agg_result)
+                data.append((commit_message, cur_commit_msg, 1))
+                cur_positives += 1
+                pos_commit_ids.add(agg_result.commit_id)
+            elif cur_negatives < num_negatives:
+                # neg_commits.append(agg_result)
+                data.append((commit_message, cur_commit_msg, 0))
+                cur_negatives += 1
+                neg_commit_ids.add(agg_result.commit_id)
+            if cur_positives == num_positives and cur_negatives == num_negatives:
                 break
 
-        # Get positive and negative samples
-        # positive_samples = [res.commit_msg for res in search_results if res.file_path in actual_files_modified][:n_positive]
-        # negative_samples = [res.commit_msg for res in search_results if res.file_path not in actual_files_modified][:n_negative]
+        assert len(pos_commit_ids.intersection(neg_commit_ids)) == 0, 'Positive and negative commit ids should not intersect'
+        # print(f"Total positives: {cur_positives}, Total negatives: {cur_negatives}")
+        total_positives += cur_positives
+        total_negatives += cur_negatives
 
-        for sample_msg in positive_samples:
-            # sample_msg  = reverse_tokenize(json.loads(sample.raw)['contents'])
-            data.append((commit_message, sample_msg, 1))
+    # convert to pandas dataframe
+    data = pd.DataFrame(data, columns=['query', 'passage', 'label'])
 
-        for sample_msg in negative_samples:
-            # sample_msg  = reverse_tokenize(json.loads(sample.raw)['contents'])
-            data.append((commit_message, sample_msg, 0))
     # Write data to cache file
-    with open(cache_file, 'wb') as file:
-        pickle.dump(data, file)
-        print(f"Saved data to cache file: {cache_file}")
+    if cache_file:
+        with open(cache_file, 'wb') as file:
+            pickle.dump(data, file)
+            print(f"Saved data to cache file: {cache_file}")
+
+    # print distribution of labels
+    print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
+    # print percentage of positives and negatives
+    denom = total_positives + total_negatives
+    print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
     return data
+
+# OLD CODE
+# def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_negatives, cache_file, overwrite=False):
+#     # Check if cache file exists
+#     if os.path.exists(cache_file) and not overwrite:
+#         print(f"Loading data from cache file: {cache_file}")
+#         with open(cache_file, 'rb') as file:
+#             return pickle.load(file)
+
+
+#     data = []
+#     print(f'Preparing data from dataframe of size: {len(df)} with search_depth: {search_depth}')
+#     total_positives = 0
+#     total_negatives = 0
+#     for _, row in df.iterrows():
+#         commit_message = row['commit_message']
+#         actual_files_modified = row['actual_files_modified']
+
+#         search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump')
+
+#         # flatten the contributing results for each aggregated result
+#         search_results = [result for agg_result in search_results for result in agg_result.contributing_results]
+
+#         # efficiently get the top num_positives and num_negatives samples
+#         positive_samples = []
+#         negative_samples = []
+
+#         for result in search_results:
+#             if result.file_path in actual_files_modified and len(positive_samples) < num_positives:
+#                 positive_samples.append(result.commit_message)
+#                 total_positives += 1
+#             elif result.file_path not in actual_files_modified and len(negative_samples) < num_negatives:
+#                 negative_samples.append(result.commit_message)
+#                 total_negatives += 1
+
+#             if len(positive_samples) == num_positives and len(negative_samples) == num_negatives:
+#                 break
+
+
+#         for sample_msg in positive_samples:
+#             data.append((commit_message, sample_msg, 1))
+
+#         for sample_msg in negative_samples:
+#             data.append((commit_message, sample_msg, 0))
+#     # Write data to cache file
+#     with open(cache_file, 'wb') as file:
+#         pickle.dump(data, file)
+#         print(f"Saved data to cache file: {cache_file}")
+
+#     # print distribution of labels
+#     print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
+#     # print percentage of positives and negatives
+#     denom = total_positives + total_negatives
+#     print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
+#     return data

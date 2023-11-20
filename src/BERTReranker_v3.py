@@ -119,7 +119,7 @@ class BERTReranker:
         query_passage_pairs = []
         for agg_result in aggregated_results:
             query_passage_pairs.extend(
-                (query, result.commit_msg)
+                (query, result.commit_message)
                 for result in agg_result.contributing_results[: self.psg_cnt]
             )
 
