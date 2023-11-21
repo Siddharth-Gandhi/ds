@@ -1,0 +1,1525 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt3
+348615be62cd0823cdcbd470bca76ea65541e0f4,1572020533,"build: update to @bazel/bazel 1.0.0 (#33367)
+
+Also removes `build:remote --spawn_strategy=remote` from .bazelrc. It seems that with Bazel 1.0.0 setting `--incompatible_list_based_execution_strategy_selection=false` no longer works around the issue with npm_package that it did when it was added. The error that was originally observed has returned after updating to Bazel 1.0.0:
+
+```
+ERROR: /home/circleci/ng/packages/angular_devkit/build_optimizer/BUILD:66:1: Assembling npm package packages/angular_devkit/build_optimizer/npm_package failed: No usable spawn strategy found for spawn with mnemonic Action. Your --spawn_strategy, --genrule_strategy or --strategy flags are probably too strict. Visit https://github.com/bazelbuild/bazel/issues/7480 for migration advice
+```
+
+This commit removes both `—incompatible_list_based_execution_strategy_selection=false` as well as `build:remote --spawn_strategy=remote` which means that Bazel will do the default behavior of picking the first available strategy from the default list, which is `remote,worker,sandboxed,local`. See https://github.com/bazelbuild/bazel/issues/7480 for more details.
+
+PR Close #33367
+",['packages/bazel/package.bzl'],"When updating to Bazel 1.0.0, an error was observed with the npm package related to the build optimizer. Previously, setting `--incompatible_list_based_execution_strategy_selection=false` was a workaround for this issue, but it no longer works with the updated version. The error, which had been temporarily resolved, has now resurfaced.
+
+The error message that appeared after the Bazel update suggests that there is no usable spawn strategy found for the npm package. The commit removes both the `—incompatible_list_based_execution_strategy_selection=false` setting and the `build:remote --spawn_strategy=remote` from the .bazelrc file. This means that Bazel will now use the default behavior of selecting the first available strategy from the default list, which consists of `remote,worker,sandboxed,local`.
+
+For more details, refer to the following link: [Link to issue](https://github.com/bazelbuild/bazel/issues/7480)"
+6ceb9034dc99e5e9f791c988eda2cc9ce99bc2e1,1557867883,"fix(core): static-query migration errors not printed properly (#30458)
+
+Apparently the devkit logger is not able to properly print
+out error objects, so we need to convert them to a string
+before in order to make the error visible to the user.
+
+This is not testable without an e2e test that validates the CLI
+terminal output.
+
+PR Close #30458
+",['packages/core/schematics/migrations/static-queries/index.ts'],"When there are errors during the static-query migration process, they are not being printed properly using the devkit logger. In order to make the error visible to the user, the error objects need to be converted to strings. An e2e test is needed to validate the CLI terminal output for this fix."
+96b7fe93af361a1cf2ea5477970f64ba6f3d8cd5,1665504181,"fix(forms): call `setDisabledState` on `ControlValueAcessor` when control is enabled (#47576)
+
+Previously, `setDisabledState` was never called when attached if the control is enabled. This PR fixes the bug, and creates a configuration option to opt-out of the fix.
+
+Fixes #35309.
+
+BREAKING CHANGE: setDisabledState will always be called when a `ControlValueAccessor` is attached. You can opt-out with `FormsModule.withConfig` or `ReactiveFormsModule.withConfig`.
+
+PR Close #47576
+","['.circleci/env.sh', 'packages/forms/src/directives.ts', 'packages/forms/src/directives/ng_form.ts', 'packages/forms/src/directives/ng_model.ts', 'packages/forms/src/directives/reactive_directives/form_control_directive.ts', 'packages/forms/src/directives/reactive_directives/form_group_directive.ts', 'packages/forms/src/directives/shared.ts', 'packages/forms/src/form_providers.ts', 'packages/forms/src/forms.ts', 'packages/forms/test/value_accessor_integration_spec.ts']","Previously, the `setDisabledState` function was not being called when a control is enabled, causing a bug. This commit fixes the issue by ensuring that `setDisabledState` is always called when a `ControlValueAccessor` is attached. Additionally, a new configuration option is introduced to allow opting out of this fix. 
+
+This change is a breaking change, as it modifies the behavior of `setDisabledState`. To opt-out of the fix, you can use either `FormsModule.withConfig` or `ReactiveFormsModule.withConfig`. 
+
+Fixes issue #35309."
+8d3da56eda12070df1fb473c8609f3a94d77bfd6,1616523784,"fix(ngcc): detect synthesized constructors that have been downleveled using TS 4.2 (#41305)
+
+TypeScript 4.2 has changed its emitted syntax for synthetic constructors
+when using `downlevelIteration`, which affects ES5 bundles that have
+been downleveled from ES2015 bundles. This is typically the case for UMD
+bundles in the APF spec, as they are generated by downleveling the
+ESM2015 bundle into ES5. ngcc needs to detect the new syntax in order to
+correctly identify synthesized constructor functions in ES5 bundles.
+
+Fixes #41298
+
+PR Close #41305
+","['packages/compiler-cli/ngcc/src/host/esm5_host.ts', 'packages/compiler-cli/ngcc/test/host/commonjs_host_spec.ts', 'packages/compiler-cli/ngcc/test/host/esm5_host_spec.ts', 'packages/compiler-cli/ngcc/test/host/umd_host_spec.ts', 'packages/compiler-cli/ngcc/test/integration/ngcc_spec.ts']","The change in TypeScript 4.2's emitted syntax for synthetic constructors when using `downlevelIteration` can impact ES5 bundles that have been downleveled from ES2015 bundles. This change specifically affects UMD bundles in the APF spec, which are generated by downleveling the ESM2015 bundle into ES5. As a result, ngcc needs to be able to detect the new syntax in order to accurately identify synthesized constructor functions in ES5 bundles."
+f7471eea3c09dff38c57acf0286cd01b455243e8,1567107482,"fix(ngcc): handle compilation diagnostics (#31996)
+
+Previously, any diagnostics reported during the compilation of an
+entry-point would not be shown to the user, but either be ignored or
+cause a hard crash in case of a `FatalDiagnosticError`. This is
+unfortunate, as such error instances contain information on which code
+was responsible for producing the error, whereas only its error message
+would not. Therefore, it was quite hard to determine where the error
+originates from.
+
+This commit introduces behavior to deal with error diagnostics in a more
+graceful way. Such diagnostics will still cause the compilation to fail,
+however the error message now contains formatted diagnostics.
+
+Closes #31977
+Resolves FW-1374
+
+PR Close #31996
+","['packages/compiler-cli/ngcc/src/analysis/decoration_analyzer.ts', 'packages/compiler-cli/ngcc/src/analysis/util.ts', 'packages/compiler-cli/ngcc/src/main.ts', 'packages/compiler-cli/ngcc/src/packages/transformer.ts', 'packages/compiler-cli/ngcc/test/integration/ngcc_spec.ts']","Previously, diagnostics reported during the compilation of an entry-point were not being shown to the user. This made it difficult to determine the origin of the error, as only the error message was displayed without any information on the code responsible for the error. This commit introduces a more graceful way of handling error diagnostics, where the compilation still fails but the error message now includes formatted diagnostics."
+eda09e69eae9513d368d7e4b2838b03ac2b3479a,1558112146,"fix(ivy): ngtsc - do not wrap arguments unnecessarily (#30349)
+
+Previously we defensively wrapped expressions in case they ran afoul of
+precedence rules. For example, it would be easy to create the TS AST structure
+Call(Ternary(a, b, c)), but might result in printed code of:
+
+```
+a ? b : c()
+```
+
+Whereas the actual structure we meant to generate is:
+
+```
+(a ? b : c)()
+```
+
+However the TypeScript renderer appears to be clever enough to provide
+parenthesis as necessary.
+
+This commit removes these defensive paraenthesis in the cases of binary
+and ternary operations.
+
+FW-1273
+
+PR Close #30349
+","['packages/compiler-cli/src/ngtsc/translator/src/translator.ts', 'packages/compiler-cli/test/compliance/r3_compiler_compliance_spec.ts', 'packages/compiler-cli/test/compliance/r3_view_compiler_i18n_spec.ts', 'packages/compiler-cli/test/compliance/r3_view_compiler_listener_spec.ts', 'packages/compiler-cli/test/ngtsc/ngtsc_spec.ts', 'packages/compiler-cli/test/ngtsc/template_mapping_spec.ts']","Defensive parenthesis were previously used to wrap expressions in case they violated precedence rules, but this resulted in unnecessary wrapping of arguments. The TypeScript renderer is capable of providing the necessary parenthesis, so this commit removes the unnecessary defensive parenthesis for binary and ternary operations."
+a33d630a219d871c0ca32534c094920f312561c6,1600360339,"fix(zone.js): should have better backward compatibilities (#38797)
+
+Close #38561, #38669
+
+zone.js 0.11.1 introduces a breaking change to adpat Angular package format,
+and it breaks the module loading order, before 0.11, in IE11, the `zone.js` es5
+format bundle will be imported, but after 0.11, the `fesm2015` format bundle will
+be imported, which causes error.
+
+And since the only purpose of the `dist` folder of zone.js bundles is to keep backward
+ compatibility, in the original commit, I use package redirect to implement that, but
+it is not fully backward compatible, we should keep the same dist structure as `0.10.3`.
+
+PR Close #38797
+","['packages/zone.js/dist/tools.bzl', 'packages/zone.js/test/npm_package/npm_package.spec.ts']","Zone.js version 0.11.1 introduces a breaking change that affects the compatibility with Angular package format. Specifically, it disrupts the module loading order. In IE11, before version 0.11, the `zone.js` ES5 format bundle was imported, but after version 0.11, the `fesm2015` format bundle is imported, causing errors.
+
+To address this problem and maintain backward compatibility, a package redirect was implemented in the `dist` folder of the zone.js bundles. However, this solution was not fully backward compatible. It is necessary to maintain the same `dist` structure as version 0.10.3.
+
+Issue references: #38561, #38669
+Pull request: #38797"
+ffea31f433c1f71b78a2245d52d2969503db1784,1618286606,"perf(compiler-cli): allow incremental compilation in the presence of redirected source files (#41448)
+
+When multiple occurrences of the same package exist within a single
+TypeScript compilation unit, TypeScript deduplicates the source files
+by introducing redirected source file proxies. Such proxies are
+recreated during an incremental compilation even if the original
+declaration file did not change, which caused the compiler not to reuse
+any work from the prior compilation.
+
+This commit changes the incremental driver to recognize a redirected
+source file and treat them as their unredirected source file.
+
+PR Close #41448
+","['packages/compiler-cli/src/ngtsc/incremental/src/state.ts', 'packages/compiler-cli/src/ngtsc/program_driver/src/ts_create_program_driver.ts', 'packages/compiler-cli/src/ngtsc/util/src/typescript.ts', 'packages/compiler-cli/test/ngtsc/incremental_spec.ts']","When multiple occurrences of the same package exist within a TypeScript compilation unit, TypeScript deduplicates the source files by introducing redirected source file proxies. However, during an incremental compilation, the proxies were being recreated even if the original declaration file did not change. This led to the compiler not reusing any work from the prior compilation. As a result, this commit modifies the incremental driver to recognize redirected source files and treat them as their unredirected source files."
+ddb95c51844c5d8aee2187712ba948e41baaf0aa,1661190050,"refactor(compiler): replace most usages of getMutableClone (#47167)
+
+Replaces (almost) all of the usages of the deprecated `getMutableClone` function from TypeScript which has started to log deprecation warnings in version 4.8 and will likely be removed in version 5.0. The one place we have left is in the default import handling of ngtsc which will be more difficult to remove.
+
+PR Close #47167
+","['packages/compiler-cli/src/ngtsc/annotations/common/src/metadata.ts', 'packages/compiler-cli/src/ngtsc/imports/src/default.ts', 'packages/compiler-cli/src/ngtsc/reflection/src/type_to_value.ts', 'packages/compiler-cli/src/ngtsc/ts_compatibility/src/ts_cross_version_utils.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/type_check_block.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/type_emitter.ts', 'packages/compiler-cli/src/ngtsc/util/src/visitor.ts', 'packages/compiler-cli/src/transformers/downlevel_decorators_transform/downlevel_decorators_transform.ts', 'packages/compiler-cli/test/downlevel_decorators_transform_spec.ts']","The usage of the deprecated `getMutableClone` function from TypeScript may result in deprecation warnings starting from version 4.8 and potential removal in version 5.0. Most of the usages of this function have been replaced, with the exception of the default import handling in ngtsc, which poses a greater challenge to remove."
+6910118b0d82255be60a8580957383d227bcd58e,1618846723,"test(zone.js): should invoke XHR task even onload handler throw error. (#41562)
+
+Close #41520.
+
+This case related to the issue #41522.
+
+```
+Zone.root
+  .fork({
+    name: 'xhr',
+    onHasTask(delegate, currentZone, zone, taskState) {
+      console.log('hasMacrotask', taskState.macroTask);
+      return delegate.hasTask(zone, taskState);
+    },
+  })
+  .run(() => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', 'https://cdnjs.cloudflare.com/ajax/libs/zone.js/0.11.4/zone.min.js');
+    xhr.addEventListener('load', () => {
+      throw new Error();
+    });
+    xhr.send();
+  });
+```
+
+zone.js invoke all `onload` event handlers before change the XHR task's state from
+`scheduled` to `notscheduled`, so if any `onload` listener throw error, the XHR task
+wlll be hang to `scheduled`, and leave the macroTask status in the zone wrongly.
+
+This has been fixed in the previous commit, this commit add test to verify the case.
+
+PR Close #41562
+",['packages/zone.js/test/browser/XMLHttpRequest.spec.ts'],"When an `onload` event listener throws an error, the XHR task remains in the `scheduled` state and the macroTask status in the zone is incorrect. This can cause the XHR task to hang indefinitely. This issue has been fixed in a previous commit, and this commit adds a test case to verify the fix."
+15b4173a76216aa9e6076d009946ef342f3300c1,1578956677,"refactor(language-service): create attr for missing attr, bound tmpl (#34743)
+
+Currently the language service constructs an `AttrAst` anytime it is
+missing from a `TemplateAst` path. However, this should only be done
+when the path does not contain an ""attribute-like"" AST, which can
+includes bound properties or bound events.
+
+This commit also refactors `visitAttr` to parse bindings only for
+microsyntax expressions and does some other minor cleanup to make
+linters happy.
+
+This is some cleanup to help the language service eventually use
+`BoundDirectivePropertyAst`s for providing completions for template
+bindings rather than performing the manual parsing currently done.
+
+PR Close #34743
+",['packages/language-service/src/completions.ts'],"The language service currently creates an `AttrAst` even when it is not missing from a `TemplateAst` path. This should only be done when the path does not contain any ""attribute-like"" ASTs, such as bound properties or bound events. This commit refactors the `visitAttr` function to only parse bindings for microsyntax expressions and also includes some minor cleanup to satisfy linters. The goal of this cleanup is to eventually allow the language service to use `BoundDirectivePropertyAst`s for providing completions for template bindings, instead of manually parsing them as it currently does."
+605775398f0ae1893a0a02a6eb3c1200f20475e9,1609883681,"docs(router): Clarify 'parent' for params inheritance (#40304)
+
+When talking about parameter inheritance, one might think that matrix
+parameters can be inherited from the ""parent"" segment, or the segment
+which appears immediately to the left. In reality, when we talk about
+a ""parent"" in the `Router`, we mean the parent `Route` config. This
+config may contain more than one segment and matrix parameters must
+appear at the end or they do not ""belong"" to any config.
+
+PR Close #40304
+",['packages/router/src/router_module.ts'],"When discussing parameter inheritance in the router, there is ambiguity around the definition of a ""parent"" segment. This could lead to confusion as to whether matrix parameters can be inherited from the segment immediately to the left. In reality, the ""parent"" in the `Router` refers to the parent `Route` config, which may encompass multiple segments. Matrix parameters must be positioned at the end, otherwise they are not associated with any specific config."
+11506491393d33ac808da78a3bbb3a8bc9fb5588,1599590503,"perf(core): use `ngDevMode` to tree-shake error messages (#38612)
+
+This commit adds `ngDevMode` guard to throw some errors only in dev mode
+(similar to how things work in other parts of Ivy runtime code). The
+`ngDevMode` flag helps to tree-shake these error messages from production
+builds (in dev mode everything will work as it works right now) to decrease
+production bundle size.
+
+PR Close #38612
+","['packages/core/src/di/r3_injector.ts', 'packages/core/src/render3/instructions/shared.ts']","Adding the `ngDevMode` guard to throw certain errors only in dev mode can help with tree-shaking the error messages from production builds. By utilizing this flag, the error messages that are only needed during development can be removed from the production bundle, reducing its size."
+2484ba4f0561bf337611f5f4aa28e262bf3fb5e0,1606251944,"refactor(compiler-cli): prepare linker options for compilation of components (#39707)
+
+This commit adds the `i18nUseExternalIds` option to the linker options,
+as the compliance tests exercise compilation results with and without
+this flag enabled. We therefore need to configure the linker to take
+this option into account, as otherwise the compliance test output would
+not be identical.
+
+Additionally, this commit switches away from spread syntax to set
+the default options. This introduced a problem when the user-provided
+options object did specify the keys, but with an undefined value. This
+would have prevented the default options from being applied.
+
+PR Close #39707
+","['packages/compiler-cli/linker/src/file_linker/linker_environment.ts', 'packages/compiler-cli/linker/src/file_linker/linker_options.ts']","The linker options for compilation of components need to be prepared. This commit adds the `i18nUseExternalIds` option to the linker options to ensure compliance test outputs are identical with and without this flag enabled. Additionally, the commit switches from spread syntax to set the default options. However, this introduced a problem where if the user-provided options object contained keys with undefined values, the default options would not be applied."
+9e5016c845824466fef1c95d399d93fa7a994730,1548187329,"feat(ivy): DynamicValue now indicates why the value is dynamic (#27697)
+
+This commit changes the partial evaluation mechanism to propagate
+DynamicValue errors internally during evaluation, and not to ""poison""
+entire data structures when a single value is dynamic. For example,
+previously if any entry in an array was dynamic, evaluating the entire
+array would return DynamicValue. Now, the array is returned with only
+the specific dynamic entry as DynamicValue.
+
+Instances of DynamicValue also report the node that was determined to
+be dynamic, as well as a potential reason for the dynamic-ness. These
+can be nested, so an expression `a + b` may have a DynamicValue that
+indicates the 'a' term was DynamicValue, which will itself contain a
+reason for the dynamic-ness.
+
+This work was undertaken for the implementation of listLazyRoutes(),
+which needs to partially evaluate provider arrays, parts of which are
+dynamic and parts of which contain useful information.
+
+PR Close #27697
+","['packages/compiler-cli/src/ngtsc/partial_evaluator/index.ts', 'packages/compiler-cli/src/ngtsc/partial_evaluator/src/builtin.ts', 'packages/compiler-cli/src/ngtsc/partial_evaluator/src/dynamic.ts', 'packages/compiler-cli/src/ngtsc/partial_evaluator/src/interpreter.ts', 'packages/compiler-cli/src/ngtsc/partial_evaluator/src/result.ts']","When evaluating arrays, if any entry is dynamic, the entire array is returned as DynamicValue. This can lead to confusion and make it difficult to determine which specific entry in the array is dynamic. Instances of DynamicValue should indicate the node that is dynamic and provide a reason for its dynamic-ness. Additionally, the ability to nest DynamicValue instances should be implemented to accurately track dynamic values in nested expressions. This change was made to support the partial evaluation of provider arrays in the implementation of listLazyRoutes()."
+e0ad9ecda0b8a541b405d2ab35335b90ceb21fd1,1579296229,"fix(ivy): ensure that `LOCALE_ID` is set after app initializers (#34830)
+
+Before ivy it was possible to configure a mutable service value
+in an application initializer (by providing an `APP_INITIALIZER`)
+that could be read in the provider of `LOCALE_ID`. This is a common
+scenario if you wanted to load the locale id asynchronously from
+an HTTP request for instance.
+
+When using the ivy, the runtime needs to be told what the current
+locale is, which is done by calling the `setLocaleId()` function with
+the value injected by the `LOCALE_ID` token. Previously this was
+being done before the application initializers were run, which meant
+that the `LOCALE_ID` provider was being executed before the
+app initializers had a chance to get a new value for it.
+
+Now this initalization of the locale for the ivy runtime is done after the
+application initializers have been run.
+
+Closes #34701
+
+PR Close #34830
+","['packages/core/src/application_ref.ts', 'packages/core/test/application_ref_spec.ts']","When using Ivy, configuring a mutable service value in an application initializer that can be read in the provider of `LOCALE_ID` can lead to issues. Previously, the `LOCALE_ID` provider was being executed before the application initializers had a chance to get a new value for it. To fix this, the initialization of the locale for the Ivy runtime is now done after the application initializers have been run."
+55f7f1d446e6280541ea525490ba36fe1db2d7ab,1617303757,"feat(docs-infra): improve search query processing (#41368)
+
+This commit tries to improve the search results by processing
+the query and attempting progressively less restrictive searches
+until a non-zero set of pages is matched.
+
+The new procesing includes:
+
+* stripping off quote marks, which were causing searches to fail
+* first attempting to match pages where ALL the query terms exist
+* second attempting to match pages where ANY of the query terms exist
+* third attempting to match pages where the title contains partial word matches
+
+The first query attempt approximates, quite well, the idea of searching
+for multi-word phrases. This is given the technical nature of the terms
+and the fairly small size of the corpus.
+
+PR Close #41368
+","['aio/src/app/search/search.worker.ts', 'aio/tests/deployment/e2e/smoke-tests.e2e-spec.ts', 'aio/tests/e2e/src/app.e2e-spec.ts']","When searching for pages, the current search query processing is causing some searches to fail due to the presence of quote marks. Additionally, the current search logic only matches pages where ALL the query terms exist. This commit aims to improve the search results by implementing a new search processing algorithm. The new algorithm involves stripping off quote marks, attempting to match pages where ANY of the query terms exist, and finally attempting to match pages where the title contains partial word matches. This new approach is expected to provide better search results, especially considering the technical nature of the terms and the size of the corpus."
+b50283ed6750dc20c38d94fbe475fee8c2f1ef5a,1551482293,"fix(ivy): support dynamic host attribute bindings (#29033)
+
+In the @Component decorator, the 'host' field is an object which represents
+host bindings. The type of this field is complex, but is generally of the
+form {[key: string]: string}. Several different kinds of bindings can be
+specified, depending on the structure of the key.
+
+For example:
+
+```
+@Component({
+  host: {'[prop]': 'someExpr'}
+})
+```
+
+will bind an expression 'someExpr' to the property 'prop'. This is known to
+be a property binding because of the square brackets in the binding key.
+
+If the binding key is a plain string (no brackets or parentheses), then it
+is known as an attribute binding. In this case, the right-hand side is not
+interpreted as an expression, but is instead a constant string.
+
+There is no actual requirement that at build time, these constant strings
+are known to the compiler, but this was previously enforced as a side effect
+of requiring the binding expressions for property and event bindings to be
+statically known (as they need to be parsed). This commit breaks that
+relationship and allows the attribute bindings to be dynamic. In the case
+that they are dynamic, the references to the dynamic values are reflected
+into the Ivy instructions for attribute bindings.
+
+PR Close #29033
+","['packages/compiler-cli/src/ngtsc/annotations/src/directive.ts', 'packages/compiler-cli/test/ngtsc/ngtsc_spec.ts', 'packages/compiler/src/compiler.ts', 'packages/compiler/src/jit_compiler_facade.ts', 'packages/compiler/src/render3/view/api.ts', 'packages/compiler/src/render3/view/compiler.ts', 'packages/compiler/src/render3/view/styling_builder.ts']","The 'host' field in the @Component decorator only supported static attribute bindings, meaning that the right-hand side was required to be a constant string. This commit allows for dynamic attribute bindings, where the right-hand side can be a dynamic value. This allows for more flexibility in attribute bindings in Ivy instructions."
+91cdc11aa0347d1b71f2f732e00af9c3ff8078fc,1614369830,"fix(common): allow number or boolean as http params (#40663)
+
+This change fixes an incompatibility between the old `@angular/http` package
+and its successor (`@angular/common/http`) by re-introducing the types that were supported before.
+
+It now allows to use number and boolean directly as HTTP params, instead of having to convert it to string first.
+
+Before:
+
+    this.http.get('/api/config', { params: { page: `${page}` } });
+
+After:
+
+    this.http.get('/api/config', { params: { page }});
+
+`HttpParams` has also been updated to have most of its methods accept number or boolean values.
+
+Fixes #23856
+
+BREAKING CHANGE:
+
+The methods of the `HttpParams` class now accept `string | number | boolean`
+instead of `string` for the value of a parameter.
+If you extended this class in your application,
+you'll have to update the signatures of your methods to reflect these changes.
+
+PR Close #40663
+","['goldens/public-api/common/http/http.d.ts', 'packages/common/http/src/client.ts', 'packages/common/http/src/params.ts', 'packages/common/http/test/client_spec.ts', 'packages/common/http/test/params_spec.ts']","There was an incompatibility issue between the old `@angular/http` package and its successor (`@angular/common/http`). The problem was that the new package did not support using number and boolean values directly as HTTP parameters, requiring them to be converted to strings first. This change re-introduces the ability to use number and boolean values directly as HTTP parameters, without the need for conversion. Additionally, the `HttpParams` class has been updated to accept number or boolean values in most of its methods. This fix resolves issue #23856. However, it should be noted that this change is a breaking change, as the signatures of methods that extended the `HttpParams` class will need to be updated to reflect the new value types."
+7e82df45c5bb72ec3dafaa07dc1eaa5d463b006c,1695032959,"feat(compiler): initial skeleton for API doc extraction (#51733)
+
+This commit adds a barebones skeleton for extracting information to be used for extracting info that can be used for API reference generation. Subsequent PRs will expand on this with increasingly real extraction. I started with @alxhub's #51615 and very slightly polished to get to this minimal commit.
+
+PR Close #51733
+","['packages/compiler-cli/src/ngtsc/core/src/compiler.ts', 'packages/compiler-cli/src/ngtsc/docs/index.ts', 'packages/compiler-cli/src/ngtsc/docs/src/entities.ts', 'packages/compiler-cli/src/ngtsc/docs/src/extractor.ts', 'packages/compiler-cli/src/ngtsc/program.ts', 'packages/compiler-cli/test/ngtsc/docs_spec.ts', 'packages/compiler-cli/test/ngtsc/env.ts']","This commit adds a basic skeleton for extracting information that will be used for generating API references. The initial implementation is minimal and will be expanded upon in future pull requests. The starting point for this implementation was commit #51615 by @alxhub, with some slight polishing."
+ef95da6d3b88f58f3e2f415f8afef27aa3108a3d,1579896952,"fix(ivy): don't detect changes on detached child embedded views (#34846)
+
+Fixes Ivy detecting changes inside child embedded views, even though they're detached.
+
+Note that there's on subtlety here: I made the changes inside `refreshDynamicEmbeddedViews` rather than `refreshView`, because we support detecting changes on a detached view (evidenced by a couple of unit tests), but only if it's triggered directly from the view's `ChangeDetectorRef`, however we shouldn't be detecting changes in the detached child view when something happens in the parent.
+
+Fixes #34816.
+
+PR Close #34846
+","['packages/core/src/render3/instructions/shared.ts', 'packages/core/test/acceptance/change_detection_spec.ts']","Ivy is currently detecting changes inside detached child embedded views, which is not intended behavior. There is a distinction to be made between detecting changes on a detached view triggered directly from the view's `ChangeDetectorRef` (which is supported) versus detecting changes in a detached child view when something happens in the parent (which should not occur). This commit specifically addresses the issue within `refreshDynamicEmbeddedViews`. The problem identified in issue #34816 is resolved with this fix."
+c7d37f74cffb2852f482b909577dcd15681e182b,1633112924,"build: expose locales as package export for ES module resolution (#43431)
+
+As part of v13, all APF packages use the `exports` field which defines
+the public entry-points/mappings for a package. so-called package exports.
+
+The `ng_package` rule creates all the necessary mappings/sub-path exports
+for the entry-points of `@angular/common`. Though, since the locale files are
+generated separately and are not an actual entry-point, we need to expose these
+files publicly so that they can be imported/resolved by consumers.
+
+PR Close #43431
+",['packages/bazel/test/ng_package/common_package.spec.ts'],"The locale files in `@angular/common` are generated separately and are not considered entry-points. As a result, they are not exposed publicly and cannot be imported or resolved by consumers. This commit aims to expose the locale files as a package export so that they can be properly imported and resolved."
+c4c340a7c4a87fdfc0bc5dff3723629f15f20b32,1562953574,"fix(zone.js): fix zone for Jasmine 3.3. (#31497)
+
+If zonejs is sent undefined callbacks it proceeds to attempt to call them, then fails, catches it own fail, rewrites the stack to hide the mistake, and reports a TypeError with a callstack unrelated to inputs.
+
+Throw early if the callback is undefined (as can happen if JS or any-ified TS calls zone invokeTask).
+
+Check for undefined onCommplete callback to zonejs jasmine wrapper.
+
+PR Close #31497
+","['packages/zone.js/lib/jasmine/jasmine.ts', 'packages/zone.js/lib/zone.ts']","If zone.js is given undefined callbacks, it tries to call them and fails. It then catches its own failure, modifies the stack trace to hide the error, and reports a TypeError with a stack trace that doesn't pertain to the original inputs. To prevent this issue, it is necessary to throw an error early if the callback is undefined, which can happen if JavaScript or transpiled TypeScript uses zone invokeTask. The fix involves checking for undefined on the onComplete callback in the zone.js Jasmine wrapper."
+6e7bd939f6901539305de0917350c5ebc328e775,1591287578,"perf(ngcc): cache parsed tsconfig between runs (#37417)
+
+This commit will store a cached copy of the parsed tsconfig
+that can be reused if the tsconfig path is the same.
+
+This will improve the ngcc ""noop"" case, where there is no processing
+to do, when the entry-points have already been processed.
+Previously we were parsing this config every time we checked for
+entry-points to process, which can take up to seconds in some
+cases.
+
+Resolves #36882
+
+PR Close #37417
+","['packages/compiler-cli/ngcc/index.ts', 'packages/compiler-cli/ngcc/src/ngcc_options.ts', 'packages/compiler-cli/ngcc/test/integration/ngcc_spec.ts', 'packages/compiler-cli/ngcc/test/ngcc_options_spec.ts']","Parsing the tsconfig file every time ngcc is run, even in cases where there is no processing to be done, can cause significant delays. This commit aims to improve performance by caching the parsed tsconfig and reusing it if the tsconfig path is the same."
+5b864ede13487458bee286d188da2fdade49289f,1578339482,"fix(ivy): TestBed not unwrapping imports array function when overriding provider (#34629)
+
+Fixes an error that is thrown when a provider is overridden in `TestBed`, if the module definition of one of the imported modules uses a function for the `imports` that is set via `setNgModuleScope`. The problem was that we have a `for...of` loop that assumes that the imports are an array, but they can also be a function. This was handled correctly in other places, but this one was missed.
+
+Note that the above-mentioned error is only thrown at runtime when the code is transpiled to es6. In es5 TS generates a call to a helper that handles the error silently so the attached unit test only fails in es6.
+
+Fixes #34623.
+
+PR Close #34629
+","['packages/core/test/test_bed_spec.ts', 'packages/core/testing/src/r3_test_bed_compiler.ts']","When a provider is overridden in `TestBed`, an error is thrown if the module definition of one of the imported modules uses a function for the `imports` that is set via `setNgModuleScope`. This error occurs because there is a `for...of` loop that assumes the imports are an array, but they can also be a function. This issue was overlooked in this specific case, although it was handled correctly in other places. It is important to note that this error is thrown at runtime when the code is transpiled to es6, as in es5 TypeScript generates a call to a helper that handles the error silently. Consequently, the unit test only fails in es6."
+53fc2ed8bf345222e0c3d53ce7f13a4f27f3052e,1573863366,"feat(language-service): completions support for indexed types (#33775)
+
+Previously, indexing a container type would not return completions for
+the indexed type because for every TypeScript type, the recorded index
+type was always marked as `undefined`, regardless of the index
+signature.
+
+This PR now returns the index type of TypeScript containers with numeric
+or string index signatures. This allows use to generate completions for
+arrays and defined index types:
+
+```typescript
+interface Container<T> {
+  [key: string]: T;
+}
+const ctr: Container<T>;
+ctr['stringKey']. // gives `T.` completions
+
+const arr: T[];
+arr[0]. // gives `T.` completions
+```
+
+Note that this does _not_ provide completions for properties indexed by
+string literals, e.g.
+
+```typescript
+interface Container<T> {
+  foo: T;
+}
+const ctr: Container<T>;
+ctr['foo']. // does not give `T.` completions
+```
+
+Closes angular/vscode-ng-language-service#110
+Closes angular/vscode-ng-language-service#277
+
+PR Close #33775
+","['packages/language-service/src/typescript_symbols.ts', 'packages/language-service/test/completions_spec.ts', 'packages/language-service/test/diagnostics_spec.ts', 'packages/language-service/test/project/app/parsing-cases.ts']","Previously, indexing a container type would not return completions for the indexed type because the recorded index type was always marked as `undefined`, regardless of the index signature. This PR fixes the issue by returning the correct index type of TypeScript containers with numeric or string index signatures, allowing for the generation of appropriate completions for arrays and defined index types."
+349935a4345a1f0eb66d9119d30ba3d546b6b32a,1557341673,"fix(core): migrations not always migrating all files (#30269)
+
+In an Angular CLI project scenario where projects only reference
+top-level source-files through the `tsconfig` `files` option, we currently
+do not migrate referenced source-files. This can be fixed checking all
+referenced source-files which aren't coming from an external library.
+
+This is similar to how `tslint` determines project source-files.
+
+PR Close #30269
+","['packages/core/schematics/migrations/injectable-pipe/index.ts', 'packages/core/schematics/migrations/move-document/index.ts', 'packages/core/schematics/migrations/static-queries/index.ts', 'packages/core/schematics/migrations/template-var-assignment/index.ts']","When using the `tsconfig` `files` option to reference top-level source files in an Angular CLI project, not all referenced source files are being migrated. This issue can be fixed by checking all referenced source files that are not from an external library, similar to how `tslint` determines project source files."
+fe343d8d96a727c7f48f7951a630ef008a9e0b9f,1604012870,"refactor(compiler): clean up i18n attribute generation logic (#39498)
+
+This is follow-up from [an earlier discussion](https://github.com/angular/angular/pull/39408#discussion_r511908358).
+After some testing, it looks like the type of `Element.attributes` was correct in specifying that it
+only has `TextAttribute` instances. This means that the extra checks that filter out `BoundAttribute`
+instances from the array isn't necessary. There is another loop a bit further down that actually
+extracts the bound i18n attributes.
+
+PR Close #39498
+","['packages/compiler/src/render3/view/i18n/util.ts', 'packages/compiler/src/render3/view/template.ts']",The type of `Element.attributes` specifying that it only has `TextAttribute` instances means that the extra checks filtering out `BoundAttribute` instances from the array is unnecessary. There is another loop further down that extracts the bound i18n attributes.
+6a0dadf46fbbf03c1e1a6f7b6c1d3db2042e2742,1639589226,"fix(forms): `_reduceValue` arrow function now has correct types. (#44483)
+
+I previously strengthened some weak types in #44370. One of these fixes exposed an incorrect call into `_reduceChildren` from `_reduceValue`. This was caught in google3 by a caller who was extending `FormGroup` and overriding these methods.
+
+Special thanks to Bart G for catching this issue and suggesting a fix.
+
+PR Close #44483
+",['packages/forms/src/model.ts'],Previously strengthening weak types in #44370 caused an issue where the `_reduceValue` arrow function had incorrect types. This problem was caught by a caller who was extending `FormGroup` and overriding these methods.
+c77656e2dd959cf70d4999f0cfc419f20a6f9e9e,1576099249,"fix(ngcc): handle imports in dts files when processing UMD (#34356)
+
+When statically evalulating UMD code it is possible to find
+that we are looking for the declaration of an identifier that
+actually came from a typings file (rather than a UMD file).
+
+Previously, the UMD reflection host would always try to use
+a UMD specific algorithm for finding identifier declarations,
+but when the id is actually in a typings file this resulted in the
+returned declaration being the containing file of the declaration
+rather than the declaration itself.
+
+Now the UMD reflection host will check to see if the file containing
+the identifier is a typings file and use the appropriate stategy.
+
+PR Close #34356
+","['packages/compiler-cli/ngcc/src/host/umd_host.ts', 'packages/compiler-cli/ngcc/test/host/umd_host_spec.ts']","When statically evaluating UMD code, there is a possibility of encountering imports that exist in typings files rather than UMD files. Previously, the UMD reflection host had a hardcoded algorithm for finding identifier declarations, which caused the returned declaration to be the containing file instead of the declaration itself when the identifier was in a typings file. This commit addresses the issue by implementing a check to see if the file containing the identifier is a typings file, and using the appropriate strategy accordingly."
+bf1bcd1e081b3678bae033dcee5e82a70960dfe7,1574362499,"fix(ngcc): render localized strings when in ES5 format (#33857)
+
+Recently the ngtsc translator was modified to be more `ScriptTarget`
+aware, which basically means that it will not generate non-ES5 code
+when the output format is ES5 or similar.
+
+This commit enhances that change by also ""downleveling"" localized
+messages. In ES2015 the messages use tagged template literals, which
+are not available in ES5.
+
+PR Close #33857
+","['packages/compiler-cli/ngcc/test/integration/ngcc_spec.ts', 'packages/compiler-cli/src/ngtsc/translator/src/translator.ts']","When the output format is ES5 or similar, the ngtsc translator was not rendering localized strings. This is because the translator was modified to be more `ScriptTarget` aware and would not generate non-ES5 code. This commit fixes that issue by ""downleveling"" the localized messages, allowing them to be rendered even in ES5 format."
+364c0eaaaecf3abaea4658062dca1751c66c98b9,1633112923,"refactor(platform-server): switch from dynamic require to import statement (#43431)
+
+In order to support ESM for the `platform-server` package, we need to
+remove two usages of dynamic imports and replace them with their
+corresponding/equivalent import statement. This will also allow ESBuild
+to recognize this import. Note that we want to keep these imports external, so
+we explicitly specify the `externals` option for the `ng_package` rule.
+
+PR Close #43431
+","['packages/core/test/render3/domino.d.ts', 'packages/platform-server/src/domino_adapter.ts', 'packages/platform-server/src/http.ts', 'packages/platform-server/src/types.d.ts']","The `platform-server` package needs to support ESM (ECMAScript modules), so the usage of two dynamic imports needs to be replaced with import statements. This is necessary for ESBuild to recognize the import. It is important to keep these imports external, so the `externals` option for the `ng_package` rule is explicitly specified."
+326240eb91fe5eee2b12755d4aa70684130008cf,1585773152,"fix(ngcc): allow ngcc configuration to match pre-release versions of packages (#36370)
+
+Ngcc supports providing a project-level configuration to affect how
+certain dependencies are processed and also has a built-in fallback
+configuration for some unmaintained packages. Each entry in these
+configurations could be scoped to specific versions of a package by
+providing a version range. If no version range is provided for a
+package, it defaults to `*` (with the intention of matching any
+version).
+
+Previously, the installed version of a package was tested against the
+version range using the [semver][1] package's `satisfies()` function
+with the default options. By default, `satisfies()` does not match
+pre-releases (see [here][2] for more details on reasoning). While this
+makes sense when determining what version of a dependency to install
+(trying to avoid unexpected breaking changes), it is not desired in the
+case of ngcc.
+
+This commit fixes it by explicitly specifying that pre-release versions
+should be matched normally.
+
+[1]: https://www.npmjs.com/package/semver
+[2]: https://github.com/npm/node-semver#prerelease-tags
+
+PR Close #36370
+","['packages/compiler-cli/ngcc/src/packages/configuration.ts', 'packages/compiler-cli/ngcc/test/packages/configuration_spec.ts']","The previous behavior of ngcc's configuration allowed for version ranges to be specified for certain dependencies, with the default range being `*`, meaning any version would match. However, the `satisfies()` function used to test the installed version against the range did not include pre-releases by default. This behavior is not desired in the case of ngcc. This commit fixes the issue by explicitly specifying that pre-release versions should be matched normally."
+eb4b7d2d8be13c4cd8489a53b3a49790fd6a3721,1579808483,"build: vendor yarn using the .yarnrc yarn-path value (#34902)
+
+Rather than enforcing yarn versioning using `package.json`'s
+engines value.  We can utilize yarn's `yarn-path` value to
+ensure that the version of yarn used at execution time is
+consistent for everyone who uses our repo.  This is the first
+step in this wider vendoring process.  We will use this same
+vendoring mechanism for CI after
+https://github.com/bazelbuild/rules_nodejs/pull/1569 lands
+
+PR Close #34902
+",['.yarn/releases/yarn-1.21.1.js'],"Enforcing yarn versioning using the `package.json`'s engines value can lead to inconsistency among different users of the repo. Instead, we should utilize yarn's `yarn-path` value to ensure a consistent version of yarn is used at execution time. This is the first step in implementing a wider vendoring process."
+e4538e03d6baf3e0968a9491b70a209fb6ba5053,1651707052,"refactor(docs-infra): Redirect old document title guide to new router feature (#45857)
+
+The ""set-document-title"" guide was in place to direct developers to the
+`Title` service for managing page titles. Managing the title is now
+available in the `Router` package and is much easier. This change
+deletes the old guide and redirects it to the section in the router
+guide about setting the page title.
+
+PR Close #45857
+","['aio/content/examples/set-document-title/e2e/src/app.e2e-spec.ts', 'aio/content/examples/set-document-title/src/app/app.component.ts', 'aio/content/examples/set-document-title/src/app/app.module.ts', 'aio/content/examples/set-document-title/src/main.ts']","The old ""set-document-title"" guide directed developers to use the `Title` service for managing page titles. However, managing the title is now available in the `Router` package and is much easier. This commit deletes the old guide and redirects it to the relevant section in the router guide."
+d80ae6ba0de9ac669130b036374c5d43cfc63b51,1557514599,"build(docs-infra): ensure hidden cli commands are excluded from `sitemap.xml` (#30395)
+
+Previously, the processor that excludes certain cli commands
+(`filterHiddenCommand`) was being run after the `createSitemap`
+processor, resulting in those commands to be present in `sitemap.xml`,
+while the actual pages where missing. This also resulted in 404s, when
+search engine crawlers tried to index the missing URLs.
+
+This commit fixes it by ensuring that the `filterHiddenCommand`
+processor is run before the `createSitemap` processor.
+
+PR Close #30395
+","['aio/tools/transforms/cli-docs-package/processors/filterHiddenCommands.js', 'aio/tools/transforms/cli-docs-package/processors/filterHiddenCommands.spec.js']","The processor responsible for excluding certain CLI commands from the `sitemap.xml` was being run after the `createSitemap` processor. This caused those commands to be included in the `sitemap.xml` while the actual pages were missing. As a result, search engine crawlers encountered 404 errors when trying to index the missing URLs. To resolve this, the order of the processors has been adjusted so that the `filterHiddenCommand` processor is executed before the `createSitemap` processor."
+fafa50d97fc45307f8e8bb19a7f9ba7dd16c5079,1588797348,"fix(ngcc): support ModuleWithProviders functions that delegate (#36948)
+
+In #36892 the `ModuleWithProviders` type parameter becomes required.
+This exposes a bug in ngcc, where it can only handle functions that have a
+specific form:
+
+```
+function forRoot() {
+  return { ... };
+}
+```
+
+In other words, it only accepts functions that return an object literal.
+
+In some libraries, the function instead returns a call to another function.
+For example in `angular-in-memory-web-api`:
+
+```
+InMemoryWebApiModule.forFeature = function (dbCreator, options) {
+  return InMemoryWebApiModule_1.forRoot(dbCreator, options);
+};
+```
+
+This commit changes the parsing of such functions to use the
+`PartialEvaluator`, which can evaluate these more complex function
+bodies.
+
+PR Close #36948
+","['packages/compiler-cli/ngcc/src/analysis/module_with_providers_analyzer.ts', 'packages/compiler-cli/ngcc/src/packages/transformer.ts', 'packages/compiler-cli/ngcc/src/rendering/esm_rendering_formatter.ts', 'packages/compiler-cli/ngcc/test/analysis/module_with_providers_analyzer_spec.ts', 'packages/compiler-cli/ngcc/test/rendering/dts_renderer_spec.ts', 'packages/compiler-cli/ngcc/test/rendering/esm_rendering_formatter_spec.ts']","The ngcc tool currently has a bug where it can only handle `ModuleWithProviders` functions that have a specific form: `function forRoot() { return { ... }; }`. It does not accept functions that return a call to another function. This creates an issue for libraries like `angular-in-memory-web-api`, where the `ModuleWithProviders` function returns a call to another function. This commit fixes the issue by changing the parsing of these functions to use the `PartialEvaluator`, which can evaluate more complex function bodies."
+28995dba19b43160249a15b2bec879aa82314b95,1587488064,"fix(core): missing-injectable migration should not migrate `@NgModule` classes (#36369)
+
+Based on the migration guide, provided classes which don't have
+either `@Injectable`, `@Directive`, `@Component` or `@Pipe` need
+to be migrated.
+
+This is not correct as provided classes with an `@NgModule` also
+have a factory function that can be read by the r3 injector. It's
+unclear in which cases the `@NgModule` decorator is used for
+provided classes, but this scenario has been reported.
+
+Either we fix this in the migration, or we make sure to report
+this as unsupported in the Ivy compiler.
+
+Fixes #35700.
+
+PR Close #36369
+","['packages/core/schematics/migrations/missing-injectable/transform.ts', 'packages/core/schematics/test/missing_injectable_migration_spec.ts']","When migrating classes, the current implementation is incorrectly excluding classes with `@NgModule` decorators. However, classes with `@NgModule` still have a factory function that can be accessed by the r3 injector. It is unclear in which scenarios the `@NgModule` decorator is used for provided classes, but this issue has been reported. We need to either fix this exclusion in the migration or explicitly state that `@NgModule` classes are unsupported in the Ivy compiler."
+1eb4066c2e50e71475e158108a727cfbc505dfe1,1605816922,"refactor(compiler-cli): Expose API for mappping from TCB to template location (#39715)
+
+Consumers of the `TemplateTypeChecker` API could be interested in
+mapping from a shim location back to the original source location in the
+template. One concrete example of this use-case is for the ""find
+references"" action in the Language Service. This will return locations
+in the TypeScript shim file, and we will then need to be able to map the
+result back to the template.
+
+PR Close #39715
+","['packages/compiler-cli/src/ngtsc/typecheck/api/api.ts', 'packages/compiler-cli/src/ngtsc/typecheck/api/checker.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/checker.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/context.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/diagnostics.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/dom.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/oob.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/source.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/tcb_util.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/type_check_block.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/type_checker__get_symbol_of_template_node_spec.ts']","When using the `TemplateTypeChecker` API, there is currently no way to map from a shim location back to the original source location in the template. This could be problematic for consumers of the API who may need to perform actions such as finding references in the template. This commit aims to address this issue by exposing an API for mapping from TCB (Type Check Block) to the template location."
+228beeabd1542941cbfff46ad78d52c1df3d283a,1623705046,"fix(language-service): Use last child end span for parent without close tag (#42554)
+
+Unclosed element tags are not assigned an `endSourceSpan` by the parser.
+As a result, the visitor which determines the target node at a position
+for the language service was unable to determine that a given position
+was inside an unclosed parent. This happens because we update the
+`endSourceSpan` of template/element nodes to be the end tag (and there
+is not one for unclosed tags). Consequently, the visitor then cannot
+match a position to any child node location.
+
+This change updates the visitor logic to check if there are any
+`children` of a template/element node and updates the end span to be the
+end span of the last child. This allows our `isWithin` logic to identify
+that a child position is within the unclosed parent.
+
+Addresses one of the issues found during investigation of https://github.com/angular/vscode-ng-language-service/issues/1399
+
+PR Close #42554
+","['packages/language-service/ivy/template_target.ts', 'packages/language-service/ivy/test/legacy/template_target_spec.ts']","When updating the `endSourceSpan` of template/element nodes to be the end tag, unclosed element tags were not being assigned an `endSourceSpan` which caused issues. The language service visitor was unable to determine if a given position was inside an unclosed parent node, leading to the visitor logic failing to match a position to any child node location. This change updates the visitor logic to check if there are any children of a template/element node and updates the end span to be the end span of the last child, allowing for accurate identification of child positions within unclosed parent nodes."
+7954c8dfa3c85d12780949c75f1448c8d783a8cf,1607126882,"perf(forms): use `ngDevMode` to tree-shake `_ngModelWarning` (#39964)
+
+This commit adds `ngDevMode` guard to call `_ngModelWarning` only
+in dev mode (similar to how things work in other parts of Ivy runtime code).
+The `ngDevMode` flag helps to tree-shake this function from production builds
+(since it will act as no-op, in dev mode everything will work as it works right now)
+to decrease production bundle size.
+
+PR Close #39964
+","['packages/forms/src/directives/reactive_directives/form_control_directive.ts', 'packages/forms/src/directives/reactive_directives/form_control_name.ts', 'packages/forms/src/directives/shared.ts']",Adding `ngDevMode` guard to calling `_ngModelWarning` only in development mode can help to reduce the production bundle size.
+52a6785a82186cc9dda0b5957b5c138d3eb10e9a,1634685981,"test(compiler-cli): run watch mode tests using Ivy compiler (#43893)
+
+This commit re-enables the `perform_watch` test target and updates the
+test to run with the Ivy compiler.
+
+Additionally, this target was switched over to use Angular v12 packages
+as input to the test, to allow the ViewEngine tests to continue working
+with v13 packages which are Ivy-only. This commit reverts those changes
+now that View Engine tests are disabled, as it's desirable to test
+against local artifacts that are build within the monorepo instead of
+depending on NPM packages.
+
+PR Close #43893
+","['packages/compiler-cli/test/perform_watch_spec.ts', 'packages/compiler-cli/test/test_support.ts']","When using the Ivy compiler, the `perform_watch` test target was disabled and needed to be re-enabled. Additionally, the test was updated to run with the Ivy compiler. A previous change had switched this target to use Angular v12 packages as input in order to allow the ViewEngine tests to work with v13 packages which are Ivy-only. However, since the View Engine tests are now disabled, it is desired to test against local artifacts within the monorepo instead of relying on NPM packages. This commit reverts those changes to ensure the desired testing setup is in place."
+acf3cff9eedbcfbc4476e0597d0a3c7a883bd05f,1593195189,"ci: exclude ""docs"" commit type from minBodyLength commit message validation (#37764)
+
+docs commits are sometimes trivial (e.g. an obvious typo fix) and in such cases its very
+akward to to write up 100 chars worth of text about why this typo fix is the best thing in the
+world and why it is so important and crucial that we must know why we are fixing the typo
+at all. After all most typos are not just typos. Or are they? We'll shall see...
+
+PR Close #37764
+",['.ng-dev/config.ts'],"The commit message validation process currently includes ""docs"" commits, which can sometimes be trivial typo fixes. However, it is unnecessary and awkward to write a 100-character explanation for such minor changes. This update is aimed at excluding ""docs"" commits from the minimum body length requirement in the commit message validation process."
+d04b550f2e73ff89939a8a747fa8665c6ee5d2c4,1633368426,"docs: Deprecate longhand binding prefixes (#43671)
+
+DEPRECATION:
+
+The template prefixes `bind-`, `on-`, `bindon-`, and `ref-` have been deprecated
+in v13. Templates should use the more widely documented syntaxes for binding and references:
+
+* `[input]=""value""` instead of `bind-input=""value""`
+* `[@trigger]=""value""` instead of `bind-animate-trigger=""value""`
+* `(click)=""onClick()""` instead of `on-click=""onClick()""`
+* `[(ngModel)]=""value""` instead of `bindon-ngModel=""value""`
+* `#templateRef` instead of `ref-templateRef`
+
+PR Close #43671
+","['aio/content/examples/built-in-directives/e2e/src/app.e2e-spec.ts', 'aio/content/examples/property-binding/e2e/src/app.e2e-spec.ts', 'aio/content/examples/template-reference-variables/e2e/src/app.e2e-spec.ts']","The template prefixes `bind-`, `on-`, `bindon-`, and `ref-` are being deprecated in favor of more widely documented syntaxes for binding and references. This deprecation affects various template bindings such as `bind-input`, `bind-animate-trigger`, `on-click`, `bindon-ngModel`, and `ref-templateRef`, and recommends using `[input]=""value""`, `[@trigger]=""value""`, `(click)=""onClick()""`, `[(ngModel)]=""value""`, and `#templateRef` respectively."
+caccb125e6a135ab7b35b2eee844a53bb409c94e,1660671411,"refactor(common): drop the `loader` input in favor of `IMAGE_LOADER` token (#47082)
+
+This commit updates the `NgOptimizedImage` directive to drop the `loader` input. Component-specific loaders can still be configured via `IMAGE_LOADER` token and the `loader` input was only useful in case different loaders have to be present in a single template, which doesn't seem to be a common case. We'll be able to re-introduce the input later if needed.
+
+PR Close #47082
+","['packages/common/src/directives/ng_optimized_image.ts', 'packages/common/test/directives/ng_optimized_image_spec.ts']","The `loader` input in the `NgOptimizedImage` directive is being dropped in favor of the `IMAGE_LOADER` token. The `loader` input was only useful in cases where different loaders needed to be present in a single template, which is not a common scenario. This change allows for component-specific loaders to still be configured using the `IMAGE_LOADER` token. The `loader` input may be re-introduced in the future if necessary."
+5bf180afb89b9a11fe8dd7bbbd7b5ca827d2719d,1622053068,"fix(devtools): skip node if there is no associated TViewData (rangle/angular-devtools#804)
+
+* fix(backend): skip node if there is no associated TViewData
+
+The code was assuming that the TViewData item at the same index as the node
+in LView would contain a data entry. This value can be `null` (which is the
+case in our app), which causes a catastrophic failure in the dev tool. By
+checking for null, the node is skipped because it cannot determine the
+associated component or directive and the dev tool does not die.
+
+fixes issue rangle/angular-devtools#801
+
+* chore: style tweak - add early return to avoid nesting",['projects/ng-devtools-backend/src/lib/directive-forest/ltree.ts'],"If there is no associated TViewData for a node in LView, the code currently assumes that there will be a data entry at the same index. However, as observed in our application, this value can sometimes be `null`, causing a catastrophic failure in the dev tool. By checking for null and skipping the node, we can prevent the dev tool from crashing."
+9a3cf661a2f464503acde5eac6f0b3de949b292c,1627937701,"refactor(core): update peerDependencies to allow rxjs7 (#42991)
+
+We can't update the framework to rxjs7 until version 13, because it contains breaking changes, but we can allow users to opt into it since all of our code should be compatible.
+
+These changes expand the allowed version range of rxjs and add an integration test to verify that we don't get compilation errors. Note that we also have a test that runs the AIO examples against rxjs 7 already (#42660).
+
+Fixes #41897.
+
+PR Close #42991
+","['integration/typings_test_rxjs7/include-all.ts', 'packages/common/test/pipes/async_pipe_spec.ts', 'packages/core/test/acceptance/property_binding_spec.ts']","Updating the peerDependencies to allow for rxjs7 is necessary because the current version of the framework is not compatible with it due to breaking changes. However, to ensure compatibility with future versions, users should be able to opt into using rxjs7. The changes in this commit expand the allowed version range of rxjs and include an integration test to ensure that there are no compilation errors. This commit also references an existing test that already runs the AIO examples against rxjs7. The issue that this commit fixes is #41897."
+6b731a067ad293866ca4df08a2dd451dba6fe0d7,1594249413,"test: fix test failure in saucelabs ivy ie10 (#37892)
+
+One of the ivy acceptance tests currently fails in IE10. This
+is because we recently added a new test that asserts that injecting
+`ViewRef` results in a `NullInjectorError`.
+
+Due to limitations in TypeScript and in polyfills for `setPrototypeOf`,
+the error cannot be thrown as `ViewRef` is always considered injectable.
+In reality, `ViewRef` should not be injectable, as explicitly noted
+in https://github.com/angular/angular/commit/c00f4ab2ae703e8a3ee4a3850170c9bbf0f9bc42.
+
+There seems no way to simulate the proper prototype chain in such
+browsers that do not natively support `__proto__`, so TypeScript
+and `core-js` polyfills simply break the prototype chain and
+assign inherited properties directly on `ViewRef`. i.e. so that
+`ViewRef.__NG_ELEMENT_ID__` exists and DI picks it up.
+
+There is a way for TypeScript to theoretically generate proper
+prototype chain in ES5 output, but they intend to only bother
+about the proper prototype chain in ES6 where `setPrototypeOf`
+etc. are offically standarized. See the response:
+
+https://github.com/microsoft/TypeScript/issues/1601#issuecomment-94892833.
+
+PR Close #37892
+",['packages/core/test/acceptance/di_spec.ts'],"When running an Ivy acceptance test in IE10, there is a failure due to a recent addition of a test that asserts the behavior of injecting `ViewRef` and the resulting `NullInjectorError`. The issue stems from limitations in TypeScript and polyfills for `setPrototypeOf`, which prevent the error from being thrown because `ViewRef` is always considered injectable. However, in reality, `ViewRef` should not be injectable as explicitly noted in a previous commit. The problem is further exacerbated by the lack of support for `__proto__` in these browsers, leading TypeScript and `core-js` polyfills to break the prototype chain and assign inherited properties directly on `ViewRef`. This includes properties such as `ViewRef.__NG_ELEMENT_ID__`, which DI picks up. Although there is a theoretical solution for generating the proper prototype chain in ES5 output, TypeScript has no intention of implementing it for ES5, as they only prioritize the proper prototype chain in ES6."
+ce76103e8fc22240870c31e1f1972bba0257202f,1660850564,"refactor(compiler): /a/.exec() returns RegExpExecArray (#47169)
+
+Fix compilation issue with TypeScript nightly. TypeScript added a field
+`0` to `RegExpMatchArray` in
+https://github.com/microsoft/TypeScript/commit/3b80ddca212959ae5dcf2f48704be627283c6468.
+Before that, `RegExpMatchArray` and `RegExpExecArray` were identical.
+
+In one place Angular incorrectly expects `RegExpMatchArray` as the
+result of a RegExp#exec() call. This assignment fails on TypeScript
+nightly with the error:
+
+    Property '0' is missing in type 'RegExpExecArray' but required in type 'RegExpMatchArray'.
+
+Fix the issue by using the type `RegExpExecArray` instead. This also
+works for older TypeScript versions.
+
+PR Close #47169
+",['packages/compiler/src/shadow_css.ts'],"Angular expects `RegExpMatchArray` as the result of a `RegExp#exec()` call in one place, but TypeScript nightly introduced a field `0` to `RegExpMatchArray`, causing a compilation issue. To fix this, the code should use the type `RegExpExecArray` instead, which is also compatible with older versions of TypeScript."
+ea8256f43d1bac1888424b29c03bf530a222bef2,1650323145,"refactor(router): Move config loader tracking to the RouterConfigLoader (#45656)
+
+This wasn't exactly possible before because the `RouterConfigLoader` was
+not an Injectable so there wasn't a straightforward way to share
+information between `ApplyRedirects` and the preloader. They each had
+their own implementation so they needed to store the values on the
+`Route` so they both had access to them. I imagine this was the case
+because trying to inject `Router` (to get access to the events) into the
+preloader would have caused a circular dependency.
+
+This refactor co-locates the loading details with the loader itself
+rather than leaking implementation into the public route config and
+mutating the object in an awkward way. This also promotes
+`RouterConfigLoader` to a proper `Injectable` so data can be shared
+throughout the system.
+
+PR Close #45656
+","['packages/router/src/models.ts', 'packages/router/src/router.ts', 'packages/router/src/router_config_loader.ts', 'packages/router/src/router_module.ts', 'packages/router/src/router_preloader.ts']","Before this commit, there was no straightforward way to share information between `ApplyRedirects` and the preloader because the `RouterConfigLoader` was not an Injectable. As a result, they had to store values on the `Route` object to have access to them. It appears that this was necessary to avoid a circular dependency that would occur if `Router` was injected into the preloader. This refactor aims to co-locate the loading details with the loader itself, eliminating the need for leaking implementation into the public route config and mutating the object in an awkward way. Additionally, it promotes `RouterConfigLoader` to a proper `Injectable` so that data can be shared throughout the system."
+8eb05964639ea66e602f3c145728cb63ced706cd,1576275596,"fix(ivy): unknown property and element checks not working correctly in IE (#34305)
+
+We have a couple of cases where we use something like `typeof Node === 'function'` to figure out whether we're in a worker context. This works in most browsers, but IE returns `object` instead of `function`. I've updated all the usages to account for it.
+
+PR Close #34305
+","['packages/core/src/render3/instructions/element.ts', 'packages/core/src/render3/instructions/shared.ts']","In Internet Explorer (IE), there are instances where the checks for unknown properties and elements are not functioning correctly. This is because IE returns `object` instead of `function` when using `typeof Node === 'function'` to determine if it is in a worker context. The code has been updated to handle this specific case and account for IE's behavior."
+310ce6dcc2df3c2f2ab7fbebccb494ef03553b40,1574444404,"fix(ngcc): do not crash on packages that specify typings as an array (#33973)
+
+In a package.json file, the ""typings"" or ""types"" field could be an array
+of typings files. ngcc would previously crash unexpectedly for such
+packages, as it assumed that the typings field would be a string. This
+commit lets ngcc skip over such packages, as having multiple typing
+entry-points is not supported for Angular packages so it is safe to
+ignore them.
+
+Fixes #33646
+
+PR Close #33973
+","['packages/compiler-cli/ngcc/src/packages/entry_point.ts', 'packages/compiler-cli/ngcc/test/packages/entry_point_spec.ts']","Packages that specify typings as an array in their package.json file can cause ngcc to crash unexpectedly. This is because ngcc expects the typings field to be a string, not an array. To prevent the crash, this commit allows ngcc to skip over packages with multiple typing entry-points, as they are not supported for Angular packages."
+0a8b943d106a8bd49e22796a3b7f1c0597993692,1669051440,"Revert ""refactor(router): Remove promise catch and re-reject (#48067)"" (#48135)
+
+This reverts commit 07c9396824f6270872fce86498113c96a5ce6763. This
+change caused test failures (both unit and integration). Though the code
+looks like it should be a no-op update, it's possible it affecting
+something to do with microtasks, zoneJS, and change detection. More
+investigation would need to be done into the exact nature of the
+failures.
+
+PR Close #48135
+",['packages/router/src/router.ts'],"The previous commit, which removed a promise catch and re-reject, caused test failures in both unit and integration. It appears that this change is affecting something related to microtasks, zoneJS, and change detection. Additional investigation is needed to determine the exact nature of these failures."
+a82fddf1ce6166e0f697e429370eade114094670,1613754797,"feat(router): Allow for custom router outlet implementations (#40827)
+
+This PR formalizes, documents, and makes public the router outlet contract.
+
+The set of `RouterOutlet` methods used by the `Router` has not changed
+in over 4 years, since the introduction of route reuse strategies.
+
+Creation of custom router outlets is already possible and is used by the
+Ionic framework
+(https://github.com/ionic-team/ionic-framework/blob/master/angular/src/directives/navigation/ion-router-outlet.ts).
+There is a small ""hack"" that is needed to make this work, which is that
+outlets must register with `ChildrenOutletContexts`, but it currently
+only accepts our `RouterOutlet`.
+
+By exposing the interface the `Router` uses to activate and deactivate
+routes through outlets, we allow for developers to more easily and safely
+extend the `Router` and have fine-tuned control over navigation and component
+activation that fits project requirements.
+
+PR Close #40827
+","['goldens/public-api/router/router.d.ts', 'packages/router/src/directives/router_outlet.ts', 'packages/router/src/index.ts', 'packages/router/src/router_outlet_context.ts']","By formalizing, documenting, and making public the router outlet contract, this commit allows for custom router outlet implementations. Currently, creation of custom router outlets is possible, as demonstrated by the Ionic framework, but it requires a small ""hack"" to register outlets with `ChildrenOutletContexts` since it only accepts the default `RouterOutlet` implementation. By exposing the interface used by the `Router` to activate and deactivate routes through outlets, developers will have an easier and safer way to extend the `Router` and have more control over navigation and component activation."
+1bce51c0ed42621b2f9623d2f083424d76d1acfd,1643148944,"fix(compiler-cli): Handle `ng-template` with structural directive in indexer (#44788)
+
+An `ng-template` with an inline template (i.e. has a structural
+directive) would previously not get an `undefined` `tagName` because the
+logic assumed the element would be `t.Element` or `t.Content` and read
+the tag name from the `name` property. For a `t.Template`, this exists
+instead on the `t.tagName`. The final result would be an `tagName` of `undefined`
+for the parent `t.Template`, causing failures in the indexer downstream.
+
+This `undefined` value is actually expected in the renderer code, even
+though the type does not specify this possibility. This change updates
+the type of `tagName` to be `string|null` and explicitly handles the
+case where there is a structural directive on an `ng-template`. You can
+see how the two are differentiated in the compliance code that was
+modified in this commit.
+
+PR Close #44788
+","['packages/compiler-cli/src/ngtsc/indexer/src/template.ts', 'packages/compiler-cli/src/ngtsc/indexer/test/template_spec.ts', 'packages/compiler-cli/test/compliance/test_cases/r3_view_compiler_i18n/element_attributes/ng-template_interpolation_structural.js', 'packages/compiler-cli/test/compliance/test_cases/r3_view_compiler_i18n/element_attributes/ng-template_structural.js', 'packages/compiler-cli/test/compliance/test_cases/r3_view_compiler_i18n/ng-container_ng-template/structural_directives.js', 'packages/compiler-cli/test/compliance/test_cases/r3_view_compiler_template/ng_template_interpolated_prop_with_structural_directive_outer_template.js', 'packages/compiler/src/render3/r3_ast.ts', 'packages/compiler/src/render3/r3_template_transform.ts', 'packages/compiler/test/render3/r3_template_transform_spec.ts', 'packages/language-service/src/utils.ts']","An `ng-template` with an inline template (i.e. a structural directive) was not being handled correctly in the indexer. The logic assumed that the element would be either `t.Element` or `t.Content` and read the tag name from the `name` property. However, for a `t.Template`, the tag name exists on the `t.tagName` property instead. This caused the parent `t.Template` to have a `tagName` of `undefined`, leading to failures downstream in the indexer.
+
+In order to handle this issue, the type of `tagName` has been updated to `string|null` and the case where there is a structural directive on an `ng-template` is now explicitly handled. This change ensures that the expected `undefined` value is handled correctly in the renderer code."
+751cd83ae3ee5c971f2d4b72af1aaa691305a866,1622745286,"fix(forms): the `min` and `max` validators should work correctly with `0` as a value (#42412)
+
+Prior to this change the `min` and `max` validator directives would not
+set the `min` and `max` attributes on the host element. The problem was
+caused by the truthy check in host binding expression that was
+calculated as `false` when `0` is used as a value. This commit updates
+the logic to leverage nullish coalescing operator in these host binding
+expressions, so `0` is treated as a valid value, thus the `min` and
+`max` attributes are set correctly.
+
+Partially closes #42267
+
+PR Close #42412
+","['packages/forms/src/directives/validators.ts', 'packages/forms/test/reactive_integration_spec.ts', 'packages/forms/test/template_integration_spec.ts']","The `min` and `max` validator directives were not correctly setting the `min` and `max` attributes on the host element. This issue was caused by a truthy check in the host binding expression that resulted in `false` when the value `0` was used. This commit resolves the problem by updating the logic to treat `0` as a valid value using the nullish coalescing operator, ensuring that the `min` and `max` attributes are set correctly."
+be46d2b9b7e0d9fe9111f84c1ccae3b876394db8,1681238811,"refactor(compiler): pipeline phase to resolve view contexts (#48580)
+
+`phaseResolveContexts()` resolves `ir.ContextExpr` expressions within views.
+Each `ir.ContextExpr` represents a reference to a particular view context. For
+the context of the view being compiled, this is available in the view's template
+function `ctx` parameter. For parent views, this is available in context
+variables which were added previously.
+
+`phaseResolveContexts()` replaces these `ir.ContextExpr` operations with
+resolved references to the requested views.
+
+PR Close #48580
+",['packages/compiler/src/template/pipeline/src/phases/resolve_contexts.ts'],"When compiling views, the `phaseResolveContexts()` method is responsible for resolving `ir.ContextExpr` expressions. These expressions represent references to specific view contexts. However, for the context of the view being compiled, these expressions are available in the view's template function `ctx` parameter. For parent views, the expressions are available in previously added context variables.
+
+To ensure these expressions are correctly resolved, `phaseResolveContexts()` replaces the `ir.ContextExpr` operations with resolved references to the requested views."
+9bd9a11f4e21e5a7cc9da18f150f6dd520e7cd1e,1680724825,"refactor(platform-browser): remove deprecated `BrowserTransferStateModule` symbol (#49718)
+
+The `TransferState` class was updated in v14 in a way that the `BrowserTransferStateModule` was no longer required. The `BrowserTransferStateModule` was deprecated in v14.1 and it's currently empty. This commit removes the `BrowserTransferStateModule`.
+
+BREAKING CHANGE: The deprecated `BrowserTransferStateModule` was removed, since it's no longer needed. The `TransferState` class can be injected without providing the module. The `BrowserTransferStateModule` was empty starting from v14 and you can just remove the reference to that module from your applications.
+
+PR Close #49718
+","['packages/platform-browser/src/browser/transfer_state_module.ts', 'packages/platform-browser/src/platform-browser.ts']","The `BrowserTransferStateModule` symbol has been deprecated in version 14.1. After updating the `TransferState` class, the `BrowserTransferStateModule` is no longer required and is currently empty. This commit removes the deprecated module, as it is no longer needed."
+d966fdd4389185ae25707124bb46cc638ace2aeb,1681317191,"refactor(router): Ensure data is bound to components in change detection following navigation (#49741)
+
+`RouterOutlet` components can initialize _during_ change detection (for
+example, if they exist in an embedded view). When this happens, data
+from the router should be bound immediately to the routed components
+rather than not being available until the next round of change
+detection. This is mostly just a problem for testing because change
+detection is triggered manually. It would be surprising to have to
+detect changes _twice_ on the fixture in order to get data bound to the
+routed component.
+
+PR Close #49741
+","['packages/router/src/directives/router_outlet.ts', 'packages/router/test/directives/router_outlet.spec.ts']","When `RouterOutlet` components initialize during change detection, there can be a delay in binding data from the router to the routed components. This delay can be particularly problematic during testing, where manual change detection is triggered. In order to avoid the need to detect changes twice on the fixture to bind data to the routed component, the data should be bound immediately to the components during change detection following navigation."
+2e4244d521f68dcfd66245ba32c6a1124f6dbaf3,1586464527,"fix(docs-infra): fix `elements` example when used with ES5 (#36536)
+
+Previously, the `elements` docs example only worked in browsers that
+natively supported Custom Elements and ES2015 modules. Furthermore, it
+didn't work on StackBlitz, because StackBlitz ignores the specified
+`target` in `tsconfig.json` and uses the UMD bundles (i.e. ES5 code)
+even on browsers that do support ES2015.
+(NOTE: In the past, this was not a problem, because we explicitly did
+not provide a StackBlitz example. This has changed in #36067.)
+
+This commit ensures the example works on all browsers and also on
+StackBlitz by providing the necessary Custom Elements polyfills.
+
+Fixes #36532
+
+PR Close #36536
+","['aio/tools/examples/example-boilerplate.js', 'aio/tools/examples/shared/boilerplate/elements/src/polyfills.ts']","The `elements` docs example previously only worked in browsers that supported Custom Elements and ES2015 modules. It also didn't work on StackBlitz due to the specific `target` in `tsconfig.json` being ignored, causing StackBlitz to use UMD bundles (ES5 code) even on browsers that support ES2015. This commit addresses these issues by including the necessary Custom Elements polyfills to ensure the example works on all browsers and StackBlitz."
+6feef368f6611e2780f4f56599fe7394a1cfcd71,1553546868,"test(ivy): add tests for component factory projectable node corner cases (#27791)
+
+In some cases ivy expects projectable nodes to be passed in a different order
+to ViewEngine. Specifically, ivy expects the catch-all (""*"") to be at index
+0, whereas ViewEngine expects it to be at its position at which it was parsed
+in the template.
+
+This commit adds one test that breaks under ivy and others that just describe
+more accurately what happens in corner cases.
+
+PR Close #27791
+","['packages/compiler/test/aot/compiler_spec.ts', 'packages/core/test/linker/projection_integration_spec.ts']","Sometimes when using Ivy, projectable nodes are expected to be passed in a different order to ViewEngine. Ivy expects the catch-all (""*"") to be at index 0, while ViewEngine expects it to be at the position it was parsed in the template. This commit adds tests that uncover cases where this behavior breaks under Ivy, as well as other tests that provide more accurate descriptions of what happens in these corner cases."
+5ba7bcd2a6cf500ff5ac9262e3286b8a0f01baf3,1608589335,"docs: fix `SpyDirective` in `lifecycle-hooks` docs example to use one ID per instance (#40208)
+
+Previously, the `SpyDirective` in the `lifecycle-hooks` docs example
+would use a different ID when logging `onInit` and when logging
+`onDestroy` for the same instance, making it impossible to associate the
+two calls. This was not helpful and came in constrast with how the
+directive was described in the corresponding guide and shown in the
+accompanying `spy-directive.gif` image.
+
+This commit fixes the logic of the `SpyDirective` class to use the same
+ID for all log operations of an instance.
+
+Partially addresses #40193.
+
+PR Close #40208
+",['aio/content/examples/lifecycle-hooks/src/app/spy.directive.ts'],The `SpyDirective` in the `lifecycle-hooks` docs example was using different IDs when logging `onInit` and `onDestroy` for the same instance. This made it difficult to associate the two calls and was inconsistent with the description of the directive in the corresponding guide and the accompanying `spy-directive.gif` image. This commit fixes the logic of the `SpyDirective` class to use the same ID for all log operations of an instance.
+c2f13a1e3a537b970f7308d5b8b1917d4f0b06b4,1572304833,"refactor(ivy): i18n - share `MessageSerializer` across `TranslationParsers` (#33444)
+
+Each of the XML based `TranslationParsers` was providing its own
+`MessageSerializer`, but they are all very similar. So these have been
+consolidated into a single more generic `MessageSerializer.
+
+As a result of this, the extra layers of folders in the project seemed
+unnecessary, so they have been flattened.
+
+PR Close #33444
+","['packages/localize/src/tools/src/translate/main.ts', 'packages/localize/src/tools/src/translate/translation_files/base_visitor.ts', 'packages/localize/src/tools/src/translate/translation_files/message_serialization/message_renderer.ts', 'packages/localize/src/tools/src/translate/translation_files/message_serialization/message_serializer.ts', 'packages/localize/src/tools/src/translate/translation_files/message_serialization/target_message_renderer.ts', 'packages/localize/src/tools/src/translate/translation_files/translation_parsers/simple_json_translation_parser.ts', 'packages/localize/src/tools/src/translate/translation_files/translation_parsers/xliff1/xliff1_message_serializer.ts', 'packages/localize/src/tools/src/translate/translation_files/translation_parsers/xliff1_translation_parser.ts', 'packages/localize/src/tools/src/translate/translation_files/translation_parsers/xliff2_translation_parser.ts', 'packages/localize/src/tools/test/translate/translation_files/translation_parsers/simple_json_spec.ts', 'packages/localize/src/tools/test/translate/translation_files/translation_parsers/xliff1_translation_parser_spec.ts', 'packages/localize/src/tools/test/translate/translation_files/translation_parsers/xliff2_translation_parser_spec.ts']","When working with XML based `TranslationParsers`, each parser was providing its own `MessageSerializer` implementation. However, these implementations were very similar. To avoid duplication and improve maintainability, all the separate `MessageSerializer` implementations have been combined into a single, more generic implementation.
+
+Additionally, it was observed that there were extra layers of folders in the project that appeared unnecessary. To simplify the project structure, these extra layers have been removed.
+
+This commit addresses the need for code consolidation and project organization improvements in relation to XML based `TranslationParsers`."
+7561698675980966898c0c042fec43763d97a4b2,1552667794,"fix(ivy): add temporary hack for deprecatedOverrideProvider (#29324)
+
+HACK: This is NOT the correct implementation for deprecatedOverrideProvider.
+We do not plan to implement this at all since the API is deprecated and
+scheduled for removal in V8. This hack is here temporarily for Ivy testing
+until we transition apps inside Google to the overrideProvider API. At that
+point, we will be able to remove this method entirely. In the meantime, we
+can use overrideProvider here to test apps with Ivy that don't care about
+eager instantiation. This fixes 97% of cases in our blueprint.
+
+PR Close #29324
+",['packages/core/testing/src/r3_test_bed.ts'],"The deprecatedOverrideProvider API is scheduled for removal in V8, but a temporary hack has been implemented for Ivy testing purposes. This hack will be removed once apps within Google transition to the overrideProvider API. In the meantime, the overrideProvider can be used to test apps with Ivy that don't require eager instantiation. This commit fixes the issue for 97% of cases."
+48f49bacb43f9acc9204be178754743c3f6238df,1621371854,"refactor(dev-infra): improve type safety of NPM dist tags in release tool (#42133)
+
+Instead of passing `string` in the release tool for NPM dist tags, we
+should use a union string type that limits the tags to `latest`, `next`
+and anything matching `v{number}-lts`. This avoids mistakes at
+compilation-level if an invalid/unknown tag would be set by a release
+action.
+
+PR Close #42133
+","['dev-infra/ng-dev.js', 'dev-infra/release/publish/actions.ts', 'dev-infra/release/publish/actions/cut-lts-patch.ts', 'dev-infra/release/publish/external-commands.ts', 'dev-infra/release/publish/test/common.spec.ts', 'dev-infra/release/publish/test/test-utils.ts', 'dev-infra/release/versioning/long-term-support.ts', 'dev-infra/release/versioning/npm-publish.ts', 'dev-infra/release/versioning/npm-registry.ts']","Passing a string for NPM dist tags in the release tool can lead to mistakes and potential issues. By using a union string type that only allows `latest`, `next`, and tags matching the pattern `v{number}-lts`, we can improve type safety and prevent compilation-level errors caused by invalid or unknown tags."
+cdf50ff9318ff5cdb4cbb1272d9113de8160065c,1638987868,"refactor(forms): Move FormControl to an overridden exported constructor. (#44316)
+
+This implementation change was originally proposed as part of Typed Forms, and will have major consequences for that project as described in the design doc. Submitting it separately will greatly simplify the risk of landing Typed Forms. This change should have no visible impact on normal users of FormControl.
+
+See the Typed Forms design doc here: https://docs.google.com/document/d/1cWuBE-oo5WLtwkLFxbNTiaVQGNk8ipgbekZcKBeyxxo.
+
+PR Close #44316
+","['packages/forms/src/forms.ts', 'packages/forms/src/model.ts', 'packages/forms/test/form_control_spec.ts']","Moving the FormControl to an overridden exported constructor is being done as part of the Typed Forms implementation change. This change is being submitted separately to simplify the risk of landing Typed Forms. The purpose of this change is to have a major impact on the Typed Forms project, as described in the design doc. However, there should be no visible impact on normal users of the FormControl. The design doc for the Typed Forms project can be found [here](https://docs.google.com/document/d/1cWuBE-oo5WLtwkLFxbNTiaVQGNk8ipgbekZcKBeyxxo)."
+19cfaf7f4cf3bdbc6676812ae804c4d897f1dce0,1583888287,"fix(core): don't re-invoke pure pipes that throw and arguments are the same (#35827)
+
+Pure pipes are not invoked again until their arguments are modified. The same
+rule should apply to pure pipes that throw an exception. This fix ensures that
+a pure pipe is not re-invoked if it throws an exception and arguments are not
+changed.
+
+PR Close #35827
+","['packages/core/src/render3/pure_function.ts', 'packages/core/test/acceptance/pipe_spec.ts']","When using pure pipes in the code, they should not be invoked again if their arguments remain the same. This principle should also apply to pure pipes that encounter an exception and throw an error. This fix ensures that a pure pipe will not be re-invoked if it throws an exception and its arguments have not been modified."
+f53d0fd2d01a323e122eaf27c2c6263f758e35e0,1555948088,"fix(ivy): classes should not mess up matching for bound dir attributes (#30002)
+
+Previously, we had a bug where directive matching could fail if the directive
+attribute was bound and followed a certain number of classes. This is because
+in the matching logic, we were treating classes like normal attributes. We
+should instead be skipping classes in the attribute matching logic. Otherwise
+classes will match for directives with attribute selectors, and as we are
+iterating through them in twos (when they are stored as name-only, not in
+name-value pairs), it may throw off directive matching for any bound attributes
+that come after. This commit changes the directive matching logic to skip
+classes altogether.
+
+PR Close #30002
+","['packages/core/src/render3/node_selector_matcher.ts', 'packages/core/test/acceptance/directive_spec.ts', 'packages/core/test/render3/node_selector_matcher_spec.ts']","There was a bug where directive matching could fail if the directive attribute was bound and followed by a certain number of classes. This was because the matching logic treated classes like normal attributes, which could throw off directive matching for any bound attributes that followed. To fix this, the directive matching logic was updated to skip classes altogether."
+29f57e315edf09b8657909ba83293a307d64c2b4,1551972644,"build: enable bundle_dts for router package (#28833)
+
+This PR also changes the name of `EmptyOutletComponent` to `ɵEmptyOutletComponent`. This is because `ngcc` requires the node to retain the original name while dts bundler will rename the node is it's only exported using the aliases.
+
+Example typings files:
+```ts
+declare class EmptyOutletComponent {
+}
+export {EmptyOutletComponent as ɵEmptyOutletComponent}
+```
+
+will be emitted as
+```ts
+export declare class ɵEmptyOutletComponent {
+}
+```
+
+PR Close #28833
+","['packages/router/src/components/empty_outlet.ts', 'packages/router/src/private_export.ts']","`ngcc` requires the original name of a node to be retained while the dts bundler will rename the node if it is only exported using aliases. To comply with this requirement, the name of `EmptyOutletComponent` is changed to `ɵEmptyOutletComponent`. This ensures that the correct typings are emitted for the `router` package."
+5268ae61a072b471b92e20360173da0b88c88f69,1555697725,"feat(ivy): support for template type-checking pipe bindings (#29698)
+
+This commit adds support for template type-checking a pipe binding which
+previously was not handled by the type-checking engine. In compatibility
+mode, the arguments to transform() are not checked and the type returned
+by a pipe is 'any'. In full type-checking mode, the transform() method's
+type signature is used to check the pipe usage and infer the return type
+of the pipe.
+
+Testing strategy: TCB tests included.
+
+PR Close #29698
+","['packages/compiler-cli/src/ngtsc/annotations/src/component.ts', 'packages/compiler-cli/src/ngtsc/program.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/api.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/context.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/environment.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/type_check_block.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/type_check_file.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/type_check_block_spec.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/type_constructor_spec.ts', 'packages/compiler-cli/test/ngtsc/fake_core/index.ts', 'packages/compiler-cli/test/ngtsc/template_typecheck_spec.ts']","Previously, there was no support for template type-checking pipe bindings in Ivy. This led to a situation where the type-checking engine did not handle the arguments to the `transform()` method and the type returned by a pipe was always 'any'. 
+
+With this commit, support for template type-checking pipe bindings has been added. In compatibility mode, the arguments to `transform()` are not checked and the type returned by the pipe is still 'any'. However, in full type-checking mode, the `transform()` method's type signature is used to check the pipe usage and infer the return type of the pipe.
+
+To ensure the correctness of this new feature, TCB (Template Type Checking) tests have been included. This commit addresses the issue mentioned in this PR: https://github.com/angular/angular/pull/29698"
+7f51f1dcae577662f917c7b1c9ce3f237c1a7a6d,1641494206,"docs(docs-infra): improve the content of attribute directives (#44628)
+
+Improve docs ""Understanding Angular-Directives-Attribute Directives""
+
+In `highlight.directive.1.ts`, add the `private` keyword for `el` property
+to make it correct and consistent with subsequent examples.
+
+For section ""Setting the value with user input"", add a step to tell the
+reader change the method `onMouseEnter`, thus more readable.
+
+For section ""Binding to a second property"", delete the aliase for the
+`Input` property, and changes the name back to `appHighlight` in the code
+to make it consistent with the whole tutorial.
+
+PR Close #44628
+","['aio/content/examples/attribute-directives/src/app/highlight.directive.1.ts', 'aio/content/examples/attribute-directives/src/app/highlight.directive.3.ts', 'aio/content/examples/attribute-directives/src/app/highlight.directive.ts']","The content of the attribute directives documentation can be improved. One improvement is to make the `el` property in the `highlight.directive.1.ts` file consistent with the subsequent examples by adding the `private` keyword. Additionally, in the section ""Setting the value with user input"", there should be a step added to instruct readers to change the method `onMouseEnter` to make it more readable. Furthermore, in the section ""Binding to a second property"", the alias for the `Input` property should be deleted and the name should be changed back to `appHighlight` in the code to maintain consistency throughout the tutorial."
+dbd0f8e6990204b8f0cc44347a45fb6cca3bced8,1588705260,"feat(language-service): [ivy] Parse Angular compiler options (#36922)
+
+Parse Angular compiler options in Angular language service.
+
+In View Engine, only TypeScript compiler options are read, Angular
+compiler options are not. With Ivy, there could be different modes of
+compilation, most notably how strict the templates should be checked.
+This commit makes the behavior of language service consistent with the
+Ivy compiler.
+
+PR Close #36922
+","['packages/language-service/ivy/language_service.ts', 'packages/language-service/ivy/test/language_service_spec.ts', 'packages/language-service/ivy/ts_plugin.ts']","Without parsing Angular compiler options in the Angular language service, there is inconsistency in behavior compared to the Ivy compiler. In View Engine, only TypeScript compiler options are read, while Angular compiler options are ignored. Since Ivy introduces different modes of compilation, including how strictly templates should be checked, it is important for the language service to correctly parse and apply these options."
+bd04fbc05b0397de966a493a863e1054203c86d9,1646339344,"feat(service-worker): emit a notification when the service worker is already up to date after check (#45216)
+
+When the service worker checks for an update and finds that the version on the server is the same as
+the version locally installed, it currently noops.  This change introduces an event which it emits
+in this situation which notifies clients a check has occurred without error and no update was found.
+
+PR Close #45216
+","['packages/service-worker/src/low_level.ts', 'packages/service-worker/src/update.ts', 'packages/service-worker/test/comm_spec.ts', 'packages/service-worker/worker/src/driver.ts', 'packages/service-worker/worker/test/happy_spec.ts']","When the service worker checks for an update and determines that the version on the server is the same as the version locally installed, it currently doesn't provide any notification to clients. This can lead to confusion as clients are unaware that a check has occurred and no update was found. To improve clarity, this change introduces an event that is emitted in this situation, notifying clients that a check has occurred without error and no update was found."
+ee6c915c82b838ee1b3a1e979ab8dc70b3986485,1695401452,"feat(devtools): added instances count and total time in bar chart (#50866)
+
+In Devtools bar chart we can see the total time for all the directive instances in one change detection run.
+
+This PR changes the bar chart to display the total count and time for all directive instances instead of showing the time for each directive instance separately in one change detection run.
+
+PR Close #50866
+","['devtools/projects/ng-devtools/src/lib/devtools-tabs/profiler/timeline/record-formatter/bargraph-formatter/bargraph-formatter.ts', 'devtools/projects/ng-devtools/src/lib/devtools-tabs/profiler/timeline/recording-visualizer/bar-chart.component.ts', 'devtools/projects/ng-devtools/src/lib/devtools-tabs/profiler/timeline/recording-visualizer/bargraph-visualizer.component.ts']","The bar chart in Devtools currently displays the time for each directive instance separately in one change detection run. However, it would be more useful to see the total count and time for all directive instances in the chart. This commit adds the functionality to display the instances count and total time in the bar chart in Devtools."
+0f10d75228c234253616fae222c53e43dd86d949,1694106467,"refactor(compiler): use native BigInt when calculating i18n digests (#48321)
+
+To further modernize and improve the performance of the i18n digest generation,
+The 64-bit aspects of the process now use the native `BigInt` instead of a
+custom JavaScript implementation. This removes the need for the big_integer
+helper code and associated tests as the code was not used anywhere else in the
+framework. Only the `BigInt` constructor, `BigInt.asUintN` function, and
+`.toString` function are currently used. `BigInt` literals can unfortunately
+not yet be used due to the bazel test devmode setup which compiles the TypeScript
+code at an EcmaScript level that does not yet support the literals.
+
+Browser support information:
+- BigInt constructor: https://caniuse.com/mdn-javascript_builtins_bigint_bigint
+- BigInt asUintN: https://caniuse.com/mdn-javascript_builtins_bigint_asuintn
+- BigInt toString: https://caniuse.com/mdn-javascript_builtins_bigint_tostring
+
+PR Close #48321
+","['packages/compiler/src/i18n/big_integer.ts', 'packages/compiler/src/i18n/digest.ts', 'packages/compiler/test/i18n/big_integer_spec.ts']","The i18n digest generation process was using a custom JavaScript implementation for the 64-bit aspects. To improve performance and modernize the code, the commit refactors the code to use the native `BigInt` instead. This eliminates the need for the custom helper code and associated tests, as the code was not used anywhere else in the framework. The refactor utilizes the `BigInt` constructor, `BigInt.asUintN` function, and `.toString` function. It should be noted that `BigInt` literals cannot be used due to the EcmaScript level used in the TypeScript code compilation during the bazel test devmode setup. The commit also includes information about browser support for the `BigInt` features that are being utilized.
+
+Link to browser support information:
+- BigInt constructor: [https://caniuse.com/mdn-javascript_builtins_bigint_bigint](https://caniuse.com/mdn-javascript_builtins_bigint_bigint)
+- BigInt asUintN: [https://caniuse.com/mdn-javascript_builtins_bigint_asuintn](https://caniuse.com/mdn-javascript_builtins_bigint_asuintn)
+- BigInt toString: [https://caniuse.com/mdn-javascript_builtins_bigint_tostring](https://caniuse.com/mdn-javascript_builtins_bigint_tostring)"
+bd91572986e8672f65728ef76b0c7f340d5f981c,1653081489,"build: lock file maintenance to avoid node module differences for babel types (#45967)
+
+We recently updated Babel and the Bazel types but this actually
+resulted in duplicates, causing differences between what people
+seen in their IDE vs. what Bazel builds.
+
+This commit removes the lock file and generates it fully fresh,
+deduping dependencies and also fixing the differences between
+local IDE and Bazel.
+
+As part of this we also need to update/fixup one assertion on the
+Babel node path types, because the node start/end can now also
+be `undefined`.
+
+PR Close #45967
+","['packages/bazel/src/ngc-wrapped/index.ts', 'packages/localize/tools/src/source_file_utils.ts']","When updating Babel and the Bazel types, there were duplicates which caused differences between what people saw in their IDE and what Bazel built. To resolve this, the lock file needs to be removed and regenerated from scratch, removing duplicate dependencies and fixing the discrepancies between the local IDE and Bazel. Additionally, one assertion on the Babel node path types needs to be updated/fix for cases where the node start/end can now be `undefined`."
+530e45f093508345be38f412af071a560a1abedb,1620247563,"fix(dev-infra): publish script python check not working on windows (#41943)
+
+We recently added a sanity check that ensures that `python` is
+available for Bazel. The check relies on `/usr/bin/python` to check
+if python is available w/ the correct version. The problem is
+that on Windows there is no guarantee that the `/usr/bin` folder
+exists, so the `ng-dev release publish` command always fails.
+
+We fix this by just accessing the `env` binary that is also consulted
+by scripts executed within Bazel actions. The `env` binary can be
+assumed exist in the shell's `$PATH` and can point us to Python
+as if it would be executed within Bazel.
+
+PR Close #41943
+","['dev-infra/ng-dev.js', 'dev-infra/release/publish/index.ts']","The current sanity check for `python` availability in Bazel relies on the existence of the `/usr/bin` folder, which does not exist on Windows. As a result, the `ng-dev release publish` command consistently fails on Windows machines. This issue is resolved by accessing the `env` binary, which is present in the shell's `$PATH` and can correctly point to the Python installation within Bazel actions."
+230e9766f6e6b8ce30b0cf8c39a891c3ba28d5be,1560271039,"test(ivy): fix strict null checks failures in ngcc tests (#30967)
+
+9d9c9e43e544ac2ecf74e20d31ba3bd1064db6c9 has been created a few days ago
+and wasn't rebased on top of recent changes that introduces a commonjs host.
+
+This means that tests for the commonjs host haven't been updated to work with
+the changes from from #30492 and now fail in `master`.
+
+PR Close #30967
+",['packages/compiler-cli/ngcc/test/host/commonjs_host_spec.ts'],"The tests for the commonjs host were not updated to work with recent changes, causing them to fail in the `master` branch. This commit fixes the failing tests by rebasing the changes from #30492 onto the branch that introduces a commonjs host."
+616c8a89b8313b04306ff50fe283fa7065cf7286,1656696051,"test: update schematics workspace test to no longer verify JSON5 features (#46642)
+
+The Angular CLI has removed the JSON5 parsing and now always uses
+`jsonc-parser`. Our test checks if JSON5 features can be parsed, but
+this now breaks and the test needs to be adjusted.
+
+We still want to keep the test to ensure we do not parse the Angular
+CLI workspace file in a different way, not e.g. supporting jsonc.
+
+PR Close #46642
+",['packages/core/schematics/test/project_tsconfig_paths_spec.ts'],"The test for JSON5 features parsing in the Angular CLI workspace file needs to be updated. This is because the Angular CLI has removed JSON5 parsing and now only uses `jsonc-parser`. Therefore, the current test breaks and needs to be adjusted to reflect this change. The purpose of this test is to ensure that the Angular CLI workspace file is parsed consistently and does not support jsonc format."
+044e0229bde8edb86e0d9e318bc358299ea6f814,1623689986,"build: generate alias locale data for closure locale (#42230)
+
+Within Google, closure compiler is used for dealing with translations.
+We generate a closure-compatible locale file that allows for
+registration within Angular, so that Closure i18n works well together
+with Angular applications. Closure compiler does not limit its
+locales to BCP47-canonical locale identifiers. This commit updates
+the generation logic so that we also support deprecated (but aliased)
+locale identifiers, or other aliases which are likely used within
+Closure. We use CLDR's alias supplemental data for this. It instructs
+us to alias `iw` to `he` for example. `iw` is still supported in Closure.
+
+Note that we do not manually extract all locales supported in Closure;
+instead we only support the CLDR canonical locales (as done before) +
+common aliases that CLDR provides data for. We are not aware of other
+locale aliases within Closure that wouldn't be part of the CLDR aliases.
+If there would be, then Angular/Closure would fail accordingly.
+
+PR Close #42230
+","['packages/common/locales/closure-locale.ts', 'packages/common/locales/generate-locales-tool/cldr-data.ts', 'packages/common/locales/generate-locales-tool/closure-locale-file.ts', 'packages/common/locales/generate-locales-tool/locale-file.ts', 'packages/common/locales/generate-locales-tool/locale-global-file.ts', 'packages/common/locales/generate-locales-tool/plural-function.ts']","The generation logic for Closure-compatible locale files needs to be updated to support deprecated or aliased locale identifiers. This is necessary because Closure compiler does not limit its locales to BCP47-canonical locale identifiers. By incorporating CLDR's alias supplemental data, we can support aliases such as `iw` being alias to `he`. Currently, only CLDR canonical locales and common aliases with CLDR data are supported, but Angular/Closure may fail if there are other locale aliases within Closure that are not part of the CLDR aliases."
+d12cdb50195b530d9fee1a06f4b0494084b5cf76,1593120128,"fix(migrations): do not incorrectly add todo for @Injectable or @Pipe (#37732)
+
+As of v10, the `undecorated-classes-with-decorated-fields` migration
+generally deals with undecorated classes using Angular features. We
+intended to run this migation as part of v10 again as undecorated
+classes with Angular features are no longer supported in planned v11.
+
+The migration currently behaves incorrectly in some cases where an
+`@Injectable` or `@Pipe` decorated classes uses the `ngOnDestroy`
+lifecycle hook. We incorrectly add a TODO for those classes. This
+commit fixes that.
+
+Additionally, this change makes the migration more robust to
+not migrate a class if it inherits from a component, pipe
+injectable or non-abstract directive. We previously did not
+need this as the undecorated-classes-with-di migration ran
+before, but this is no longer the case.
+
+Last, this commit fixes an issue where multiple TODO's could be
+added. This happens when multiple Angular CLI build targets have
+an overlap in source files. Multiple programs then capture the
+same source file, causing the migration to detect an undecorated
+class multiple times (i.e. adding a TODO twice).
+
+Fixes #37726.
+
+PR Close #37732
+","['integration/ng_update_migrations/src/app/migration-tests/undecorated-classes-with-fields.ts', 'integration/ng_update_migrations/src/app/migration-tests/undecorated-classes-with-fields_expected.ts', 'packages/core/schematics/migrations/undecorated-classes-with-decorated-fields/transform.ts', 'packages/core/schematics/test/google3/undecorated_classes_with_decorated_fields_spec.ts', 'packages/core/schematics/test/helpers.ts', 'packages/core/schematics/test/undecorated_classes_with_decorated_fields_migration_spec.ts']","The `undecorated-classes-with-decorated-fields` migration in Angular has some incorrect behavior when dealing with undecorated classes that use the `@Injectable` or `@Pipe` decorators and also have the `ngOnDestroy` lifecycle hook. In these cases, the migration adds a TODO incorrectly. This commit addresses that issue.
+
+Additionally, the commit improves the migration's robustness by not migrating a class if it inherits from a component, pipe, injectable, or non-abstract directive. This additional check was not previously necessary because the undecorated-classes-with-di migration ran before, but with the changes in planned v11, this has become necessary.
+
+Finally, the commit fixes an issue where multiple TODOs could be added. This occurs when multiple Angular CLI build targets have overlapping source files, causing the migration to detect an undecorated class multiple times and add a TODO twice.
+
+The commit resolves issue #37726.
+
+PR Close #37732"
+bd9c1e6cfcfc4fb7da242134b80424e67cca2c65,1591815825,"build: add commit message scope for migration changes (#36390)
+
+This is a proposal commit that adds a separate scope for
+migration changes. The motiviation is that migrations aren't
+necessarily always affecting `@angular/core`, but are just
+stored in the core package for a canonical location when
+someone runs `ng update`. Additionally, it rather seems confusing in the
+changelog if migration changes are listed under `core`.
+
+PR Close #36390
+",['.ng-dev/config.ts'],"Migration changes are currently listed under `core` in the changelog, which can be confusing since migrations don't always affect `@angular/core`. This commit proposes adding a separate scope for migration changes to provide a more accurate representation in the changelog."
+3b2f607cdad4edd01f08bab502db16849bbd8d95,1626464699,"build: generate closure locale files using hard-coded list of locales (#42230)
+
+With the refactoring from a Gulp task to a Bazel too, we tried switching
+away from the hard-coded list of locales and aliases for the Closure
+Locale file generation. After multiple attempts of landing this, it
+turned out that Closure Compiler/Closure Library relies on locale
+identifiers CLDR does not capture within it's `availableLocales.json`
+or `aliases.json` data.
+
+Closure Library does not use any unknown locale identifiers here. The
+locale identifiers can be resolved within CLDR using the bundle lookup
+algorithm that is specified as part of CLDR; instead the problem is that
+the locale identifiers do not follow any reasonable pattern and
+therefore it's extremely difficult to generate them automatically (it's
+almost like we'd need to build up _all_ possible combinations). Instead
+of doing that, we just use the hard-coded locales and aliases from the
+old Closure Locale generation script.
+
+PR Close #42230
+","['packages/common/locales/closure-locale.ts', 'packages/common/locales/generate-locales-tool/closure-locale-file.ts']","Closure Compiler and Closure Library rely on locale identifiers that are not captured within the availableLocales.json or aliases.json data in CLDR. These identifiers do not follow a reasonable pattern, making it difficult to generate them automatically. Instead of attempting to generate the identifiers dynamically, we will continue using the hard-coded list of locales and aliases from the old Closure Locale generation script."
+5b31a0a2942c50059cac4c7ccb92047a50473347,1595269004,"docs: separate template syntax into multiple docs (#36954)
+
+This is part of a re-factor of template syntax and
+structure. The first phase breaks out template syntax
+into multiple documents. The second phase will be
+a rewrite of each doc.
+
+Specifically, this PR does the following:
+
+- Breaks sections of the current template syntax document each into their own page.
+- Corrects the links to and from these new pages.
+- Adds template syntax subsection to the left side NAV which contains all the new pages.
+- Adds the new files to pullapprove.
+
+PR Close #36954
+","['packages/common/src/directives/ng_for_of.ts', 'packages/common/src/directives/ng_if.ts', 'packages/core/src/metadata/directives.ts']","When refactoring the template syntax and structure, it is necessary to separate the template syntax into multiple documents. This commit specifically addresses the following issues:
+- Breaking sections of the current template syntax document into their own pages.
+- Correcting the links to and from these new pages.
+- Adding a template syntax subsection to the left side NAV that contains all the new pages.
+- Adding the new files to pullapprove."
+db97453ca0d4c4dd011eef8df18cf6a482f0b272,1608067852,"refactor(compiler-cli): move template parse errors to TemplateData (#40026)
+
+Durring analysis we find template parse errors. This commit changes
+where the type checking context stores the parse errors. Previously, we
+stored them on the AnalysisOutput this commit changes the errors to be
+stored on the TemplateData (which is a property on the shim). That way,
+the template parse errors can be grouped by template.
+
+Previously, if a template had a parse error, we poisoned the module and
+would not procede to find typecheck errors. This change does not poison
+modules whose template have typecheck errors, so that ngtsc can emit
+typecheck errors for templates with parse errors.
+
+Additionally, all template diagnostics are produced in the same place.
+This allows requesting just the template template diagnostics or just
+other types of errors.
+
+PR Close #40026
+","['packages/compiler-cli/src/ngtsc/annotations/src/component.ts', 'packages/compiler-cli/src/ngtsc/annotations/test/component_spec.ts', 'packages/compiler-cli/src/ngtsc/typecheck/api/context.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/checker.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/context.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/test_utils.ts', 'packages/compiler-cli/test/ngtsc/ngtsc_spec.ts', 'packages/language-service/ivy/test/diagnostic_spec.ts']","When analyzing templates, it was discovered that parse errors were being stored in the wrong location. Previously, parse errors were stored on the AnalysisOutput, but this commit moves them to the TemplateData property on the shim. This change allows for grouping the template parse errors by template.
+
+In the previous implementation, if a template had a parse error, the module would be poisoned and typecheck errors would not be found. With this change, modules whose templates have parse errors are not poisoned, allowing ngtsc to emit typecheck errors for templates with parse errors.
+
+Furthermore, this commit ensures that all template diagnostics are produced in the same place. This improvement allows for obtaining only the template template diagnostics or other types of errors separately."
+627cecdfe2253c73279f8ed3bc025d15a92ec3cf,1550172205,"fix(ivy): ensure host bindings and host styling works on a root component (#28664)
+
+Prior to this fix if a root component was instantiated it create host
+bindings, but never render them once update mode ran unless one or more
+slot-allocated bindings were issued. Since styling in Ivy does not make
+use of LView slots, the host bindings function never ran on the root
+component.
+
+This fix ensures that the `hostBindings` function does run for a root
+component and also renders the schedlued styling instructions when
+executed.
+
+Jira Issue: FW-1062
+
+PR Close #28664
+","['packages/core/src/render3/component.ts', 'packages/core/src/render3/instructions.ts', 'packages/core/src/render3/interfaces/view.ts', 'packages/core/src/render3/styling/util.ts', 'packages/core/src/render3/util.ts', 'packages/core/test/acceptance/integration_spec.ts', 'packages/core/test/bundling/animation_world/index.ts', 'packages/core/test/render3/render_util.ts']","If a root component was instantiated, its host bindings were not being rendered once the update mode ran, unless slot-allocated bindings were issued. However, since styling in Ivy does not utilize LView slots, the host bindings function was not running on the root component. This led to a situation where the host bindings and host styling were not working on the root component. This fix ensures that the `hostBindings` function is executed for a root component and also renders the scheduled styling instructions."
+bdb5371033d8e9a110619861323e8383a32d5900,1665159360,"feat(common): add injection token for default DatePipe configuration (#47157)
+
+This commit introduces a new `DATE_PIPE_DEFAULT_OPTIONS` token, which
+can be used to configure default DatePipe options, such as date
+format and timezone.
+
+DEPRECATED:
+
+The `DATE_PIPE_DEFAULT_TIMEZONE` token is now deprecated in favor
+of the `DATE_PIPE_DEFAULT_OPTIONS` token, which accepts an object
+as a value and the timezone can be defined as a field (called `timezone`)
+on that object.
+
+PR Close #47157
+","['packages/common/src/common.ts', 'packages/common/src/pipes/date_pipe.ts', 'packages/common/src/pipes/date_pipe_config.ts', 'packages/common/src/pipes/index.ts', 'packages/common/test/pipes/date_pipe_spec.ts']","The `DATE_PIPE_DEFAULT_OPTIONS` injection token is being added to provide default configuration options for the DatePipe. Previously, there was a `DATE_PIPE_DEFAULT_TIMEZONE` token that served a similar purpose, but it is now being deprecated in favor of `DATE_PIPE_DEFAULT_OPTIONS`. With this new token, users can configure default options for the DatePipe, including the date format and timezone by providing an object with a `timezone` field."
+f0f426b2d06929e3675a5beacf75295f4bed1d4b,1574803647,"fix(ivy): support inserting a `viewRef` that is already present (#34052)
+
+When inserting a `viewRef` it is possible to not provide
+an `index`, which is regarded as appending to the end of
+the container.
+
+If the `viewRef` already exists in the container, then
+this results in a move. But there was a fault in the logic
+that computed where to insert the `viewRef` that did not
+account for the fact that the `viewRef` was already in
+the container, so the insertion `index` was outside the
+bounds of the array.
+
+Fixes #33924
+
+PR Close #34052
+","['packages/core/src/render3/view_engine_compatibility.ts', 'packages/core/test/acceptance/view_container_ref_spec.ts']","When inserting a `viewRef` into a container, not providing an `index` can result in the `viewRef` being appended to the end. However, if the `viewRef` already exists in the container, this can lead to issues with the logic that computes where to insert the `viewRef`. This can cause the insertion `index` to be outside the bounds of the array."
+e9cb0454dce2113cfd5ba11deeca6cdcf47d47f0,1654276565,"feat(upgrade): more closely align `UpgradeModule#bootstrap()` with `angular.bootstrap()` (#46214)
+
+Previously, [UpgradeModule#bootstrap()][1], while being a replacement
+for and accepting the same arguments as [angular.bootstrap()][2], did
+not return the same value as `angular.bootstrap()` (i.e. the AngularJS
+injector in most cases). This made it less straight forward to migrate
+some usecases that relied on the return value of `.bootstrap()`. The
+work-around was to access the injector via [UpgradeModule#$injector][3]
+(after the app had been bootstrapped with `UpgradeModule#bootstrap()`).
+
+This commit addresses this by ensuring `UpgradeModule#bootstrap()`
+returns the same value as `angular.bootstrap()`, making it easier to
+replace the latter with the former.
+
+[1]: https://angular.io/api/upgrade/static/UpgradeModule#bootstrap
+[2]: https://docs.angularjs.org/api/ng/function/angular.bootstrap
+[3]: https://angular.io/api/upgrade/static/UpgradeModule#%24injector
+
+Fixes #46211
+
+PR Close #46214
+","['packages/upgrade/static/src/upgrade_module.ts', 'packages/upgrade/static/test/integration/upgrade_module_spec.ts']","Previously, the `[UpgradeModule#bootstrap()][1]` function did not return the same value as `[angular.bootstrap()][2]`, which made it difficult to migrate use cases that relied on the return value of `.bootstrap()`. This commit ensures that `UpgradeModule#bootstrap()` now returns the same value as `angular.bootstrap()`, making it easier to replace the latter with the former."
+0847a0353b87cd181ef2a257e36126a888f02d75,1614806038,"fix(language-service): Always attempt HTML AST to template AST conversion for LS (#41068)
+
+The current logic in the compiler is to bail when there are errors when
+parsing a template into an HTML AST or when there are errors in the i18n
+metadata. As a result, a template with these types of parse errors
+_will not have any information for the language service_. This is because we
+never attempt to conver the HTML AST to a template AST in these
+scenarios, so there are no template AST nodes for the language service
+to look at for information. In addition, this also means that the errors
+are never displayed in the template to the user because there are no
+nodes to map the error to.
+
+This commit adds an option to the template parser to temporarily ignore
+the html parse and i18n meta errors and always perform the template AST
+conversion. At the end, the i18n and HTML parse errors are appended to
+the returned errors list. While this seems risky, it at least provides
+us with more information than we had before (which was 0) and it's only
+done in the context of the language service, when the compiler is
+configured to use poisoned data (HTML parse and i18n meta errors can be
+interpreted as a ""poisoned"" template).
+
+fixes angular/vscode-ng-language-service#1140
+
+PR Close #41068
+","['packages/compiler-cli/src/ngtsc/annotations/src/component.ts', 'packages/compiler/src/render3/view/template.ts', 'packages/compiler/test/render3/r3_template_transform_spec.ts', 'packages/language-service/ivy/test/completions_spec.ts', 'packages/language-service/ivy/test/diagnostic_spec.ts', 'packages/language-service/ivy/test/legacy/template_target_spec.ts']","When parsing a template into an HTML AST or encountering errors with i18n metadata, the current logic in the compiler bails and the template has no information available for the language service. This means that not only is there no template AST for the language service to reference, but the errors are also not displayed to the user because there are no nodes to map them to. 
+
+To address this issue, this commit introduces an option to the template parser to ignore HTML parse errors and i18n meta errors temporarily and always perform the template AST conversion. The errors encountered during HTML parsing and i18n metadata are then appended to the list of returned errors. This approach, although potentially risky, provides more information than the previous situation of having no information at all. It is only done in the context of the language service when the compiler is configured to use ""poisoned"" data, where HTML parse errors and i18n meta errors are treated as ""poisoned"" templates.
+
+Resolves: angular/vscode-ng-language-service#1140"
+d3c0fa3b1a7fa59df5651a925364602bc3772734,1650458757,"refactor(compiler-cli): propagate standalone flag in .d.ts metadata (#45672)
+
+This commit adds a type field to .d.ts metadata for directives, components,
+and pipes which carries a boolean literal indicating whether the given type
+is standalone or not. For backwards compatibility, this flag defaults to
+`false`.
+
+Tests are added to validate that standalone types coming from .d.ts files
+can be correctly imported into new standalone components.
+
+PR Close #45672
+","['packages/compiler-cli/ngcc/test/integration/ngcc_spec.ts', 'packages/compiler-cli/src/ngtsc/metadata/src/dts.ts', 'packages/compiler-cli/src/ngtsc/metadata/src/util.ts', 'packages/compiler-cli/test/ngtsc/standalone_spec.ts', 'packages/compiler/src/render3/r3_pipe_compiler.ts', 'packages/compiler/src/render3/view/compiler.ts', 'packages/core/src/render3/interfaces/public_definitions.ts']","When importing standalone types from .d.ts files into new standalone components, there may be issues with correctly propagating the standalone flag. This commit adds a type field to the .d.ts metadata for directives, components, and pipes to indicate whether the type is standalone or not. By default, this flag is set to false for backwards compatibility. To ensure that standalone types can be imported correctly, tests have been added to validate this functionality."
+9da68a77e612d8f9e8ecdc9f77a43444d0e95461,1625867415,"refactor(bazel): compatibility with `rules_nodejs` v4.0.0 (#42760)
+
+This commit applies changes to `@angular/bazel` which are necessary
+to support the Bazel NodeJS rules v4.0.0. The Bazel NodeJS rules
+no longer support the `_tslibrary` option for the `LinkablePackageInfo`
+provider and therefore we need to stop using it. Due to this removal,
+we also need to add two new attributes called `package_name` and
+`package_path` so that the API of `ng_module` matches `ts_library`.
+
+Note: This is denoted as `refactor` as we currently are not able to
+merge feature commits into patch branches, but we want the tooling
+to not diverge significantly between the patch and next branch. It is
+planned to update the merge tooling to allow for such changes to land.
+
+PR Close #42760
+",['packages/bazel/src/ng_module.bzl'],"The `@angular/bazel` package needs to be refactored to ensure compatibility with the Bazel NodeJS rules v4.0.0. The Bazel NodeJS rules no longer support the `_tslibrary` option for the `LinkablePackageInfo` provider, so the usage of this option needs to be stopped. Additionally, two new attributes, `package_name` and `package_path`, need to be added to the API of `ng_module` in order to align it with `ts_library`. This refactor is necessary to ensure that the tooling does not significantly diverge between patch and next branches."
+e7cf1e05802a61bda9cbe619ed86a491ba067d04,1575658689,"feat(docs-infra): add the ability to expose globals (#34237)
+
+Adds the ability to expose global symbols in the API docs via the `@globalApi` tag. Also supports optionally setting a namespace which will be added to the name automatically (e.g. `foo` will be renamed to `ng.foo`). Relevant APIs should also be exported through the `global.ts` file which will show up under `core/global`.
+
+PR Close #34237
+","['aio/tools/transforms/angular-api-package/index.js', 'aio/tools/transforms/angular-api-package/processors/addGlobalApiData.js', 'aio/tools/transforms/angular-api-package/processors/addGlobalApiData.spec.js', 'aio/tools/transforms/angular-api-package/processors/updateGlobalApiPath.js', 'aio/tools/transforms/angular-api-package/processors/updateGlobalApiPath.spec.js', 'aio/tools/transforms/angular-api-package/tag-defs/globalApi.js', 'packages/core/global.ts']","The current documentation infrastructure does not provide a way to expose global symbols in the API docs. The addition of the `@globalApi` tag will allow for the documentation of global symbols. Additionally, there is support for setting a namespace, which will automatically add it to the name of the global symbol. The relevant APIs will also be exported through the `global.ts` file, allowing them to be easily accessed under the `core/global` directory."
+fd83d9479af1825c1ee3805e7b3751b016c90a62,1574290227,"fix(ivy): avoid using stale cache in TestBed if module overrides are defined (#33787)
+
+NgModule compilation in JIT mode (that is also used in TestBed) caches module scopes on NgModule defs (using `transitiveCompileScopes` field). Module overrides (defined via TestBed.overrideModule) may invalidate this data by adding/removing items in `declarations` list. This commit forces TestBed to recalculate transitive scopes in case module overrides are present, so TestBed always gets the most up-to-date information.
+
+PR Close #33787
+","['packages/core/src/render3/jit/module.ts', 'packages/core/test/test_bed_spec.ts', 'packages/core/testing/src/r3_test_bed_compiler.ts']","When module overrides are defined in TestBed, the NgModule compilation in JIT mode may use stale cache data, leading to incorrect results. This occurs because module overrides can add or remove items in the `declarations` list, invalidating the cached module scopes on NgModule defs. To ensure that TestBed always has the most up-to-date information, this commit forces TestBed to recalculate the transitive scopes when module overrides are present."
+10aa5641dd85a5eb89f1d1590b9df4119015c29f,1614793151,"fix(language-service): only provide template results on reference requests (#41041)
+
+VSCode only de-duplicates references results for ""go to references"" requests
+but does not de-duplicate them for ""find all references"" requests. The
+result is that users see duplicate references for results in TypeScript
+files - one from the built-in TS extension and one from us.
+While this is an issue in VSCode (see https://github.com/microsoft/vscode/issues/117095)
+this commit provides a quick workaround on our end until it can be addressed there.
+
+This commit should be reverted when microsoft/vscode/issues/117095 is resolved.
+
+fixes https://github.com/angular/vscode-ng-language-service/issues/1124
+
+PR Close #41041
+","['packages/language-service/ivy/references.ts', 'packages/language-service/ivy/test/references_spec.ts']","When performing ""find all references"" requests in VSCode, duplicate references can appear for results in TypeScript files. This occurs because VSCode de-duplicates references results for ""go to references"" requests, but not for ""find all references"" requests. Users may see duplicate references from both the built-in TypeScript extension and our extension. This commit implements a temporary workaround on our end until the issue is addressed in the VSCode repository. Once the issue is resolved, this commit should be reverted."
+a8569e38029724a7d77935bccce99117a7e1aefa,1665431006,"feat(forms): export forms utility functions: isFormArray, isFormGroup… (#47718)
+
+This commit exports existing utility functions to check for control instances:
+isFormControl, isFormGroup, isFormRecord, isFormArray
+Those are useful when implementing validators that use the specifics of one of those control types.
+To narrow down the type to what it actually is, we can now use the util functions in validators:
+
+```
+export const myArrayValidator: ValidatorFn = (control) => {
+  if (!isFormArray(control)) { return null; }
+
+  // now you can use FormArray-specific members, e.g.:
+  if (control.controls.every(c => !!c.value) {
+    return { myerror: true }
+  } else { return null; }
+}
+```
+
+PR Close #47718
+","['packages/forms/src/forms.ts', 'packages/forms/src/model/form_array.ts', 'packages/forms/src/model/form_control.ts', 'packages/forms/src/model/form_group.ts']","When implementing validators that rely on specific control types, it can be helpful to have utility functions to check for those control types. This commit exports utility functions to determine if a control is a form control, a form group, a form record, or a form array. These functions can be used to narrow down the control type and access control-specific members in validators."
+a3b08644280fb43d9dfd037927c4e6a48a2c9a46,1612311897,"refactor(compiler-cli): remove the overrideComponentTemplate API (#40585)
+
+The `TemplateTypeChecker.overrideComponentTemplate` operation was originally
+conceived as a ""fast path"" for the Language Service to react to a template
+change without needing to go through a full incremental compilation step. It
+served this purpose until the previous commit, which switches the LS to use
+the new resource-only incremental change operation provided by `NgCompiler`.
+
+`overrideComponentTemplate` is now no longer utilized, and is known to have
+several hard-to-overcome issues that prevent it from being useful in any
+other situations. As such, this commit removes it entirely.
+
+PR Close #40585
+","['packages/compiler-cli/src/ngtsc/annotations/src/component.ts', 'packages/compiler-cli/src/ngtsc/typecheck/api/checker.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/checker.ts', 'packages/compiler-cli/src/ngtsc/typecheck/src/context.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/type_checker__completion_spec.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/type_checker__get_symbol_of_template_node_spec.ts', 'packages/compiler-cli/src/ngtsc/typecheck/test/type_checker_spec.ts', 'packages/language-service/ivy/test/legacy/template_target_spec.ts']","The `overrideComponentTemplate` API in the compiler-cli was originally intended to provide a quick way for the Language Service to respond to template changes without a full incremental compilation. However, with the introduction of the new resource-only incremental change operation in the previous commit, the Language Service no longer needs to use `overrideComponentTemplate`. This API has been found to have several difficult-to-address issues that make it ineffective in any other scenarios. As a result, this commit removes the `overrideComponentTemplate` API entirely."
+302ab340e07a4a7d5639b6fc9997a101af39cb57,1697473335,"fix(compiler): avoid error in template parser for tag names that can occur in object prototype (#52225)
+
+Fixes that the compiler was throwing an error if an element tag name is the same as a built-in prototype property (e.g. `constructor` or `toString`). The problem was that we were storing the tag names in an object literal with the `Object` prototype. These changes resolve the issue by creating an object without a prototype.
+
+Fixes #52224.
+
+PR Close #52225
+","['packages/compiler/src/ml_parser/html_tags.ts', 'packages/compiler/test/ml_parser/html_parser_spec.ts']","The compiler was throwing an error when encountering element tag names that matched built-in prototype properties, such as `constructor` or `toString`. The issue stemmed from storing the tag names in an object literal with the `Object` prototype. This commit solves the problem by creating an object without a prototype."
+3a7bfc721efd61809ec16b950549f14ad4f9e75d,1557772015,"fix(ivy): handle windows drives correctly (#30297)
+
+At the moment the module resolver will end up in an infinite loop in Windows because we are assuming that the root directory is always `/` however in windows this can be any drive letter example `c:/` or `d:/` etc...
+
+With this change we also resolve the drive letter in windows, when using `AbsoluteFsPath.from` for consistence so under `/foo` will be converted to `c:/foo` this is also needed because of relative paths with different drive letters.
+
+PR Close #30297
+","['packages/compiler-cli/ngcc/src/dependencies/module_resolver.ts', 'packages/compiler-cli/ngcc/src/packages/ngcc_compiler_host.ts', 'packages/compiler-cli/ngcc/test/helpers/mock_file_system.ts', 'packages/compiler-cli/src/ngtsc/path/src/types.ts']","The current module resolver in Windows is causing an infinite loop because it assumes that the root directory is always `/`, when in reality it can be any drive letter (e.g. `c:/` or `d:/`). This causes issues with resolving absolute paths and relative paths with different drive letters. This change resolves the issue by correctly handling the drive letter in Windows, ensuring consistency and converting `/foo` to `c:/foo`, for example."
+afd68e5674e99a64fe5acc40e08cc8386dc6a454,1623087897,"feat(compiler): emit diagnostic for shadow dom components with an invalid selector (#42245)
+
+This is based on a discussion we had a few weeks ago. Currently if a component uses `ViewEncapsulation.ShadowDom` and its selector doesn't meet the requirements for a custom element tag name, a vague error will be thrown at runtime saying something like ""Element does not support attachShadowRoot"".
+
+These changes add a new diagnostic to the compiler that validates the component selector and gives a better error message during compilation.
+
+PR Close #42245
+","['goldens/public-api/compiler-cli/error_code.d.ts', 'packages/compiler-cli/src/ngtsc/annotations/src/component.ts', 'packages/compiler-cli/src/ngtsc/diagnostics/src/error_code.ts', 'packages/compiler-cli/test/ngtsc/ngtsc_spec.ts']",Using `ViewEncapsulation.ShadowDom` for a component with an invalid selector can lead to runtime errors with vague error messages. This commit adds a new diagnostic to the compiler to validate the component selector and provide a more informative error message during compilation.

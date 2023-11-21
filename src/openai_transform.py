@@ -122,13 +122,13 @@ def main():
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         # add a new column to final_df
-        final_df['transformed_message_gpt3'] = np.nan
+        final_df[f'transformed_message_{model_name}'] = np.nan
         for index, row in tqdm(final_df.iterrows(), total=final_df.shape[0]):
             # check if transformed_message_gpt3 is NaN or not
-            if not pd.isna(row['transformed_message_gpt3']):
+            if not pd.isna(row[f'transformed_message_{model_name}']):
                 continue
             transformed_message = transform_message(row['commit_message'], model_name)
-            final_df.at[index, 'transformed_message_gpt3'] = transformed_message
+            final_df.at[index, f'transformed_message_{model_name}'] = transformed_message
 
         csv_save_path = os.path.join(output_dir, f'{repo_name}_{model_name}_gold.csv')
         final_df.to_csv(csv_save_path, index=False)
