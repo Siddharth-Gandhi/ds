@@ -49,7 +49,7 @@ af08b5cbcaf4d3e3ad965a9165e41688733a7771,1509740372,"Release script follow-up wo
 * Release script also updates @next tag when publishing @latest
 
 * Fixed a typo. Improved inline comment.
-","['scripts/release/build-commands/add-git-tag.js', 'scripts/release/build-commands/print-post-build-summary.js', 'scripts/release/build-commands/update-package-versions.js', 'scripts/release/build.js', 'scripts/release/publish-commands/publish-to-npm.js']",
+","['scripts/release/build-commands/add-git-tag.js', 'scripts/release/build-commands/print-post-build-summary.js', 'scripts/release/build-commands/update-package-versions.js', 'scripts/release/build.js', 'scripts/release/publish-commands/publish-to-npm.js']","When using the release script after the 16.1.0-beta release, there were several follow-up tasks that needed to be addressed. These tasks include the build script not properly creating a git tag, the build script instructions not displaying relative paths correctly, pre-release version numbers not including the appropriate pre-release suffix (e.g. '-beta.0'), the post-NPM-publish step not correctly handling the minor revision comparison check, the release script not updating the '@next' tag when publishing the '@latest' version, and a typo and inline comment that needed to be fixed and improved."
 24dbe851e8a3a3a5233654183fd80b0d64b99295,1576610956,"fix(dev-tools): fix show correct displayName with forwardRef in Dev Tools (#17613)
 
 * fix(dev-tools): fix show correct displayName with forwardRef in Dev Tools
@@ -60,7 +60,7 @@ makesure Dev Tools show displayName as same as `getWrappedName` in `shared/getCo
 * Removed a little unnecessary/redundant code.
 
 * Fixed lint error (removed unused var)
-",['packages/react-devtools-shared/src/backend/renderer.js'],
+",['packages/react-devtools-shared/src/backend/renderer.js'],"When using `React.forwardRef()`, the displayName may not be shown correctly in the Dev Tools. This is because the `displayName` could be set after `React.forwardRef()`. This can be fixed by ensuring that the Dev Tools show the displayName as the same as the `getWrappedName` in `shared/getComponentName.js`. Additionally, there was some unnecessary and redundant code that was removed, and a lint error related to an unused variable was fixed."
 ddc4b65cfe17b3f08ff9f18f8804ff5b663788c8,1586291681,"Clear finished discrete updates during commit phase (#18515)
 
 * Reproduce a bug where `flushDiscreteUpdates` causes fallback never to be committed
@@ -87,7 +87,7 @@ owner, which should ever happen.
 
 I'll add a regression test later.
 
-Co-authored-by: Andrew Clark <git@andrewclark.io>","['packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.internal.js']",
+Co-authored-by: Andrew Clark <git@andrewclark.io>","['packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.internal.js']","If a root is finished with a priority lower than that of the latest pending discrete updates on it, these updates could still be in progress. This can cause issues when calling `flushDiscreteUpdates` later on, as it may start a new empty render pass and potentially cancel a scheduled timeout."
 5d3d71b1ddbbf5743108c998904f7bb575f4330e,1578072511,"Partial fix DevTools Profiler ''Could not find node…'' error (#17759)
 
 The Profiler stores:
@@ -100,7 +100,7 @@ It uses this information (snapshot + operations diff) to reconstruct the state o
 
 #16446 tracks a long-standing bug where these two arrays get misaligned. I am still not entirely sure what causes this bug, but with PR #17253, I exacerbated things by introducing another potential way for it to happen. This PR addresses the regression at least (and adds test coverage for it).
 
-I will follow up this afternoon on the original #16446 issue. I think I may have a lead on what's happening at least, if not exactly an idea of how to reproduce it.","['packages/react-devtools-shared/src/__tests__/profilerStore-test.js', 'packages/react-devtools-shared/src/backend/renderer.js']",
+I will follow up this afternoon on the original #16446 issue. I think I may have a lead on what's happening at least, if not exactly an idea of how to reproduce it.","['packages/react-devtools-shared/src/__tests__/profilerStore-test.js', 'packages/react-devtools-shared/src/backend/renderer.js']","The Profiler in DevTools can encounter an error ('Could not find node...') when reconstructing the state of the application for a given commit if the operations and metadata arrays do not align. Although the root cause of this bug is still unknown, the introduction of another potential way for these arrays to misalign in PR #17253 has exacerbated the issue. This commit addresses the regression and adds test coverage, but further investigation is needed to fully understand and reproduce the bug described in the original #16446 issue."
 392530104c00c25074ce38e1f7e1dd363018c7ce,1528759867,"Remove feature flag around 'getDerivedStateFromProps' bug fix (#13022)
 
 **what is the change?:**
@@ -115,7 +115,7 @@ Ran tests and lint, and really we have been testing this because the
 flag is open internally as of last week or so.
 
 **issue:**
-Internal task T29948812 has some info.","['packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/__tests__/ReactIncremental-test.internal.js', 'packages/shared/ReactFeatureFlags.js', 'packages/shared/forks/ReactFeatureFlags.native-fabric-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-fabric-oss.js', 'packages/shared/forks/ReactFeatureFlags.native-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-oss.js', 'packages/shared/forks/ReactFeatureFlags.persistent.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.js', 'packages/shared/forks/ReactFeatureFlags.www.js']",
+Internal task T29948812 has some info.","['packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/__tests__/ReactIncremental-test.internal.js', 'packages/shared/ReactFeatureFlags.js', 'packages/shared/forks/ReactFeatureFlags.native-fabric-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-fabric-oss.js', 'packages/shared/forks/ReactFeatureFlags.native-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-oss.js', 'packages/shared/forks/ReactFeatureFlags.persistent.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.js', 'packages/shared/forks/ReactFeatureFlags.www.js']","The issue behind this commit seems to be related to a bug fix around the `getDerivedStateFromProps` feature in React. The feature flag that was previously added to control this fix is now being removed. The commit message mentions that the fix was rolled out internally and in open source a few weeks ago, and now they are cleaning up. The issue itself seems to have more information in an internal task with the ID T29948812."
 efd8f6442d1aa7c4566fe812cba03e7e83aaccc3,1644508750,"Resolve default onRecoverableError at root init (#23264)
 
 Minor follow up to initial onRecoverableError PR.
@@ -124,7 +124,7 @@ When onRecoverableError is not provided to `createRoot`, the
 renderer falls back to a default implementation. Originally I
 implemented this with a host config method, but what we can do instead
 is pass the default implementation the root constructor as if it were
-a user provided one.","['packages/react-art/src/ReactARTHostConfig.js', 'packages/react-dom/src/client/ReactDOMHostConfig.js', 'packages/react-dom/src/client/ReactDOMLegacy.js', 'packages/react-dom/src/client/ReactDOMRoot.js', 'packages/react-native-renderer/src/ReactFabric.js', 'packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/ReactNativeHostConfig.js', 'packages/react-native-renderer/src/ReactNativeRenderer.js', 'packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/ReactFiberReconciler.new.js', 'packages/react-reconciler/src/ReactFiberReconciler.old.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/forks/ReactFiberHostConfig.custom.js', 'packages/react-test-renderer/src/ReactTestRenderer.js']",
+a user provided one.","['packages/react-art/src/ReactARTHostConfig.js', 'packages/react-dom/src/client/ReactDOMHostConfig.js', 'packages/react-dom/src/client/ReactDOMLegacy.js', 'packages/react-dom/src/client/ReactDOMRoot.js', 'packages/react-native-renderer/src/ReactFabric.js', 'packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/ReactNativeHostConfig.js', 'packages/react-native-renderer/src/ReactNativeRenderer.js', 'packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/ReactFiberReconciler.new.js', 'packages/react-reconciler/src/ReactFiberReconciler.old.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/forks/ReactFiberHostConfig.custom.js', 'packages/react-test-renderer/src/ReactTestRenderer.js']","When the `onRecoverableError` callback is not provided to the `createRoot` function, the renderer falls back to a default implementation. However, there was an issue with the initial implementation of this fallback method. Instead of using a host config method, there is a need to pass the default implementation the root constructor as if it were a user-provided callback."
 515326753b15eb247493b1b5c657eee1bc515337,1588184055,"[Blocks] Initial implementation of cache and data/fetch (#18774)
 
 * Rename ReactCache -> ReactCacheOld
@@ -137,7 +137,7 @@ We still use it in some tests so I'm going to leave it for now. I'll start makin
 
 * Initial implementation of cache and data/fetch
 
-* Address review","['fixtures/blocks/src/App.js', 'fixtures/blocks/src/Comments.js', 'fixtures/blocks/src/Post.js', 'fixtures/blocks/src/lib/cache.js', 'fixtures/blocks/src/lib/data.js', 'packages/react-cache/index.js', 'packages/react-cache/src/ReactCacheOld.js', 'packages/react-cache/src/__tests__/ReactCacheOld-test.internal.js', 'packages/react-data/fetch.js', 'packages/react-data/index.js', 'packages/react-data/npm/fetch.js', 'packages/react-data/npm/index.js', 'packages/react-data/src/ReactData.js', 'packages/react-data/src/__tests__/ReactData-test.js', 'packages/react-data/src/__tests__/ReactDataFetch-test.js', 'packages/react-data/src/fetch/ReactDataFetch.js', 'packages/react/npm/unstable-cache.js', 'packages/react/src/__tests__/ReactCache-test.js', 'packages/react/src/cache/ReactCache.js', 'packages/react/unstable-cache.js', 'scripts/rollup/bundles.js']",
+* Address review","['fixtures/blocks/src/App.js', 'fixtures/blocks/src/Comments.js', 'fixtures/blocks/src/Post.js', 'fixtures/blocks/src/lib/cache.js', 'fixtures/blocks/src/lib/data.js', 'packages/react-cache/index.js', 'packages/react-cache/src/ReactCacheOld.js', 'packages/react-cache/src/__tests__/ReactCacheOld-test.internal.js', 'packages/react-data/fetch.js', 'packages/react-data/index.js', 'packages/react-data/npm/fetch.js', 'packages/react-data/npm/index.js', 'packages/react-data/src/ReactData.js', 'packages/react-data/src/__tests__/ReactData-test.js', 'packages/react-data/src/__tests__/ReactDataFetch-test.js', 'packages/react-data/src/fetch/ReactDataFetch.js', 'packages/react/npm/unstable-cache.js', 'packages/react/src/__tests__/ReactCache-test.js', 'packages/react/src/cache/ReactCache.js', 'packages/react/unstable-cache.js', 'scripts/rollup/bundles.js']","When implementing the cache and data/fetch features, several changes were made. The ReactCache component was renamed to ReactCacheOld, although it is still being used in some tests. Two new entry points, react/unstable-cache and react-data, were added. This commit represents the initial implementation of the cache and data/fetch functionalities and addresses a review. There may have been issues with the previous cache implementation or a need for improved data fetching."
 3ba5c87377710e154351aebc818df3d33ee6a718,1616966018,"Remove Scheduler indirection (#21107)
 
 * Bump version number
@@ -149,7 +149,7 @@ types separate in case there was a versioning mismatch between the two
 modules. However, it looks like we're going to keep the Scheduler module
 private in the short to medium term, and longer term the public
 interface will match postTask. So, I've removed the extra indirection
-(the switch statements that convert between the two types).","['packages/react-devtools-scheduling-profiler/src/import-worker/__tests__/preprocessData-test.internal.js', 'packages/react-devtools-shared/src/backend/renderer.js', 'packages/react-reconciler/src/ReactFiberHooks.new.js', 'packages/react-reconciler/src/ReactFiberHooks.old.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/SchedulerWithReactIntegration.new.js', 'packages/react-reconciler/src/SchedulerWithReactIntegration.old.js', 'packages/shared/ReactVersion.js']",
+(the switch statements that convert between the two types).","['packages/react-devtools-scheduling-profiler/src/import-worker/__tests__/preprocessData-test.internal.js', 'packages/react-devtools-shared/src/backend/renderer.js', 'packages/react-reconciler/src/ReactFiberHooks.new.js', 'packages/react-reconciler/src/ReactFiberHooks.old.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/SchedulerWithReactIntegration.new.js', 'packages/react-reconciler/src/SchedulerWithReactIntegration.old.js', 'packages/shared/ReactVersion.js']","The original intention of keeping the React PriorityLevel and Scheduler PriorityLevel types separate was to account for a potential versioning mismatch between the two modules. However, it has now been determined that the Scheduler module will remain private in the near future, and in the long term, the public interface will align with postTask. As a result, the extra indirection, specifically the switch statements that convert between the two types, has been removed."
 cb141681750c8221ac799074df09df2bb448c7a4,1590776748,"Remove unnecessary throw catch (#19044)
 
 This was originally added so you could use ""break on caught exceptions""
@@ -161,7 +161,7 @@ break point here.
 
 Since DevTools injects its own console.error, we could inject a ""debugger""
 statement in there. Conditionally. E.g. React DevTools could have a flag
-to toggle ""break on warnings"".",['packages/shared/consoleWithStackDev.js'],
+to toggle ""break on warnings"".",['packages/shared/consoleWithStackDev.js'],"The unnecessary try-catch block was added to enable the ""break on caught exceptions"" feature, but this feature is no longer useful as it is primarily used for feature detection and Suspense. A better approach is to use the stack trace to jump to the source and set a breakpoint there. Instead of relying on try-catch, a ""debugger"" statement could be injected into DevTools' own console.error, with the option to conditionally toggle ""break on warnings"" flag in React DevTools."
 0f2f90bd9a9daf241d691bf4af3ea2e3a263c0e3,1522785766,"getDerivedStateFrom{Props,Catch} should update updateQueue.baseState (#12528)
 
 Based on a bug found in UFI2.
@@ -169,14 +169,14 @@ Based on a bug found in UFI2.
 There have been several bugs related to the update queue (and
 specifically baseState) recently, so I'm going to follow-up with some
 refactoring to clean it up. This is a quick fix so we can ship a
-patch release.","['packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.internal.js']",
+patch release.","['packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.internal.js']","There have been multiple bugs related to the update queue and specifically the baseState, which have led to issues in UFI2. To address this, some refactoring is needed to clean up the update queue. This commit focuses on implementing a quick fix to enable the shipping of a patch release."
 4ebaeae40dec52c84c968a25f1f21f4d0f571336,1649435300,"moved mutation code to passive (#24251)
 
 This PR moves the code for transition tracing in the mutation phase that adds transitions to the pending callbacks object (to be called sometime later after paint) from the mutation to the passive phase.
 
 Things to think about:
 
-Passive effects can be flushed before or after paint. How do we make sure that we get the correct end time for the interaction?","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js', 'packages/react-reconciler/src/ReactFiberCompleteWork.new.js', 'packages/react-reconciler/src/ReactFiberCompleteWork.old.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js']",
+Passive effects can be flushed before or after paint. How do we make sure that we get the correct end time for the interaction?","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js', 'packages/react-reconciler/src/ReactFiberCompleteWork.new.js', 'packages/react-reconciler/src/ReactFiberCompleteWork.old.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js']","When adding transitions to the pending callbacks object during the mutation phase, there is a concern about the timing of when passive effects are flushed. If passive effects are flushed before paint, there might be issues with getting the correct end time for the interaction."
 267ed981466ef323b1461b013b5db8db31e31772,1549383016,"expose `TestUtils.act()` for batching actions in tests (#14744)
 
 * expose unstable_interact for batching actions in tests
@@ -242,7 +242,7 @@ pass tests
 * hi andrew
 
 (prettier fix)
-","['packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-dom/src/__tests__/ReactDOMSuspensePlaceholder-test.js', 'packages/react-dom/src/__tests__/ReactTestUtils-test.js', 'packages/react-dom/src/test-utils/ReactTestUtils.js', 'packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseFuzz-test.internal.js', 'packages/react-test-renderer/src/ReactTestRenderer.js', 'packages/react-test-renderer/src/__tests__/ReactTestRenderer-test.internal.js']",
+","['packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-dom/src/__tests__/ReactDOMSuspensePlaceholder-test.js', 'packages/react-dom/src/__tests__/ReactTestUtils-test.js', 'packages/react-dom/src/test-utils/ReactTestUtils.js', 'packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseFuzz-test.internal.js', 'packages/react-test-renderer/src/ReactTestRenderer.js', 'packages/react-test-renderer/src/__tests__/ReactTestRenderer-test.internal.js']","When testing, it is important to be able to batch actions together. Currently, there is no way to do this, leading to difficulties in testing certain scenarios. This commit aims to expose a new function called `TestUtils.act()` which can be used to batch actions in tests."
 15557fa67fe3cbd4a9bc7bf7340594d3f7e8ab89,1669657377,"[Fix] properly track `useId` use in StrictMode in development (#25713)
 
 In `<StrictMode>` in dev hooks are run twice on each render.
@@ -263,7 +263,7 @@ properly sees that the component did generate an ID.
 The fix is to not reset the localIdCounter in `renderWithHooksAgain`. It
 gets reset anyway once the `renderWithHooks` is complete and since we do
 not re-mount the ID in the `...Again` pass we should retain the state
-from the initial pass.","['packages/react-dom/src/__tests__/ReactDOMUseId-test.js', 'packages/react-reconciler/src/ReactFiberHooks.new.js', 'packages/react-reconciler/src/ReactFiberHooks.old.js']",
+from the initial pass.","['packages/react-dom/src/__tests__/ReactDOMUseId-test.js', 'packages/react-reconciler/src/ReactFiberHooks.new.js', 'packages/react-reconciler/src/ReactFiberHooks.old.js']","When using `useId` in `<StrictMode>` in development, the hooks are run twice on each render. However, in the update path, the local ID counter is not incremented, causing the render to appear as if no ID was used. This leads to a different set of IDs being generated for subsequent calls to `useId` in the subtree. This issue was causing a hydration error because the ID generation did not match between the server and client. The fix for this issue is to not reset the local ID counter in `renderWithHooksAgain` and retain the state from the initial pass."
 4a924a206783df5d2e06755caa0fbd2dd580b14e,1510880342,"Updates at the same priority should not interrupt current render (#11578)
 
 When we're rendering work at a specific level, and a higher priority
@@ -284,7 +284,7 @@ An exception is in Flux-like systems where multiple setStates are the
 result of a single conceptual update/event/dispatch. We can add an
 explicit API for batching in the future; in fact, we'd likely need one
 anyway to account for expiration accidentally causing consecutive
-updates to fall into separate buckets.","['packages/react-noop-renderer/src/ReactNoop.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactIncremental-test.js']",
+updates to fall into separate buckets.","['packages/react-noop-renderer/src/ReactNoop.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactIncremental-test.js']","When rendering work at a specific level, a higher priority update can interrupt the current work and restart at the higher priority. However, currently, updates of equal priority also interrupt the current work. The rationale for this behavior is not clear, as separate setStates are usually distinct updates that can be flushed separately, especially if the components being updated are in separate subtrees. An exception to this is in Flux-like systems where multiple setStates are the result of a single update/event/dispatch. In the future, an explicit API for batching could be added to account for expiration accidentally causing consecutive updates to fall into separate buckets."
 d8144730475cf2d71781e26e300d0d579ac6b8d9,1678293970,"[Internal API only] Delete non-awaited form of act (#26339)
 
 **This commit only affects the internal version of `act` that we use in
@@ -294,7 +294,7 @@ We should always await the result of an `act` call so that any work
 queued in a microtask has a chance to flush. Neglecting to do this can
 cause us to miss bugs when testing React behavior.
 
-I codemodded all the existing `act` callers in previous PRs.",['packages/jest-react/src/internalAct.js'],
+I codemodded all the existing `act` callers in previous PRs.",['packages/jest-react/src/internalAct.js'],"The non-awaited form of the `act` function in the internal API can potentially lead to issues when testing React behavior. Neglecting to await the result of an `act` call can cause the work queued in a microtask to not properly flush, potentially resulting in missed bugs."
 54c2f2a3469e296fba025cf444d0639c7bf8f39a,1694701288,"fix[devtools/extension]: unregister dynamically injected content scripts instead of filtering (#27369)
 
 Same as https://github.com/facebook/react/pull/26765.
@@ -309,7 +309,7 @@ Turns out, it stops working after the first reload, and it stops only in
 incognito mode, so I am rolling out back the previous workaround.
 
 Tested on Chrome that it fixes the extension in incognito mode and that
-it doesn't affect default mode.",['packages/react-devtools-extensions/src/background/dynamicallyInjectContentScripts.js'],
+it doesn't affect default mode.",['packages/react-devtools-extensions/src/background/dynamicallyInjectContentScripts.js'],"When dynamically injecting content scripts in the devtools extension, there is an issue with unregistering them properly. This issue was introduced in a previous refactor of the extension's background logic and was missed because the extension was only tested in regular mode, not in incognito mode. As a result, the extension stops working in incognito mode after the first reload. This commit rolls back the previous workaround and fixes the extension in incognito mode while not affecting default mode."
 96fd2fb726130d2980e6d450f5d9e468f922b8b9,1681864762,"(patch)[DevTools] bug fix: backend injection logic not working for undocked devtools window (#26665)
 
 bugfix for #26492
@@ -322,7 +322,7 @@ The else-if logic is broken when user switch to undocked devtools mode
 <img width=""314"" alt=""image""
 src=""https://user-images.githubusercontent.com/1001890/232930094-05a74445-9189-4d50-baf1-a0360b29ef7e.png"">
 
-Tested on Chrome with a local build",['packages/react-devtools-extensions/src/background.js'],
+Tested on Chrome with a local build",['packages/react-devtools-extensions/src/background.js'],"Users were unable to use the devtools because the backend injection logic was not functioning properly for undocked devtools windows. The else-if logic was broken in this case, as `sender.tab` would exist when the user switched to undocked mode."
 5f21a9fca455069bc1e986e1528963a5055a8f21,1616876777,"Clean up host pointers in level 2 of clean-up flag (#21112)
 
 The host tree is a cyclical structure. Leaking a single DOM node can
@@ -341,7 +341,7 @@ large amounts of memory.
 In our plan for removing the alternate model, DOM nodes would not be
 connected to fibers, except at the root of the whole tree, which is
 easy to disconnect on deletion. So in that world, we likely won't have
-to do any additional work.","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']",
+to do any additional work.","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']","Memory leaks caused by host pointers in level 2 of the clean-up flag could be leading to a significant impact on memory usage. Although it's difficult to completely eliminate leaks in non-React code, it may be worth the extra effort to clear these fields. Moving this issue to level 2 will help confirm if clearing these fields alone can result in memory savings, or if there are other fields causing the retention of large amounts of memory. In the long-term plan for removing the alternate model, DOM nodes would only be connected to fibers at the root of the tree, making it easy to disconnect them upon deletion. This would potentially eliminate the need for any additional work to address this issue."
 4c7036e807fa18a3e21a5182983c7c0f05c5936e,1591027281,"Bugfix: Infinite loop in beforeblur event (#19053)
 
 * Failing test: Infinite loop in beforeblur event
@@ -363,7 +363,7 @@ revisit after the planned refactor of the commit phase.
 * Move logic to commit phase
 
 isFiberSuspenseAndTimedOut is used elsewhere, so I inlined the commit
-logic into the commit phase itself.","['packages/react-dom/src/events/__tests__/DOMModernPluginEventSystem-test.internal.js', 'packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js', 'packages/react-reconciler/src/ReactFiberTreeReflection.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js']",
+logic into the commit phase itself.","['packages/react-dom/src/events/__tests__/DOMModernPluginEventSystem-test.internal.js', 'packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js', 'packages/react-reconciler/src/ReactFiberTreeReflection.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js']","When a focused node is hidden by a Suspense boundary, the beforeblur event can cause an infinite loop. The check for whether a tree is being hidden is not specific enough, as it fires for updates as well as initially hidden trees. To fix this, the beforeblur event should only fire if the node was previously visible, not during updates to an already hidden tree. Additionally, the logic for isFiberSuspenseAndTimedOut is moved to the commit phase to prevent issues."
 0b974418c9a56f6c560298560265dcf4b65784bc,1673033335,"[Fizz] Fork Fizz instruction set for inline script and external runtime (#25862)
 
 ~~[Fizz] Duplicate completeBoundaryWithStyles to not reference globals~~
@@ -395,7 +395,11 @@ function (`getCompleteBoundaryWithStyles`) with no luck
 - bundle size for unstable_external_runtime should be slightly smaller
 (due to lack of globals)
 - `ReactDOMFizzServer-test.js` and `ReactDOMFloat-test.js` should be
-unaffected","['packages/react-dom-bindings/src/server/ReactDOMServerExternalRuntime.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineClientRenderBoundary.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineCompleteBoundary.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineCompleteBoundaryWithStyles.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineCompleteSegment.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetExternalRuntime.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetInlineSource.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetShared.js', 'scripts/rollup/generate-inline-fizz-runtime.js']",
+unaffected","['packages/react-dom-bindings/src/server/ReactDOMServerExternalRuntime.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineClientRenderBoundary.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineCompleteBoundary.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineCompleteBoundaryWithStyles.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInlineCompleteSegment.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetExternalRuntime.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetInlineSource.js', 'packages/react-dom-bindings/src/server/fizz-instruction-set/ReactDOMFizzInstructionSetShared.js', 'scripts/rollup/generate-inline-fizz-runtime.js']","When using Fizz's external runtime and its inline script writer, there was an issue with referencing `completeBoundary` and `resourceMap` in different contexts. The `completeBoundaryWithStylesInlineLocals` function was used by the external runtime and could reference and rename `completeBoundary` and `resourceMap` as locals. However, the `completeBoundaryWithStylesInlineGlobals` function was used by the inline script writer and needed to reference `completeBoundary($RC)` and `resourceMap($RM)` as globals.
+
+In an ideal situation, Closure would handle inlining a shared implementation. However, due to a lack of an `@inline` compiler directive and Closure thinking that a shared `completeBoundaryWithStyles` function is too large, it always keeps it as a separate function. Attempts were made to address this by using currying or writing a higher-order function, but they didn't work.
+
+To solve this issue, the Fizz instruction set was forked for the inline script and external runtime."
 a53f5cc22eab9617a1d5473e16ce872c7158edef,1564722148,"[SuspenseList] Bug fix: Reset renderState when bailing out (#16278)
 
 If there are adjacent updates we bail out of rendering the suspense list
@@ -403,7 +407,7 @@ at all but we may still complete the node. We need to reset the render
 state in that case.
 
 I restructured so that this is in the same code path so we don't forget it
-in the future.","['packages/react-reconciler/src/ReactFiberBeginWork.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseList-test.internal.js']",
+in the future.","['packages/react-reconciler/src/ReactFiberBeginWork.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseList-test.internal.js']","When there are adjacent updates, bailing out of rendering the suspense list can still result in the completion of the node. However, in this case, the render state is not being reset, which can lead to unexpected behavior. By restructuring the code so that the reset of the render state is included in the same code path, we can ensure that this issue is addressed consistently in the future."
 703c67560d1b5e5d32170cd513cda52559933527,1678202134,"Codemod act -> await act (1/?) (#26334)
 
 Similar to the rationale for `waitFor` (see
@@ -413,7 +417,7 @@ the result of an `act` call so that microtasks have a chance to fire.
 This only affects the internal `act` that we use in our repo, for now.
 In the public `act` API, we don't yet require this; however, we
 effectively will for any update that triggers suspense once `use` lands.
-So we likely will start warning in an upcoming minor.","['packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-dom/src/__tests__/ReactDOMConsoleErrorReporting-test.js', 'packages/react-dom/src/__tests__/ReactDOMFiberAsync-test.js', 'packages/react-dom/src/__tests__/ReactDOMNativeEventHeuristic-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerPartialHydration-test.internal.js', 'packages/react-dom/src/__tests__/ReactErrorBoundaries-test.internal.js', 'packages/react-dom/src/__tests__/ReactUpdates-test.js', 'packages/react-interactions/events/src/dom/create-event-handle/__tests__/useFocusWithin-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js', 'packages/react/src/__tests__/ReactStartTransition-test.js', 'packages/react/src/__tests__/ReactStrictMode-test.internal.js', 'packages/react/src/__tests__/ReactStrictMode-test.js']",
+So we likely will start warning in an upcoming minor.","['packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-dom/src/__tests__/ReactDOMConsoleErrorReporting-test.js', 'packages/react-dom/src/__tests__/ReactDOMFiberAsync-test.js', 'packages/react-dom/src/__tests__/ReactDOMNativeEventHeuristic-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerPartialHydration-test.internal.js', 'packages/react-dom/src/__tests__/ReactErrorBoundaries-test.internal.js', 'packages/react-dom/src/__tests__/ReactUpdates-test.js', 'packages/react-interactions/events/src/dom/create-event-handle/__tests__/useFocusWithin-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js', 'packages/react/src/__tests__/ReactStartTransition-test.js', 'packages/react/src/__tests__/ReactStrictMode-test.internal.js', 'packages/react/src/__tests__/ReactStrictMode-test.js']","By not awaiting the result of an `act` call, microtasks may not have a chance to fire. This currently only affects the internal `act` used in the repository, but it will likely have an impact on updates that trigger suspense once `use` is implemented."
 668fbd651b6b245da5c42e9e243adc88f0278517,1557882490,"Fix serial passive effects (#15650)
 
 * Failing test for false positive warning
@@ -437,7 +441,9 @@ This commit moves the `flushPassiveEffects` call to before the discrete
 event handlers are called, and removes it from the `setState` method.
 Non-discrete events will not cause passive effects to flush, which is
 fine, since by definition they are not order dependent.
-","['packages/react-dom/src/__tests__/ReactDOMHooks-test.js', 'packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberReconciler.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.internal.js']",
+","['packages/react-dom/src/__tests__/ReactDOMHooks-test.js', 'packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberReconciler.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.internal.js']","The current implementation checks for pending passive effects inside the `setState` method before adding additional updates to the queue. However, this approach is too late because the event that caused the update might not have fired if the passive effects were flushed earlier. This results in a problem similar to the discrete/serial events issue. When a serial update arrives and there is already a pending serial update, we need to process the pending update before invoking the user-provided event handlers because those handlers can potentially change as a result of the pending update. 
+
+To address this issue, the `flushPassiveEffects` call has been moved to before the discrete event handlers are called and removed from the `setState` method. Non-discrete events will not trigger the flushing of passive effects, which is acceptable since they are not order dependent."
 87c803d1dad7e5fe8863436b0d2d18df3d462f21,1678994835,"Fix a test case in ReactUpdates-test (#26399)
 
 Just noticed the test isn't testing what it is meant to test properly.
@@ -447,7 +453,7 @@ behave as if it's running React 17. Learn more:
 https://reactjs.org/link/switch-to-createroot` is thrown, the inner
 `expect(error).toContain('Warning: Maximum update depth exceeded.');`
 failed and threw jest error, and the outer `.toThrow('Maximum update
-depth exceeded.')` happens to catch it and makes the test pass.",['packages/react-dom/src/__tests__/ReactUpdates-test.js'],
+depth exceeded.')` happens to catch it and makes the test pass.",['packages/react-dom/src/__tests__/ReactUpdates-test.js'],"The test case in ReactUpdates-test is not properly testing what it is meant to test. The error message ""Warning: ReactDOM.render is no longer supported in React 18. Use createRoot instead. Until you switch to the new API, your app will behave as if it's running React 17"" is being thrown, but the inner expectation that the error should contain ""Warning: Maximum update depth exceeded"" is failing and throwing a Jest error. However, the outer expectation `.toThrow('Maximum update depth exceeded.')` is catching the error and making the test pass."
 fa1a3262271be165820fa51daeb036ba260205a3,1569433587,"Update useEditableValue hook to sync external value changes (#16878)
 
 * Update useEditableValue to mirror value cahnges
@@ -457,7 +463,7 @@ Previously, the hook initialized local state (in useState) to mirror the prop/st
 * Optimistic CHANGELOG update
 
 * Added additional useEditableValue() unit test cases
-","['packages/react-devtools-shared/src/__tests__/useEditableValue-test.js', 'packages/react-devtools-shared/src/devtools/views/Components/EditableValue.js', 'packages/react-devtools-shared/src/devtools/views/Components/HooksTree.js', 'packages/react-devtools-shared/src/devtools/views/Components/InspectedElementTree.js', 'packages/react-devtools-shared/src/devtools/views/Components/KeyValue.js', 'packages/react-devtools-shared/src/devtools/views/Components/TreeContext.js', 'packages/react-devtools-shared/src/devtools/views/hooks.js']",
+","['packages/react-devtools-shared/src/__tests__/useEditableValue-test.js', 'packages/react-devtools-shared/src/devtools/views/Components/EditableValue.js', 'packages/react-devtools-shared/src/devtools/views/Components/HooksTree.js', 'packages/react-devtools-shared/src/devtools/views/Components/InspectedElementTree.js', 'packages/react-devtools-shared/src/devtools/views/Components/KeyValue.js', 'packages/react-devtools-shared/src/devtools/views/Components/TreeContext.js', 'packages/react-devtools-shared/src/devtools/views/hooks.js']","The useEditableValue hook needs to be updated to properly synchronize changes to the external value. Previously, the hook only initialized local state to mirror the prop or state value, but updates to the value were ignored. This means that once the state was initialized, it was never updated with any changes to the external value. The updated hook ensures that the local/editable state correctly mirrors the external value, unless there are already pending, local edits being made. Additional unit test cases have also been added to cover this update."
 3c27178a2f2c74f14d90613028e3929e1f06d830,1695272229,"Update tracked value after resetting radio group (#27394)
 
 Fixes #26876, I think. Review each commit separately (all assertions
@@ -483,13 +489,13 @@ calls—in particular I think if clicking A changed the checked radio
 button from B to C then the code as I have it would be incorrect, but
 that also seems unlikely so idk whether to care.
 
-cc @zhengjitf @Luk-z who did some investigation on the original issue","['packages/react-dom-bindings/src/client/ReactDOMInput.js', 'packages/react-dom/src/__tests__/ReactDOMInput-test.js']",
+cc @zhengjitf @Luk-z who did some investigation on the original issue","['packages/react-dom-bindings/src/client/ReactDOMInput.js', 'packages/react-dom/src/__tests__/ReactDOMInput-test.js']","When resetting a radio group, there are some concerns that need to be addressed. The commit message mentions confusion regarding two issues. Firstly, it is not clear how the isCheckedDirty assertions are true when .checked is not set unconditionally. Secondly, there is confusion regarding a previous faulty change that is not reflected in the restoration logic that was modified in this commit. Despite these confusions, the commit author believes that the updateInput() call is necessary and should resolve the issue at hand. It is suggested that all the updateInput() calls should be done before the updateValueIfChanged() calls. Further investigation and clarification are needed to ensure the correctness and effectiveness of the code changes."
 69be472c11231056d297a7b73dd0b121905606d3,1694571423,"Fix: Initialize childIndex in Task constructor (#27367)
 
 This field was not being initialized. Although the property is part of
 the Flow type, the type error wasn't caught because the constructor
 itself is not covered by Flow, which is unfortunate. (I assume this is
-related to the dev-only componentStack property.)",['packages/react-server/src/ReactFizzServer.js'],
+related to the dev-only componentStack property.)",['packages/react-server/src/ReactFizzServer.js'],"The childIndex field in the Task constructor was not being initialized, leading to potential issues. Although the property is part of the Flow type, the type error was not caught because the constructor itself is not covered by Flow."
 69e732ac9d32ecb7251834af4209d46fff5d5102,1588896440,"Disable Profiler commit filtering (#18862)
 
 * Disable Profiler commit filtering
@@ -498,7 +504,7 @@ We used to filter ""empty"" DevTools commits, but it was error prone (see #18798
 
 For that matter, hiding ""empty"" commits might cause confusion too. A commit *did happen* even if none of the components the Profiler is showing were involved.
 
-* Restart flaky CI",['packages/react-devtools-shared/src/devtools/views/Profiler/utils.js'],
+* Restart flaky CI",['packages/react-devtools-shared/src/devtools/views/Profiler/utils.js'],"When filtering ""empty"" DevTools commits, there is a risk of corrupting the resulting data and causing runtime errors. Additionally, hiding these ""empty"" commits may cause confusion as a commit did occur, even if none of the components displayed in the Profiler were involved."
 67f4fb02130b1fe1856289e3b66bb0b8cca57ff7,1682969757,"Allow forms to skip hydration of hidden inputs (#26735)
 
 This allows us to emit extra ephemeral data that will only be used on
@@ -512,7 +518,7 @@ look at the code together and find shared paths.
 canHydrate returns the instance if it matches, that used to just be
 there to refine the type but it can also be used to just return a
 different instance later that we find. If we don't find one, we'll bail
-out and error regardless so no need to skip past anything.","['packages/react-dom-bindings/src/client/ReactFiberConfigDOM.js', 'packages/react-dom/src/__tests__/ReactServerRenderingHydration-test.js', 'packages/react-reconciler/src/ReactFiberConfigWithNoHydration.js', 'packages/react-reconciler/src/ReactFiberHydrationContext.js', 'packages/react-reconciler/src/forks/ReactFiberConfig.custom.js']",
+out and error regardless so no need to skip past anything.","['packages/react-dom-bindings/src/client/ReactFiberConfigDOM.js', 'packages/react-dom/src/__tests__/ReactServerRenderingHydration-test.js', 'packages/react-reconciler/src/ReactFiberConfigWithNoHydration.js', 'packages/react-reconciler/src/ReactFiberHydrationContext.js', 'packages/react-reconciler/src/forks/ReactFiberConfig.custom.js']","When rendering server forms, hidden inputs are currently being hydrated unnecessarily. This commit aims to allow forms to skip the hydration of hidden inputs, by refactoring the shouldSkip functions to be part of the canHydrate methods. This change not only reduces the surface area of Config bindings but also helps optimize the code by identifying shared paths. If no matching instance is found, the code will now bail out and error instead of skipping past anything."
 e6e393b9c5221bfb1a5ddcc7221c42e96ab3baca,1515515089,"Add warning in server renderer if class doesn't extend React.Component (#11993)
 
 * Add warning in server renderer if class doesn't extend React.Component
@@ -524,7 +530,7 @@ In dev mode, while server rendering, a warning will be thrown if there is a clas
 * Deduplicate client-side warning if class doesn't extend React.Component
 
 * Default componentName to Unknown if null
-","['packages/react-dom/src/__tests__/ReactCompositeComponent-test.js', 'packages/react-dom/src/__tests__/ReactServerRendering-test.js', 'packages/react-dom/src/server/ReactPartialRenderer.js', 'packages/react-reconciler/src/ReactFiberBeginWork.js']",
+","['packages/react-dom/src/__tests__/ReactCompositeComponent-test.js', 'packages/react-dom/src/__tests__/ReactServerRendering-test.js', 'packages/react-dom/src/server/ReactPartialRenderer.js', 'packages/react-reconciler/src/ReactFiberBeginWork.js']","During server rendering in development mode, there is a potential problem where a class that does not extend `React.Component` may cause issues. To address this, a warning is added in the server renderer to notify developers of this issue. Additionally, the warning is deduplicated to prevent multiple instances of the same warning. If the component name is null, it is defaulted to ""Unknown""."
 281616f462866f382c0fead366c7b2b5172a1ce5,1556266969,"Support highlighting of all DOM elements of Fragments, not just first
 
 Fixes https://github.com/bvaughn/react-devtools-experimental/issues/131
@@ -537,7 +543,7 @@ which used to highlight only the first DOM element of a Fragment.
 Reworked `src/backend/views/Overlay` to support highlighting
 more than one element rectangle annotated with one tooltip.
 Fixed minor issues with the tooltip position calculation.
-","['src/backend/agent.js', 'src/backend/renderer.js', 'src/backend/types.js', 'src/backend/views/Highlighter.js', 'src/backend/views/Overlay.js']",
+","['src/backend/agent.js', 'src/backend/renderer.js', 'src/backend/types.js', 'src/backend/views/Highlighter.js', 'src/backend/views/Overlay.js']","When using the React DevTools Experimental tool, only the first DOM element of a Fragment is highlighted. This commit aims to fix this issue by modifying the `src/backend/views/Overlay` file to support highlighting multiple element rectangles with one tooltip. Additionally, the commit removes the dependency on React's `renderer.findHostInstanceByFiber` function. There were also some minor issues with the tooltip position calculation that have been addressed."
 524a74331399fd7102037c878f327afbd5e14f53,1527719501,"Fix for Flow issues in SimpleCacheProvider (#12942)
 
 * Fix for Flow issues in SimpleCacheProvider
@@ -557,7 +563,7 @@ Flow passes!
 https://github.com/facebook/react/issues/12941
 
 * Fix lints
-",['packages/simple-cache-provider/src/SimpleCacheProvider.js'],
+",['packages/simple-cache-provider/src/SimpleCacheProvider.js'],The SimpleCacheProvider was experiencing some Flow issues that were not being properly caught by CI. The flow errors were fixed and the flow types were loosened to avoid a recursive loop in Flow. This change was made to unbreak the master branch and allow other changes to be made. The commit also includes fixes for lints.
 3278d242184a13add3f25f683b77ef9a6a2305f3,1586218647,"Add useOpaqueIdentifier Hook (#17322)
 
 * Add useOpaqueIdentifier Hook
@@ -582,12 +588,14 @@ unique ID based on whether the hook was called on the server or client.
 If the hook is called during hydration, it generates an opaque object
 that will rerender the hook so that the IDs match.
 
-Co-authored-by: Andrew Clark <git@andrewclark.io>","['packages/react-art/src/ReactARTHostConfig.js', 'packages/react-debug-tools/src/ReactDebugHooks.js', 'packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerIntegrationHooks-test.internal.js', 'packages/react-dom/src/client/DOMPropertyOperations.js', 'packages/react-dom/src/client/ReactDOMComponent.js', 'packages/react-dom/src/client/ReactDOMHostConfig.js', 'packages/react-dom/src/server/ReactPartialRendererHooks.js', 'packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/ReactNativeHostConfig.js', 'packages/react-reconciler/src/ReactCurrentFiber.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberHydrationContext.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/forks/ReactFiberHostConfig.custom.js', 'packages/react-test-renderer/src/ReactTestHostConfig.js', 'packages/react/index.classic.fb.js', 'packages/react/index.experimental.js', 'packages/react/index.js', 'packages/react/index.modern.fb.js', 'packages/react/src/React.js', 'packages/react/src/ReactHooks.js', 'packages/shared/ReactSymbols.js']",
+Co-authored-by: Andrew Clark <git@andrewclark.io>","['packages/react-art/src/ReactARTHostConfig.js', 'packages/react-debug-tools/src/ReactDebugHooks.js', 'packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerIntegrationHooks-test.internal.js', 'packages/react-dom/src/client/DOMPropertyOperations.js', 'packages/react-dom/src/client/ReactDOMComponent.js', 'packages/react-dom/src/client/ReactDOMHostConfig.js', 'packages/react-dom/src/server/ReactPartialRendererHooks.js', 'packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/ReactNativeHostConfig.js', 'packages/react-reconciler/src/ReactCurrentFiber.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberHydrationContext.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/forks/ReactFiberHostConfig.custom.js', 'packages/react-test-renderer/src/ReactTestHostConfig.js', 'packages/react/index.classic.fb.js', 'packages/react/index.experimental.js', 'packages/react/index.js', 'packages/react/index.modern.fb.js', 'packages/react/src/React.js', 'packages/react/src/ReactHooks.js', 'packages/shared/ReactSymbols.js']","Using unique IDs in various places can lead to several issues. These issues include hydration ID mismatches when server side rendering and then hydrating, different IDs for different parts of the page when server side rendering one part and client side rendering another, and ID mismatches when conditionally rendering something with an ID. 
+
+To address these issues, this commit adds a new hook called `useOpaqueIdentifier` that generates a unique ID based on whether it is called on the server or the client. During hydration, it generates an opaque object that will rerender the hook to ensure that the IDs match."
 a63708432082d480d422b0c93de5403611d9ce38,1642711937,"DevTools: Add Jest snapshot serializer for number formatting (#23139)
 
 Numbers in JavaScript can have precision issues due to how they are encoded. This shows up in snapshot tests sometimes with values like 0.0009999999999999992, which makes the tests hard to read and visually diff.
 
-This PR adds a new snapshot serializers which clamps numbers at 3 decimal points (e.g. the above number 0.0009999999999999992 is serialized as 0.001). This new serializer does not impact non-numeric values, integers, and special numbers like NaN and Infinity.","['packages/react-devtools-shared/src/__tests__/__serializers__/dehydratedValueSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/hookSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/inspectedElementSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/numberToFixedSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/storeSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/treeContextStateSerializer.js', 'packages/react-devtools-shared/src/__tests__/preprocessData-test.js', 'packages/react-devtools-shared/src/__tests__/storeStressSync-test.js', 'packages/react-devtools-shared/src/__tests__/storeStressTestConcurrent-test.js', 'scripts/jest/config.build-devtools.js']",
+This PR adds a new snapshot serializers which clamps numbers at 3 decimal points (e.g. the above number 0.0009999999999999992 is serialized as 0.001). This new serializer does not impact non-numeric values, integers, and special numbers like NaN and Infinity.","['packages/react-devtools-shared/src/__tests__/__serializers__/dehydratedValueSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/hookSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/inspectedElementSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/numberToFixedSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/storeSerializer.js', 'packages/react-devtools-shared/src/__tests__/__serializers__/treeContextStateSerializer.js', 'packages/react-devtools-shared/src/__tests__/preprocessData-test.js', 'packages/react-devtools-shared/src/__tests__/storeStressSync-test.js', 'packages/react-devtools-shared/src/__tests__/storeStressTestConcurrent-test.js', 'scripts/jest/config.build-devtools.js']","Snapshot tests sometimes have precision issues with numbers due to how they are encoded in JavaScript. This can result in values like 0.0009999999999999992, making the tests difficult to read and visually diff. This commit adds a new Jest snapshot serializer that clamps numbers at 3 decimal points, improving the readability of snapshot tests for numeric values. The new serializer does not affect non-numeric values, integers, or special numbers like NaN and Infinity."
 4ccf58a94dce323718540b8185a32070ded6094b,1522710510,"Fix context stack misalignment caused by error replay (#12508)
 
 * Add regression tests for error boundary replay bugs
@@ -603,7 +611,7 @@ original error, so React's internal stack is not misaligned.
 * Reset originalReplayError after replaying
 
 * Typo fix
-","['packages/react-reconciler/src/ReactFiberHostContext.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalErrorReplay-test.js']",
+","['packages/react-reconciler/src/ReactFiberHostContext.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalErrorReplay-test.js']","When replaying a failed unit of work, the context stack may become misaligned if the renderer does not throw. This can lead to issues with React's internal stack."
 b14d7fa4b88dad5f0017d084e462952c700aa2ad,1670597032,"Add support for setNativeProps to Fabric (#25737)
 
 Add support for `setNativeProps` in Fabric to make migration to the new
@@ -612,7 +620,7 @@ the core and iOS in
 https://github.com/facebook/react-native/commit/1d3fa40c59b234f21f516db85c322ec0ed0311e0.
 
 It is still recommended to move away from `setNativeProps` because the
-API will not work with future features.","['packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/__mocks__/react-native/Libraries/ReactPrivate/InitializeNativeFabricUIManager.js', 'packages/react-native-renderer/src/__tests__/ReactFabricHostComponent-test.internal.js', 'scripts/flow/react-native-host-hooks.js']",
+API will not work with future features.","['packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/__mocks__/react-native/Libraries/ReactPrivate/InitializeNativeFabricUIManager.js', 'packages/react-native-renderer/src/__tests__/ReactFabricHostComponent-test.internal.js', 'scripts/flow/react-native-host-hooks.js']","Adding support for `setNativeProps` in Fabric is necessary to ensure a smoother migration to the new architecture. Although the React Native part of this change has already been implemented, it is still advisable to transition away from using `setNativeProps` as it may not be compatible with future features."
 6edaf6f764f23043f0cd1c2da355b42f641afd8b,1588967271,"Detect and prevent render starvation, per lane (#18864)
 
 * Detect and prevent render starvation, per lane
@@ -643,10 +651,18 @@ currently stored on each update object for this purpose.) But that
 won't work because in the case of expiration times, we reset the clock
 whenever the update becomes IO-bound. So to replace the per-update
 field, I'm going to have to track those on the room separately from
-expiration times.","['packages/react-reconciler/src/ReactFiberBeginWork.new.js', 'packages/react-reconciler/src/ReactFiberClassComponent.new.js', 'packages/react-reconciler/src/ReactFiberHooks.new.js', 'packages/react-reconciler/src/ReactFiberHotReloading.new.js', 'packages/react-reconciler/src/ReactFiberLane.js', 'packages/react-reconciler/src/ReactFiberNewContext.new.js', 'packages/react-reconciler/src/ReactFiberReconciler.new.js', 'packages/react-reconciler/src/ReactFiberRoot.new.js', 'packages/react-reconciler/src/ReactFiberRoot.old.js', 'packages/react-reconciler/src/ReactFiberThrow.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/__tests__/ReactExpiration-test.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js']",
+expiration times.","['packages/react-reconciler/src/ReactFiberBeginWork.new.js', 'packages/react-reconciler/src/ReactFiberClassComponent.new.js', 'packages/react-reconciler/src/ReactFiberHooks.new.js', 'packages/react-reconciler/src/ReactFiberHotReloading.new.js', 'packages/react-reconciler/src/ReactFiberLane.js', 'packages/react-reconciler/src/ReactFiberNewContext.new.js', 'packages/react-reconciler/src/ReactFiberReconciler.new.js', 'packages/react-reconciler/src/ReactFiberRoot.new.js', 'packages/react-reconciler/src/ReactFiberRoot.old.js', 'packages/react-reconciler/src/ReactFiberThrow.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/__tests__/ReactExpiration-test.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js']","When an update is CPU-bound for longer than expected according to its priority, it may be starved by other work on the main thread. To address this issue, a system has been implemented to detect and prevent render starvation, per lane.
+
+To detect render starvation, the elapsed time is tracked using a fixed-size array where each slot corresponds to a lane. The stored value in the array is the event time when the lane first became CPU-bound.
+
+When receiving a new update or yielding to the main thread, the system checks how long each lane has been pending. If the elapsed time exceeds a threshold constant corresponding to the priority of the update, the lane is marked as expired, forcing it to synchronously finish.
+
+To avoid mistaking time elapsed while an update is IO-bound (waiting for data resolution) for time when it is CPU-bound, the associated event time is cleared from the array when a lane suspends. When the lane receives a signal to try again, such as a ping or an update, a new event time is assigned to restart the clock.
+
+Note: Originally, the start time was stored with the intention of using it to measure Suspense timeouts in the future. However, this approach proved to be impractical because the clock is reset whenever the update becomes IO-bound. Therefore, it is necessary to track expiration times separately from start times."
 a8de69f358acb6d0be5f1c2970592fb0b1b821a1,1600700865,"DevTools: Drop IE 11 support (#19875)
 
-DevTools shared Babel config previously supported IE 11 to target Hermes (for the standalone backend that gets embedded within React Native apps). This targeting resulted in less optimal code for other DevTools targets though which did not need to support IE 11. This PR updates the shared config to remove IE 11 support by default, and only enables it for the standalone backend target.","['packages/react-devtools-core/webpack.backend.js', 'packages/react-devtools-shared/babel.config.js']",
+DevTools shared Babel config previously supported IE 11 to target Hermes (for the standalone backend that gets embedded within React Native apps). This targeting resulted in less optimal code for other DevTools targets though which did not need to support IE 11. This PR updates the shared config to remove IE 11 support by default, and only enables it for the standalone backend target.","['packages/react-devtools-core/webpack.backend.js', 'packages/react-devtools-shared/babel.config.js']","The DevTools shared Babel config previously supported IE 11 in order to target Hermes, the standalone backend within React Native apps. However, this support for IE 11 resulted in less optimal code for other DevTools targets that did not require IE 11 compatibility. This commit aims to update the shared config by removing IE 11 support by default, and only enabling it for the standalone backend target."
 0b817777b480fc53e4080a36787b2c7a86b9c55e,1556449408,"Remove Agent addBridge: there can only be one bridge, add in constructor
 
 Let's make impossible states truly impossible, and fix Flow types, too.
@@ -655,7 +671,15 @@ All three usages of Agent called addBridge right after constructing it.
 Agent has one field `_bridge` which is force-typed as not-null despite
 there's a temporary zone between the constructor end and addBridge start
 where `_bridge` is null.
-","['shells/browser/shared/src/backend.js', 'shells/dev/src/backend.js', 'src/__tests__/setupTests.js', 'src/backend/agent.js']",
+","['shells/browser/shared/src/backend.js', 'shells/dev/src/backend.js', 'src/__tests__/setupTests.js', 'src/backend/agent.js']","There seems to be an issue with the usage of the `Agent` class and its `addBridge` method. Currently, the `Agent` class allows for multiple bridges to be added, but it appears that there should only be one bridge allowed. The current implementation does not enforce this constraint, as it allows for the `addBridge` method to be called multiple times after constructing an `Agent` object.
+
+Additionally, there seems to be a problem with the Flow types in the codebase that need to be fixed.
+
+To address these issues, the commit removed the usage of `addBridge` after constructing the `Agent` object and instead added it in the constructor itself. This change ensures that there can only be one bridge per `Agent` object.
+
+Furthermore, the commit aims to fix the Flow types related to the `Agent` class.
+
+It is important to note that there may have been a possibility of having inconsistent states when using the `Agent` class due to the timing between the constructor and the `addBridge` method."
 c44c2a21614ed2e5d3078dcb24dc7ef086df24be,1533145508,"More helpful message when passing an element to createElement() (#13131)
 
 * [#13130] Add a more helpful message when passing an element to createElement()
@@ -675,7 +699,7 @@ c44c2a21614ed2e5d3078dcb24dc7ef086df24be,1533145508,"More helpful message when p
 * remove unrelated changes
 
 * Tweak the message
-","['packages/react/src/ReactElementValidator.js', 'packages/react/src/__tests__/ReactElementValidator-test.internal.js']",
+","['packages/react/src/ReactElementValidator.js', 'packages/react/src/__tests__/ReactElementValidator-test.internal.js']","When passing an element to `createElement()`, the error message generated may be unclear or unhelpful. This can make it difficult to debug and identify the root cause of the issue. This commit aims to improve the error message to provide more useful information for developers encountering this problem."
 9ce8711d5a7c84e71587c75d2935966023ee6dbb,1567642173,"[react-events] Tap responder (#16628)
 
 This is a partial replacement for the 'Press' responder:
@@ -707,7 +731,7 @@ MouseEvent/TouchEvent fallback.
 5. `useTap` has better unit test coverage . All pointer types and the fallback
 environment are tested. The shape of the gesture state object is also defined
 and tested.
-","['packages/react-dom/src/events/DOMEventResponderSystem.js', 'packages/react-events/npm/tap.js', 'packages/react-events/src/dom/Press.js', 'packages/react-events/src/dom/Tap.js', 'packages/react-events/src/dom/__tests__/Tap-test.internal.js', 'packages/react-events/src/dom/shared/index.js', 'packages/react-events/src/dom/testing-library/domEnvironment.js', 'packages/react-events/src/dom/testing-library/domEventSequences.js', 'packages/react-events/src/dom/testing-library/domEvents.js', 'packages/react-events/src/dom/testing-library/index.js', 'packages/react-events/tap.js', 'packages/shared/ReactDOMTypes.js', 'scripts/rollup/bundles.js']",
+","['packages/react-dom/src/events/DOMEventResponderSystem.js', 'packages/react-events/npm/tap.js', 'packages/react-events/src/dom/Press.js', 'packages/react-events/src/dom/Tap.js', 'packages/react-events/src/dom/__tests__/Tap-test.internal.js', 'packages/react-events/src/dom/shared/index.js', 'packages/react-events/src/dom/testing-library/domEnvironment.js', 'packages/react-events/src/dom/testing-library/domEventSequences.js', 'packages/react-events/src/dom/testing-library/domEvents.js', 'packages/react-events/src/dom/testing-library/index.js', 'packages/react-events/tap.js', 'packages/shared/ReactDOMTypes.js', 'scripts/rollup/bundles.js']","`useTap` is a partial replacement for the 'Press' responder and is intended to work with pointers only. It cancels the gesture if the pointer moves over an element outside of the responder target's subtree, whereas `usePress` keeps the gesture active even when the pointer exits the target's subtree. The `usePress` behavior requires measuring DOM elements repeatedly, causing performance issues. `useTap` avoids this by relying on `document.elementFromPoint` for TouchEvent fallbacks. Additionally, `useTap` introduces new callbacks `onTapUpdate`, `onTapEnd`, and `onTapCancel` to report gesture state changes, whereas `usePress` did not explicitly report when the gesture failed. `useTap` also separates the implementation for different pointer types and has better unit test coverage."
 6b6d0617eff48860c5b4e3e79c74cbd3312cf45a,1676874956,"Update Rollup and related plugins to their most recent versions (#24916)
 
 Update Rollup and related plugins to their most recent versions +
@@ -737,7 +761,7 @@ AppVeyor:
 - https://github.com/facebook/react/issues/24891
   - https://github.com/facebook/react/pull/24892
 
-Co-authored-by: Sebastian Markbage <sebastian@calyptus.eu>","['packages/react-devtools-shared/src/hooks/__tests__/updateMockSourceMaps.js', 'packages/react-dom/src/test-utils/FizzTestUtils.js', 'scripts/rollup/build.js']",
+Co-authored-by: Sebastian Markbage <sebastian@calyptus.eu>","['packages/react-devtools-shared/src/hooks/__tests__/updateMockSourceMaps.js', 'packages/react-dom/src/test-utils/FizzTestUtils.js', 'scripts/rollup/build.js']","Updating Rollup and related plugins to their most recent versions could potentially introduce breaking changes, deprecations, or other issues. This update was inspired by a pull request that aimed to add sourcemap output support to React's builds. However, the scope of changes in that pull request was minimized, and the build tooling was also modernized in the process. It is important to note that if any of these updates rely on a Node version later than `10.x`, a separate pull request may need to be implemented first to avoid potential issues with AppVeyor."
 18875b240131273c8e3dd213341edc159150d80e,1578523207,"Remove special casing of toString values when enableTrustedTypesIntegration (#17774)
 
 * Remove toString of dangerouslySetInnerHTML
@@ -758,13 +782,13 @@ We don't really support IE8/9 anymore and by the time this flag is on,
 we should be able to deprecate it.
 
 Unless this is also an issue in IE11. I haven't tested yet.
-","['packages/react-dom/src/client/DOMPropertyOperations.js', 'packages/react-dom/src/client/ToStringValue.js', 'packages/react-dom/src/client/setAttribute.js', 'packages/react-dom/src/client/setInnerHTML.js']",
+","['packages/react-dom/src/client/DOMPropertyOperations.js', 'packages/react-dom/src/client/ToStringValue.js', 'packages/react-dom/src/client/setAttribute.js', 'packages/react-dom/src/client/setInnerHTML.js']","When enabling Trusted Types integration, there is a special casing issue with the toString values in user space. This special casing originated from the need to support IE8/9, but since we no longer really support those browsers, this special casing can be removed. However, further testing is needed to determine if this issue also exists in IE11."
 e7d2a558ad8e664df36a70b0a86a85f925d1418f,1615221194,"DevTools flushes updated passive warning/error info after delay (#20931)
 
 * DevTools flushes updated passive warning/error info after delay
 Previously this information was not flushed until the next commit, but this provides a worse user experience if the next commit is really delayed. Instead, the backend now flushes only the warning/error counts after a delay. As a safety, if there are already any pending operations in the queue, we bail.
 
-Co-authored-by: eps1lon <silbermann.sebastian@gmail.com>","['packages/react-devtools-shared/src/__tests__/store-test.js', 'packages/react-devtools-shared/src/__tests__/utils.js', 'packages/react-devtools-shared/src/backend/renderer.js']",
+Co-authored-by: eps1lon <silbermann.sebastian@gmail.com>","['packages/react-devtools-shared/src/__tests__/store-test.js', 'packages/react-devtools-shared/src/__tests__/utils.js', 'packages/react-devtools-shared/src/backend/renderer.js']","The DevTools were previously not flushing updated passive warning/error information until the next commit, resulting in a poor user experience if the next commit was significantly delayed. To improve this, the backend now flushes only the warning/error counts after a delay. However, if there are already pending operations in the queue, the flushing process is cancelled as a safety measure."
 5227a37868c4bf3133ba5f2b3b39cac9175d7ea9,1595954293,"Add ""unstable_"" prefix to experimental mutable source APIs (#19472)
 
 * Add ""unstbale_"" prefix to mutable source APIs
@@ -773,7 +797,7 @@ Co-authored-by: eps1lon <silbermann.sebastian@gmail.com>","['packages/react-devt
 
 This was causing an observable behavioral difference between experimental DEV and PROD builds.
 
-We don't initialize stack position for other composite hooks (e.g. useDeferredValue, useTransition, useOpaqueIdentifier). If we did, it would cause the same obesrvable behavioral difference.","['packages/react-debug-tools/src/ReactDebugHooks.js', 'packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-reconciler/src/__tests__/useMutableSource-test.internal.js', 'packages/react-reconciler/src/__tests__/useMutableSourceHydration-test.js', 'packages/react/index.classic.fb.js', 'packages/react/index.experimental.js', 'packages/react/index.js', 'packages/react/index.modern.fb.js']",
+We don't initialize stack position for other composite hooks (e.g. useDeferredValue, useTransition, useOpaqueIdentifier). If we did, it would cause the same obesrvable behavioral difference.","['packages/react-debug-tools/src/ReactDebugHooks.js', 'packages/react-debug-tools/src/__tests__/ReactHooksInspectionIntegration-test.js', 'packages/react-reconciler/src/__tests__/useMutableSource-test.internal.js', 'packages/react-reconciler/src/__tests__/useMutableSourceHydration-test.js', 'packages/react/index.classic.fb.js', 'packages/react/index.experimental.js', 'packages/react/index.js', 'packages/react/index.modern.fb.js']","It seems that the commit is addressing an issue related to observable behavioral differences between experimental DEV and PROD builds caused by the use of mutable source APIs. To resolve the problem, the commit adds an ""unstable_"" prefix to the experimental mutable source APIs and ensures that the DebugHooks no longer calls useMutableSource() on initialization. The issue is also mentioned to be applicable to other composite hooks, such as useDeferredValue, useTransition, and useOpaqueIdentifier, if their stack position is initialized."
 73c380fca77a32af167d85c77553ae5d40c6fda8,1559349990,"WorkPhase -> ExecutionContext
 
 WorkPhase is an enum that represents the currently executing phase of
@@ -787,7 +811,9 @@ ExecutionContext is a bitmask instead of an enum. It represents a stack
 of React entry points. For example, when `batchedUpdates` is called
 from inside an effect, the ExecutionContext is
 `BatchedContext | CommitContext`.
-",['packages/react-reconciler/src/ReactFiberWorkLoop.js'],
+",['packages/react-reconciler/src/ReactFiberWorkLoop.js'],"The current implementation of the WorkPhase enum in the React update -> render -> commit cycle can be difficult to work with when dealing with nested phases. For instance, when the commit phase is nested inside the ""batched phase,"" it becomes cumbersome to manage. 
+
+To address this issue, this commit replaces the WorkPhase with a new concept called ExecutionContext. The ExecutionContext is represented as a bitmask instead of an enum, allowing for better management of nested React entry points. For example, when the `batchedUpdates` function is called from within an effect, the ExecutionContext is set to `BatchedContext | CommitContext`."
 a8f971b7a669a9a6321b9f3cea820f68b2e4ac6e,1677269187,"Switch to mount dispatcher after use() when needed (#26232)
 
 When resuming a suspended render, there may be more Hooks to be called
@@ -795,7 +821,7 @@ that weren't seen the previous time through. Make sure to switch to the
 mount dispatcher when calling use() if the next Hook call should be
 treated as a mount.
 
-Fixes #25964.","['packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactThenable-test.js']",
+Fixes #25964.","['packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/__tests__/ReactHooks-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactThenable-test.js']","When resuming a suspended render, there may be additional Hooks that need to be called. To ensure the next Hook call is treated as a mount, switch to the mount dispatcher when calling use(). This resolves the issue mentioned in #25964."
 f8ef4ff571db3de73b0bfab566c1ce9d69c6582f,1617212359,"Flush discrete passive effects before paint (#21150)
 
 If a discrete render results in passive effects, we should flush them
@@ -810,7 +836,7 @@ need to be observed by external systems.
 For legacy mode, we will maintain the existing behavior, since it hasn't
 been reported as an issue, and we'd have to do additional work to
 distinguish ""legacy default sync"" from ""discrete sync"" to prevent all
-passive effects from being treated this way.","['packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/__tests__/ReactFlushSync-test.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js']",
+passive effects from being treated this way.","['packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/__tests__/ReactFlushSync-test.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js']","When a discrete render results in passive effects, there is a need to flush them synchronously at the end of the current task. This ensures that the effects are immediately observable and take effect before the next input. However, this flush is not necessary for effects that do not have discrete/sync priority since they are assumed to be order-independent and do not need to be observed by external systems. In legacy mode, the existing behavior will be maintained as there have been no reported issues, and distinguishing between ""legacy default sync"" and ""discrete sync"" to prevent all passive effects from being treated this way would require additional work."
 b617db3d966f678eb0b4aac6d96f7967b37a9e91,1575926366,"Refactor Update Queues to Fix Rebasing Bug
 
 Fixes a bug related to rebasing updates. Once an update has committed,
@@ -828,7 +854,7 @@ commit in case they need to be reverted.
 
 Co-authored-by: Sebastian Markbåge <sema@fb.com>
 Co-authored-by: Andrew Clark <git@andrewclark.io>
-","['packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/ReactUpdateQueue.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.internal.js']",
+","['packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/ReactUpdateQueue.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.internal.js']","Sometimes, when updates are interrupted by higher priority updates, they can un-commit, which leads to inconsistent state updates across components. This commit fixes this issue by refactoring the hook update queue and the class and root update queue. Combining these two changes into a single commit ensures that they are not landed separately, to avoid the need for potential reversion."
 32f6f258bad524ec3886901a5b132887f8dd7553,1531393895,"Remove event simulation of onChange events (#13176)
 
 * Remove event simulation of onChange events
@@ -841,7 +867,7 @@ All remaining `ReactTestUtils.Simulate` calls are either testing
 ReactTestUtils or assert that they do/don't throw.
 
 * Use input instead of change event for all but checkbox, radio, and select
-","['packages/react-dom/src/__tests__/ReactDOMInput-test.js', 'packages/react-dom/src/__tests__/ReactDOMSelect-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerIntegrationForms-test.js', 'packages/react-dom/src/__tests__/ReactDOMTextarea-test.js']",
+","['packages/react-dom/src/__tests__/ReactDOMInput-test.js', 'packages/react-dom/src/__tests__/ReactDOMSelect-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerIntegrationForms-test.js', 'packages/react-dom/src/__tests__/ReactDOMTextarea-test.js']","When testing onChange events, there may have been issues with using event simulation. In this commit, the event simulation for all onChange tests is being removed. To do this, a setter for the untracked value/checked props needs to be obtained.  Additionally, the commit also mentions that input is being used instead of change event for all components except checkbox, radio, and select."
 113497cc0e9cebf276a30d916c98c15aa075a225,1559259476,"[Suspense] Change Suspending and Restarting Heuristics (#15769)
 
 * Track most recent commit time of a fallback globally
@@ -898,7 +924,7 @@ we're already ready to restart. Right now we wait until the next yield.
 * Add test that we don't restart for initial render
 
 * Add Suspense Heuristics as a comment in Throw
-","['packages/react-reconciler/src/ReactFiberBeginWork.js', 'packages/react-reconciler/src/ReactFiberCommitWork.js', 'packages/react-reconciler/src/ReactFiberCompleteWork.js', 'packages/react-reconciler/src/ReactFiberExpirationTime.js', 'packages/react-reconciler/src/ReactFiberSuspenseComponent.js', 'packages/react-reconciler/src/ReactFiberThrow.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalPerf-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactLazy-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspensePlaceholder-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js']",
+","['packages/react-reconciler/src/ReactFiberBeginWork.js', 'packages/react-reconciler/src/ReactFiberCommitWork.js', 'packages/react-reconciler/src/ReactFiberCompleteWork.js', 'packages/react-reconciler/src/ReactFiberExpirationTime.js', 'packages/react-reconciler/src/ReactFiberSuspenseComponent.js', 'packages/react-reconciler/src/ReactFiberThrow.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalPerf-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactLazy-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspense-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspensePlaceholder-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js']","The suspense heuristic in React has been changed to eagerly commit non-delayed suspended trees, with the exception of retries which are throttled to 500ms. This change also includes adjustments to various tests and tracking whether there is a ping on the currently rendering level to determine if a suspension might occur later. Additionally, a comment about moving markers has been added to throwException for earlier marker placement."
 bb1357b38170e81cfbf2398cc6fefcf7a1ef2ccb,1657656413,"Wrap try-catch directly around each user function 
 
 (This is the same as f9e6aef, but for the passive mount phase rather than the
@@ -922,7 +948,7 @@ the error handling requires additional memory.
 Wrapping every user function is a bit tedious, but it's better
 for performance. Many of them already had try blocks around
 them already.
-","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']",
+","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']","When mounting a component tree, if a mount effect throws an error, the whole tree is deleted. Previously, we only wrapped try-catch blocks around unmount functions, as we still needed to call all the unmount functions even if one of them threw an error. However, with the switch from an iterative loop to a recursive one, having a try-catch block for every call frame on the stack would consume additional memory. To improve performance, we are now wrapping try-catch blocks directly around each user function (effect function, callback, etc.) during the passive mount phase. This ensures that any errors thrown by user functions are caught and handled appropriately."
 2d2f2af29bc3175530a158bc90189fc6f12f7855,1694803999,"Restrict React DOM imports from Server Components (#27382)
 
 Adds a separate entry point for the react-dom package when it's accessed
@@ -931,7 +957,7 @@ condition.
 
 When you're inside a Server Component module, you won't be able to
 import client-only APIs like useState. This applies to almost all React
-DOM exports, except for Float ones like preload.","['packages/react-dom/npm/react-dom.shared-subset.js', 'packages/react-dom/src/ReactDOMSharedSubset.js', 'scripts/rollup/bundles.js', 'scripts/rollup/forks.js', 'scripts/shared/inlinedHostConfigs.js']",
+DOM exports, except for Float ones like preload.","['packages/react-dom/npm/react-dom.shared-subset.js', 'packages/react-dom/src/ReactDOMSharedSubset.js', 'scripts/rollup/bundles.js', 'scripts/rollup/forks.js', 'scripts/shared/inlinedHostConfigs.js']","When working with Server Components, there is a need to restrict imports from the React DOM package. These imports should be limited to only the necessary APIs that are compatible with Server Components, excluding any client-only APIs like useState. This commit adds a separate entry point in the react-dom package specifically for environments utilizing Server Components, using the ""react-server"" export condition."
 7e36d8beba53102e11c523f317976b311666e449,1612306082,"Some release script fixes (#20718)
 
 * Retry loop should not start over from beginning
@@ -946,12 +972,14 @@ not found. The new build workflow doesn't include those yet (might not
 need to) and since the instructions that depend on it only affect
 semver (latest) releases, I've moved the code to that branch. Will
 follow up with a proper fix, either by adding back a build-info.json
-file or removing that dependency and reading the commit some other way.","['scripts/release/publish-commands/print-follow-up-instructions.js', 'scripts/release/publish-commands/publish-to-npm.js', 'scripts/release/publish.js']",
+file or removing that dependency and reading the commit some other way.","['scripts/release/publish-commands/print-follow-up-instructions.js', 'scripts/release/publish-commands/publish-to-npm.js', 'scripts/release/publish.js']","When retrying publishing packages after an otp timeout, the script currently starts over from the beginning instead of picking up where it left off. This can result in unnecessary duplicate publishing attempts.
+
+Additionally, the ""print follow up instructions"" step crashes if the build-info.json file is not found. The new build workflow does not include this file yet, and the instructions that depend on it only affect semver (latest) releases. The code responsible for this step has been moved to the branch that handles semver releases. A proper fix will be implemented in the future, either by adding back the build-info.json file or finding an alternative way to read the necessary commit information."
 6f6b560a645adb595ba1e40630a3915d8abdf038,1530890729,"Renamed selfBaseTime/treeBaseTime Fiber attributes to selfBaseDuration/treeBaseDuration (#13156)
 
 This is an unobservable change to all but the (under development) DevTools Profiler plugin. It is being done so that the plugin can safely feature detect a version of React that supports it. The profiler API has existed since the 16.4.0 release, but it did not support the DevTools plugin prior to PR #13058.
 
-Side note: I am not a big fan of the term ""base duration"". Both it and ""actual duration"" are kind of awkward and vague. If anyone has suggestions for better names– this is the best time to bikeshed about them.","['packages/react-reconciler/src/ReactFiber.js', 'packages/react-reconciler/src/ReactFiberCommitWork.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/ReactProfilerTimer.js', 'packages/react/src/__tests__/ReactProfilerDevToolsIntegration-test.internal.js']",
+Side note: I am not a big fan of the term ""base duration"". Both it and ""actual duration"" are kind of awkward and vague. If anyone has suggestions for better names– this is the best time to bikeshed about them.","['packages/react-reconciler/src/ReactFiber.js', 'packages/react-reconciler/src/ReactFiberCommitWork.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/react-reconciler/src/ReactProfilerTimer.js', 'packages/react/src/__tests__/ReactProfilerDevToolsIntegration-test.internal.js']","The renaming of the ""selfBaseTime"" and ""treeBaseTime"" Fiber attributes to ""selfBaseDuration"" and ""treeBaseDuration"" was done to support the DevTools Profiler plugin. This change allows the plugin to safely feature detect a version of React that includes this functionality. The Profiler API existed prior to the 16.4.0 release, but it did not support the DevTools plugin until the changes made in PR #13058."
 09b023a6e6f0d9a3eed95d488d6e910f305e4ad8,1555951054,"Naive suspense implementation for selected element panel
 
 This commit leaves a few major things uunresolved:
@@ -959,7 +987,11 @@ This commit leaves a few major things uunresolved:
 * We aren't yet using the two setState pattern
 * The resource cache will grow unbounded over time because we aren't yet clearing items from it
 * The renderer interface is not smart enough to avoid resending unchanged data between requests
-","['src/backend/renderer.js', 'src/devtools/InspectedElementCache.js', 'src/devtools/ProfilingCache.js', 'src/devtools/cache.js', 'src/devtools/store.js', 'src/devtools/views/Components/Components.js', 'src/devtools/views/Components/SelectedElement.js', 'src/devtools/views/Components/TreeContext.js']",
+","['src/backend/renderer.js', 'src/devtools/InspectedElementCache.js', 'src/devtools/ProfilingCache.js', 'src/devtools/cache.js', 'src/devtools/store.js', 'src/devtools/views/Components/Components.js', 'src/devtools/views/Components/SelectedElement.js', 'src/devtools/views/Components/TreeContext.js']","The current implementation of the selected element panel lacks several important features. 
+1. We are not actively polling for updates, which means changes may not be reflected in real-time.
+2. We have not implemented the two setState pattern, which may lead to inconsistent state updates.
+3. The resource cache is not cleared over time, causing it to grow unbounded and potentially impacting performance.
+4. The renderer interface is not optimized to avoid unnecessary data transmission for unchanged requests."
 a87adefecdff672d5261e93945c227ad72c5444c,1642018327,"Allow functions to be passed to custom element setters (#23042)
 
 This is part of the new custom element features that were implemented
@@ -972,7 +1004,7 @@ directly to the custom element's property, regardless of the type of the
 value. However, it was discovered that this isn't working with
 functions. This patch makes it work with functions.
 
-Fixes https://github.com/facebook/react/issues/23041","['packages/react-dom/src/__tests__/DOMPropertyOperations-test.js', 'packages/react-dom/src/client/DOMPropertyOperations.js']",
+Fixes https://github.com/facebook/react/issues/23041","['packages/react-dom/src/__tests__/DOMPropertyOperations-test.js', 'packages/react-dom/src/client/DOMPropertyOperations.js']","When using custom element setters for properties in React, there was an issue where passing a function as a value did not work correctly. The value passed to the React property should be assigned directly to the custom element's property, regardless of the type of the value. However, this was not happening with functions. This commit fixes the problem and ensures that functions can be passed as values to custom element setters."
 491aec5d6113ce5bae7c10966bc38a4a8fc091a8,1682961560,"Implement experimental_useOptimisticState (#26740)
 
 This adds an experimental hook tentatively called useOptimisticState.
@@ -992,7 +1024,7 @@ Technically the use cases for this hook are broader than just optimistic
 updates; you could use it implement any sort of ""pending"" state, such as
 the ones exposed by useTransition and useFormStatus. But we expect
 people will most often reach for this hook to implement the optimistic
-update pattern; simpler cases are covered by those other hooks.","['packages/react-devtools-shared/src/__tests__/TimelineProfiler-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzForm-test.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/__tests__/ReactAsyncActions-test.js', 'packages/react-server/src/ReactFizzHooks.js', 'packages/react/index.classic.fb.js', 'packages/react/index.experimental.js', 'packages/react/index.js', 'packages/react/index.modern.fb.js', 'packages/react/src/React.js', 'packages/react/src/ReactHooks.js']",
+update pattern; simpler cases are covered by those other hooks.","['packages/react-devtools-shared/src/__tests__/TimelineProfiler-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzForm-test.js', 'packages/react-reconciler/src/ReactFiberHooks.js', 'packages/react-reconciler/src/ReactInternalTypes.js', 'packages/react-reconciler/src/__tests__/ReactAsyncActions-test.js', 'packages/react-server/src/ReactFizzHooks.js', 'packages/react/index.classic.fb.js', 'packages/react/index.experimental.js', 'packages/react/index.js', 'packages/react/index.modern.fb.js', 'packages/react/src/React.js', 'packages/react/src/ReactHooks.js']","When implementing optimistic updates, there is currently no built-in mechanism to automatically revert the optimistic state once the transition or action is complete. Additionally, the optimistic updates are not being continually rebased on top of the latest state. This can lead to issues where the optimistic state remains active even after the corresponding transition or action has finished."
 a807c307c496d96e8ff79f53cf2d6203c45cf0c6,1573997948,"[eslint] Check forwardRef callbacks (#17255)
 
 * [eslint] Check forwardRef callbacks (#17220)
@@ -1004,7 +1036,7 @@ a807c307c496d96e8ff79f53cf2d6203c45cf0c6,1573997948,"[eslint] Check forwardRef c
 * [eslint] Add tests for callbacks not known to be components (#17220)
 
 * [eslint] Correct comments and add another test (#17220)
-","['packages/eslint-plugin-react-hooks/__tests__/ESLintRulesOfHooks-test.js', 'packages/eslint-plugin-react-hooks/src/RulesOfHooks.js']",
+","['packages/eslint-plugin-react-hooks/__tests__/ESLintRulesOfHooks-test.js', 'packages/eslint-plugin-react-hooks/src/RulesOfHooks.js']","When using forwardRef callbacks in React, there may be potential issues that need to be checked. In this case, the commit is adding ESLint tests and making adjustments to ensure that anonymous callbacks of React.memo are checked for rules-of-hooks. Additionally, tests are included to check callbacks that are not known to be components. The goal of this commit is to improve the reliability and correctness of forwardRef callbacks by ensuring they adhere to the necessary rules and conventions."
 7028ce74561b1585de401f8a70ce79b98d63849d,1662604024,"experimental_use(promise) for Server Components (#25207)
 
 Follow up to #25084. Implements experimental_use(promise) API in 
@@ -1023,7 +1055,7 @@ Server Components is the primary runtime where this API is intended to
 be used.
 
 The last runtime where we need to implement this is the server renderer
-(Fizz).","['packages/react-reconciler/src/ReactFiberWakeable.new.js', 'packages/react-reconciler/src/ReactFiberWakeable.old.js', 'packages/react-server-dom-webpack/src/__tests__/ReactFlightDOMBrowser-test.js', 'packages/react-server/src/ReactFlightHooks.js', 'packages/react-server/src/ReactFlightServer.js', 'packages/react-server/src/ReactFlightWakeable.js', 'packages/react/src/ReactSharedSubset.experimental.js']",
+(Fizz).","['packages/react-reconciler/src/ReactFiberWakeable.new.js', 'packages/react-reconciler/src/ReactFiberWakeable.old.js', 'packages/react-server-dom-webpack/src/__tests__/ReactFlightDOMBrowser-test.js', 'packages/react-server/src/ReactFlightHooks.js', 'packages/react-server/src/ReactFlightServer.js', 'packages/react-server/src/ReactFlightWakeable.js', 'packages/react/src/ReactSharedSubset.experimental.js']","When using the experimental_use(promise) API in the Server Components runtime (Flight), there are a few implementation details that need to be addressed. One issue is the lack of state in the runtime, which requires the addition of ""state"" to track the result of each promise across attempts. Additionally, there are some caveats related to neglecting to cache a promise. The state of the promises is preserved even if the runtime switches to a different task. This API is primarily intended to be used in the Server Components runtime, and the next step is to implement it in the server renderer (Fizz)."
 ad27845ccd4fe34189514db23b645d7ab2213496,1526950076,"Fix double-firing submit events (#12877)
 
 We were adding a listener at the root when we weren't meant to. Blames to e96dc140599363029bd05565d58bcd4a432db370.
@@ -1040,7 +1072,7 @@ var Hello = class extends React.Component {
     );
   }
 };
-```",['packages/react-dom/src/events/ReactBrowserEventEmitter.js'],
+```",['packages/react-dom/src/events/ReactBrowserEventEmitter.js'],Adding a listener at the root when it wasn't supposed to be there was causing submit events to fire twice. The issue has now been resolved and the event will alert only once.
 5550ed4a8f33ff562e807175b8f35a1f9e037670,1534202031,"Ensure arguments are coerced to strings in warnings (#13385)
 
 * Manually join extra attributes in warning
@@ -1057,7 +1089,7 @@ size of the array.
 * Pass args through with spread, convert all arguments to strings
 
 * Rename strings to stringArgs
-",['packages/shared/warningWithoutStack.js'],
+",['packages/shared/warningWithoutStack.js'],"Warnings in the code were not properly handling arguments that were not strings. This led to a bug where Chrome would report an incorrect output when an array was passed as an argument, showing `Array(n)` instead of the expected value. The issue was resolved by ensuring that all arguments passed to warnings are coerced to strings before being used."
 d962f35cac4e1b9e4c6d9320e60ca51037680296,1681833762,"[DevTools] use backend manager to support multiple backends in extension (#26615)
 
 In the extension, currently we do the following:
@@ -1080,7 +1112,15 @@ purpose.
 
 
 ------
-I've tested it on Chrome, Edge and Firefox extensions","['packages/react-devtools-extensions/src/backend.js', 'packages/react-devtools-extensions/src/backendManager.js', 'packages/react-devtools-extensions/src/background.js', 'packages/react-devtools-extensions/src/contentScripts/prepareInjection.js', 'packages/react-devtools-extensions/src/contentScripts/proxy.js', 'packages/react-devtools-extensions/src/main.js', 'packages/react-devtools-extensions/src/utils.js', 'packages/react-devtools-extensions/webpack.backend.js', 'packages/react-devtools-extensions/webpack.config.js', 'packages/react-devtools-shared/src/backend/NativeStyleEditor/setupNativeStyleEditor.js', 'packages/react-devtools-shared/src/backend/index.js', 'packages/react-devtools-shared/src/backend/types.js', 'packages/react-devtools-shared/src/backend/utils.js', 'packages/react-devtools-shared/src/hook.js']",
+I've tested it on Chrome, Edge and Firefox extensions","['packages/react-devtools-extensions/src/backend.js', 'packages/react-devtools-extensions/src/backendManager.js', 'packages/react-devtools-extensions/src/background.js', 'packages/react-devtools-extensions/src/contentScripts/prepareInjection.js', 'packages/react-devtools-extensions/src/contentScripts/proxy.js', 'packages/react-devtools-extensions/src/main.js', 'packages/react-devtools-extensions/src/utils.js', 'packages/react-devtools-extensions/webpack.backend.js', 'packages/react-devtools-extensions/webpack.config.js', 'packages/react-devtools-shared/src/backend/NativeStyleEditor/setupNativeStyleEditor.js', 'packages/react-devtools-shared/src/backend/index.js', 'packages/react-devtools-shared/src/backend/types.js', 'packages/react-devtools-shared/src/backend/utils.js', 'packages/react-devtools-shared/src/hook.js']","The current implementation of the extension only supports one React renderer on the page. This prevents the extension from working properly when there are multiple versions of React renderers on the page. 
+
+To address this issue, we need to update the extension to support multiple versions of backends. This involves checking the versions of React renderers on the page and loading the corresponding React DevTools backends that are shipped with the extension. If the required backends are not contained within the extension (usually prod builds of prereleases), a UI will be shown to allow users to load them. Each backend will then be initialized.
+
+To enable this workflow, a backend will ignore React renderers that do not match its version.
+
+In order to implement this functionality, a new file called ""backendManager"" has been added to the extension. 
+
+Please note that this change has been tested on Chrome, Edge, and Firefox extensions."
 d1e35c70398a3341d2e090d09a0863c7fe6c3325,1668091770,"Don't disappear layout effects unnecessarily (#25660)
 
 Nested Offscreens can run into a case where outer Offscreen is revealed
@@ -1109,7 +1149,7 @@ To following. Notice that visibility of each offscreen flips.
 
 Inner offscreen must not call
 `recursivelyTraverseDisappearLayoutEffects`.
-Check unit tests for an example of this.","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js', 'packages/react-reconciler/src/__tests__/ReactOffscreen-test.js']",
+Check unit tests for an example of this.","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js', 'packages/react-reconciler/src/__tests__/ReactOffscreen-test.js']","Nested Offscreens can encounter a case where the outer Offscreen is revealed while the inner Offscreen is hidden, leading to the unnecessary calling of `disappear layout effects`. This is an edge case that was previously overlooked. The problem occurs when transitioning from a state where the outer Offscreen is hidden and the inner Offscreen is visible to a state where the visibility of each Offscreen flips. In this scenario, the inner Offscreen should not trigger the `recursivelyTraverseDisappearLayoutEffects` function."
 2c1ac9fe1d124e474f0cfb24625930023b92b46b,1509474183,"Inline fbjs/lib/EventListener dependency (#11402)
 
 * Drop fbjs/lib/EventListener from tests
@@ -1133,7 +1173,7 @@ This uses the injection model in ReactErrorUtils. This isn't technically
 going to used for errors but close enough.
 
 This really wants to be eager but we can't because of dynamic injection.
-","['packages/react-dom/src/__tests__/ReactBrowserEventEmitter-test.js', 'packages/react-dom/src/events/ReactDOMEventListener.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/shared/ReactErrorUtils.js']",
+","['packages/react-dom/src/__tests__/ReactBrowserEventEmitter-test.js', 'packages/react-dom/src/events/ReactDOMEventListener.js', 'packages/react-reconciler/src/ReactFiberScheduler.js', 'packages/shared/ReactErrorUtils.js']","When testing, relying on the fbjs/lib/EventListener dependency can cause issues. Instead of using this dependency, the test should assert on the underlying native event listener. Additionally, inlining the fbjs/lib/EventListener dependency is preferable and should not be shimmed. The code can likely even drop the IE path since it is not supported, but this change may be a breaking one. Finally, event listeners and the callback passed to requestIdleCallback should be wrapped using the injection model in ReactErrorUtils, even though it is not intended for error handling."
 1102224bbbfd587ec6088620c66f048d10856c59,1616975430,"Fix: flushSync changes priority inside effect (#21122)
 
 When called from inside an effect, flushSync cannot synchronously flush
@@ -1143,7 +1183,7 @@ However, we should still change the priority of the updates to sync so
 that they flush at the end of the current task.
 
 This only affects useEffect because updates inside useLayoutEffect (and
-the rest of the commit phase, like ref callbacks) are already sync.","['packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/__tests__/ReactFlushSync-test.js']",
+the rest of the commit phase, like ref callbacks) are already sync.","['packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js', 'packages/react-reconciler/src/__tests__/ReactFlushSync-test.js']","When called from inside an effect, flushSync is unable to synchronously flush its updates due to React already being in progress. This inconsistency in behavior leads to a warning being fired. Nonetheless, the priority of the updates should still be changed to sync in order for them to flush at the end of the current task. This issue only affects useEffect, as updates inside useLayoutEffect (and other commit phase operations like ref callbacks) are already synchronous."
 2d4705e7532d32147da8ee61e5760124d068a8a6,1536067611,"Make IE 11 not complain about non-crucial style attribute hydration mismatch (#13534)
 
 IE 11 parses & normalizes the style attribute as opposed to other
@@ -1154,7 +1194,7 @@ properties in the client & server versions or applying
 normalized. Since it only affects IE, we're skipping style warnings
 in that browser completely in favor of doing all that work.
 
-Fixes #11807","['packages/react-dom/src/__tests__/ReactServerRenderingHydration.js', 'packages/react-dom/src/client/ReactDOMComponent.js']",
+Fixes #11807","['packages/react-dom/src/__tests__/ReactServerRenderingHydration.js', 'packages/react-dom/src/client/ReactDOMComponent.js']","IE 11 complains about non-crucial style attribute hydration mismatch. When parsing and normalizing the style attribute, IE 11 adds spaces and sorts the properties in a non-alphabetical order. This requires sorting CSS properties in the client and server versions or applying `expectedStyle` to a temporary DOM node to read its normalized `style` attribute. However, since this only affects IE, we are choosing to skip style warnings in that browser instead of implementing these additional steps."
 b8c96b136d9968fd593ea0ed44adfc2ac39b6b8d,1657646842,"Move ref commit effects inside switch statement
 
 Only certain fiber types can have refs attached to them, so this moves the
@@ -1165,7 +1205,7 @@ The types of fibers this affects are host components and class components.
 Function components are not affected because they can only have a ref via
 useImperativeHandle, which has a different implementation. The experimental
 Scope type attaches its refs in the mutation phase, not the layout phase.
-","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']",
+","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']","Certain fiber types, specifically host components and class components, may have issues with ref attachments. Currently, the Ref effect logic is being executed in the common path, but it needs to be moved into the corresponding branch of the layout phase's switch statement. Function components are not affected by this issue because they can only have a ref via useImperativeHandle, which is implemented differently. Additionally, the experimental Scope type attaches its refs in the mutation phase, not the layout phase."
 c12194f7485f298fadc1e51cfffb93e63d61ad96,1675774784,"[DevTools] improve error handling in extension (#26068)
 
 ## Summary
@@ -1186,7 +1226,7 @@ allowing the runtime to rebuild the double pipe.
 - Log the error message so Chrome believes we've handled it and will not
 interrupt the execution.
 
-This also seems to be helpful in fixing #25806.",['packages/react-devtools-extensions/src/background.js'],
+This also seems to be helpful in fixing #25806.",['packages/react-devtools-extensions/src/background.js'],"There are a couple of edge cases with the extension that need to be addressed. First, when reloading the page, there is a chance that a port, most likely the devtools one, is not properly unloaded. This causes the React DevTools to stop working unless a new tab is created. Additionally, for unknown reasons, Chrome sometimes spins up two service worker processes, resulting in an error being thrown and potentially interrupting the execution of the rest of the service worker. To solve these problems, the logic needs to be made more robust by automatically shutting down the double pipe if the message fails and allowing the runtime to rebuild it. Logging the error message will also help prevent Chrome from interrupting the execution. This change is expected to be helpful in fixing issue #25806 as well."
 856dc5e43352454b1d06c13e233d565ceda77e61,1692745800,"Fix escaping in action error URL (#27273)
 
 This URL is generated on the client (there's an equivalent but shorter
@@ -1196,7 +1236,7 @@ stopped early.
 
 The `'` wasn't escaped so this yielded invalid syntax. Which is an error
 too but much less helpful. `missing ) after argument list`. Added a test
-that evals to make sure it's correct syntax.","['packages/react-dom-bindings/src/client/ReactDOMComponent.js', 'packages/react-dom/src/__tests__/ReactDOMForm-test.js']",
+that evals to make sure it's correct syntax.","['packages/react-dom-bindings/src/client/ReactDOMComponent.js', 'packages/react-dom/src/__tests__/ReactDOMForm-test.js']","When a function is used as an action and a URL is generated on the client side, there is a potential issue with escaping certain characters. In this case, the `'` character was not escaped, resulting in invalid syntax for the generated URL. This can cause errors, specifically the `missing ) after argument list` error. To fix this issue, the commit adds proper escaping for the character and includes a test to ensure that the syntax is correct."
 c6702656ff312fda4da9f442c99fe3931745c80d,1619629014,"Revert ""Clean up host pointers in level 2 of clean-up flag (#21112)""
 
 This reverts commit 8ed0c85bf174ce6e501be62d9ccec1889bbdbce1.
@@ -1218,7 +1258,7 @@ In our plan for removing the alternate model, DOM nodes would not be
 connected to fibers, except at the root of the whole tree, which is
 easy to disconnect on deletion. So in that world, we likely won't have
 to do any additional work.
-","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']",
+","['packages/react-reconciler/src/ReactFiberCommitWork.new.js', 'packages/react-reconciler/src/ReactFiberCommitWork.old.js']","Disconnecting host pointers in level 2 of the clean-up flag has memory impact and can lead to memory leaks in non-React code. Moving this to level 2 will help confirm if disconnecting these fields alone is responsible for the memory savings or if there are other fields retaining significant amounts of memory. In the future, as part of the plan to remove the alternate model, DOM nodes will not be connected to fibers except at the root of the tree, making it easier to disconnect on deletion and potentially eliminating the need for additional work."
 dee03049f5690e23787f3ba1afd3150fb3540624,1573062514,"[Flight] Basic Streaming Suspense Support (#17285)
 
 * Return whether to keep flowing in Host config
@@ -1238,7 +1278,7 @@ We should refactor to favor that approach.
 * Add basic suspense in example
 
 * Add comment describing the protocol that the server generates
-","['packages/react-dom/src/client/flight/ReactFlightDOMClient.js', 'packages/react-dom/src/server/ReactDOMFizzServerBrowser.js', 'packages/react-dom/src/server/ReactDOMFizzServerNode.js', 'packages/react-dom/src/server/flight/ReactFlightDOMServerBrowser.js', 'packages/react-dom/src/server/flight/ReactFlightDOMServerNode.js', 'packages/react-flight/src/ReactFlightClient.js', 'packages/react-server/src/ReactFizzStreamer.js', 'packages/react-server/src/ReactFlightServer.js', 'packages/react-server/src/ReactServerHostConfigBrowser.js', 'packages/react-server/src/ReactServerHostConfigNode.js']",
+","['packages/react-dom/src/client/flight/ReactFlightDOMClient.js', 'packages/react-dom/src/server/ReactDOMFizzServerBrowser.js', 'packages/react-dom/src/server/ReactDOMFizzServerNode.js', 'packages/react-dom/src/server/flight/ReactFlightDOMServerBrowser.js', 'packages/react-dom/src/server/flight/ReactFlightDOMServerNode.js', 'packages/react-flight/src/ReactFlightClient.js', 'packages/react-server/src/ReactFizzStreamer.js', 'packages/react-server/src/ReactFlightServer.js', 'packages/react-server/src/ReactServerHostConfigBrowser.js', 'packages/react-server/src/ReactServerHostConfigNode.js']","When something suspends, a new chunk is created which can lead to issues. The code needs to be refactored to favor a recursive approach to prevent this. Additionally, there is a need for basic streaming suspense support on the client side."
 75ab53b9e1de662121e68dabb010655943d28d11,1564181037,"[scheduler] Yield many times per frame, no rAF (#16214)
 
 Adds experimental flag to yield many times per frame using a message
@@ -1259,7 +1299,7 @@ increases, not decreases).
 The main risk is that yielding more often will exacerbate main thread
 contention with other browser tasks.
 
-Let's try it and see.","['packages/scheduler/src/SchedulerFeatureFlags.js', 'packages/scheduler/src/__tests__/SchedulerBrowser-test.internal.js', 'packages/scheduler/src/__tests__/SchedulerBrowser-test.js', 'packages/scheduler/src/forks/SchedulerFeatureFlags.www.js', 'packages/scheduler/src/forks/SchedulerHostConfig.default.js']",
+Let's try it and see.","['packages/scheduler/src/SchedulerFeatureFlags.js', 'packages/scheduler/src/__tests__/SchedulerBrowser-test.internal.js', 'packages/scheduler/src/__tests__/SchedulerBrowser-test.js', 'packages/scheduler/src/forks/SchedulerFeatureFlags.www.js', 'packages/scheduler/src/forks/SchedulerHostConfig.default.js']","The current approach of guessing the next vsync and yielding at the end of the frame might not be sufficient to keep the main thread responsive, especially for high frame rates. There is a risk of main thread contention with other browser tasks. To address this, an experimental flag is added to yield many times per frame using a message event loop, completely bypassing the use of `requestAnimationFrame`. This new approach posts a message event and performs a small amount of work before yielding to the browser, regardless of the vsync cycle. If there is still work remaining, another message event is posted. The goal is to improve main thread responsiveness and handle varying hardware frame rates effectively."
 978fae4b4f6d5aa28887b530b5c9bf28b1e7b74b,1678161155,"[Float][Fiber] implement a faster hydration match for hoistable elements (#26154)
 
 This PR is now based on #26256 
@@ -1295,7 +1335,15 @@ It is concievable with og tags that there may be true duplciates `<meta
 property=""og:image:size:height"" content=""100"" />` but even if we did
 bind to the wrong instance meta tags are typically only read from SSR by
 bots and rarely inserted by 3rd parties so an adverse functional outcome
-is not expected.","['packages/react-dom-bindings/src/client/ReactDOMComponent.js', 'packages/react-dom-bindings/src/client/ReactDOMComponentTree.js', 'packages/react-dom-bindings/src/client/ReactDOMFloatClient.js', 'packages/react-dom-bindings/src/client/ReactDOMHostConfig.js', 'packages/react-dom/src/__tests__/ReactDOMFloat-test.js', 'packages/react-reconciler/src/ReactFiberCommitWork.js', 'packages/react-reconciler/src/ReactFiberHostConfigWithNoResources.js', 'packages/react-reconciler/src/ReactFiberHydrationContext.js', 'packages/react-reconciler/src/forks/ReactFiberHostConfig.custom.js']",
+is not expected.","['packages/react-dom-bindings/src/client/ReactDOMComponent.js', 'packages/react-dom-bindings/src/client/ReactDOMComponentTree.js', 'packages/react-dom-bindings/src/client/ReactDOMFloatClient.js', 'packages/react-dom-bindings/src/client/ReactDOMHostConfig.js', 'packages/react-dom/src/__tests__/ReactDOMFloat-test.js', 'packages/react-reconciler/src/ReactFiberCommitWork.js', 'packages/react-reconciler/src/ReactFiberHostConfigWithNoResources.js', 'packages/react-reconciler/src/ReactFiberHydrationContext.js', 'packages/react-reconciler/src/forks/ReactFiberHostConfig.custom.js']","When hydrating hoistable elements, the original matching function had challenging time complexity. This new implementation aims to improve the complexity by implementing a faster hydration match.
+
+For hoisted title tags, the first valid title is matched, excluding titles in SVG context and titles with the `itemprop` attribute. This path is much faster and efficient, especially since valid Documents only have one title. Even if there is a mismatch, the rendered title still ends up as the Document title, so there is no functional degradation for misses.
+
+For hoisted link and meta tags, a cache is used to track all potentially hydratable elements of each type per Document. The cache is refreshed once per commit if there is a hoistable title or meta tag. The caches are partitioned by a natural key for each type (href for link and content for meta), and secondary attributes are checked to determine if there is a match.
+
+For link tags, the `rel`, `title`, and `crossorigin` attributes are checked for entropy to ensure that we rarely have collisions, even if links are injected in arbitrary places in the Document by third-party scripts or browser extensions.
+
+For meta tags, the `name`, `property`, `http-equiv`, and `charset` attributes are checked to provide enough entropy and avoid meaningful collisions. Although it is possible to have true duplicates with Open Graph (OG) tags, if we bind to the wrong instance, it is not expected to have an adverse functional outcome since meta tags are typically only read from server-side rendering (SSR) by bots and are rarely inserted by third parties."
 8ec962d825fc948ffda5ab863e639cd4158935ba,1687535153,"fix[devtools/ci]: fixed incorrect condition calculation for @reactVersion annotation (#26997)
 
 Suppose that you have this setup for devtools test:
@@ -1313,14 +1361,14 @@ With these changes the resulting condition will be `""<= 18.1 >= 17.1""`,
 not using `&&`, because semver does not support this operator. All
 currently failing tests will be skipped now as expected.
 
-Also increased timeout value for shell server to start","['packages/react-devtools-extensions/src/__tests__/xGoogleIgnoreList-test.js', 'scripts/babel/transform-react-version-pragma.js', 'scripts/circleci/run_devtools_e2e_tests.js']",
+Also increased timeout value for shell server to start","['packages/react-devtools-extensions/src/__tests__/xGoogleIgnoreList-test.js', 'scripts/babel/transform-react-version-pragma.js', 'scripts/circleci/run_devtools_e2e_tests.js']","The previous implementation of the condition calculation for the `@reactVersion` annotation in devtools led to incorrect results. The accumulated condition was being evaluated as `"">= 17.1""`, causing tests for older versions of React to be executed on the main branch and fail. The fix involves changing the implementation to use `""<= 18.1 >= 17.1""` instead of `&&` since semver does not support the `&&` operator. Additionally, the timeout value for the shell server was increased for it to start properly."
 35bf9d27a3f9fdf60cea060d20b5c178e437520d,1568922111,"Exclude react-dom when flow checking other builds (#16737)
 
 This is because the HostConfig can't be guaranteed to be consistent with
 other code such as code that touches the DOM directly.
 
 Ideally we'd have a more systemic solution to this since it will pop
-up for other packages later too.",['scripts/flow/createFlowConfigs.js'],
+up for other packages later too.",['scripts/flow/createFlowConfigs.js'],"When flow checking other builds, the presence of react-dom can cause inconsistencies with the HostConfig and other code that directly interacts with the DOM. This issue may occur in other packages as well, so a more systemic solution is ideal."
 f411e8990ff2a6d5ea5e0813489f11747e518d7b,1678567576,"Remote `.internal` override from untrusted URL tests (#26372)
 
 Adding `.internal` to a test file prevents it from being tested in build
@@ -1328,14 +1376,14 @@ mode. The best practice is to instead gate the test based on whether the
 feature is enabled.
 
 Ideally we'd use the `@gate` pragma in these tests, but the `itRenders`
-test helpers don't support that.","['packages/react-dom/src/__tests__/ReactDOMServerIntegrationUntrustedURL-test.js', 'scripts/jest/setupTests.www.js']",
+test helpers don't support that.","['packages/react-dom/src/__tests__/ReactDOMServerIntegrationUntrustedURL-test.js', 'scripts/jest/setupTests.www.js']","When adding `.internal` to a test file, it prevents the file from being tested in build mode. Instead, it is best to gate the test based on whether the feature is enabled. However, the `itRenders` test helpers do not support the use of the `@gate` pragma."
 5200547100cb8505eb293f84da53762b7c482fc2,1585767487,"Do not warn when a controlled input has `onInput` handler. (#18189)
 
 `onInput` behaves the same as `onChange` for controlled inputs as far as I
 know, so React should not print the following warning when `onInput` is
 present.
 
-> Failed prop type: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultValue`. Otherwise, set either `onChange` or `readOnly`.","['packages/react-dom/src/__tests__/ReactDOMInput-test.js', 'packages/react-dom/src/shared/ReactControlledValuePropTypes.js']",
+> Failed prop type: You provided a `value` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultValue`. Otherwise, set either `onChange` or `readOnly`.","['packages/react-dom/src/__tests__/ReactDOMInput-test.js', 'packages/react-dom/src/shared/ReactControlledValuePropTypes.js']","When a controlled input has an `onInput` handler, React should not print a warning about a missing `onChange` handler. Currently, React displays a warning that a `value` prop is provided without an `onChange` handler, suggesting to use `defaultValue` instead. This warning should be updated to include `onInput` as a valid handler for controlled inputs."
 53e787b45f633468f5ccdc2012468f1ebbba9d4c,1551378646,"Replace noop's fake Scheduler implementation with mock Scheduler build (#14969)
 
 * Replace noop's fake Scheduler implementation with mock Scheduler build
@@ -1358,7 +1406,9 @@ still possible using the `yieldValue` API.
 Follow-up: Do the same for test renderer.
 
 * Fix import to scheduler/unstable_mock
-","['packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/__tests__/ReactExpiration-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncremental-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalErrorHandling-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalPerf-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalScheduling-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalTriangle-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactNewContext-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js', 'scripts/jest/matchers/reactTestMatchers.js', 'scripts/rollup/forks.js']",
+","['packages/react-noop-renderer/src/createReactNoop.js', 'packages/react-reconciler/src/__tests__/ReactExpiration-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactHooksWithNoopRenderer-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncremental-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalErrorHandling-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalPerf-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalScheduling-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalTriangle-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactIncrementalUpdates-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactNewContext-test.internal.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseWithNoopRenderer-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js', 'scripts/jest/matchers/reactTestMatchers.js', 'scripts/rollup/forks.js']","The existing mock implementation of the Scheduler interface in the noop renderer has been replaced with a proper mock Scheduler build. This change allows for more comprehensive testing and better integration with the Scheduler queue. Previously, passive effects were scheduled on a separate queue from rendering, but now both rendering and effects are scheduled in the Scheduler queue. This simplifies testing as all work can be flushed with a single call to `flushAll`. However, for tests that specifically need to flush rendering without effects, the `yieldValue` API can still be used. This change also includes a fix for the import to `scheduler/unstable_mock`.
+
+A follow-up task is to apply the same changes to the test renderer."
 fbf3bc31585f7142b66eb22770fac90aa9a7e2c1,1676542352,"Add `scale` as a unitless property (#25601)
 
 ## Summary
@@ -1389,20 +1439,20 @@ because `scale` is not in the list of unitless properties. This PR adds
 
 I built `react` and `react-dom` from source and copied it into the
 node_modules of my project and verified that now `<div style={{scale:
-2}}>` does indeed work whereas before it did not.",['packages/react-dom-bindings/src/shared/CSSProperty.js'],
+2}}>` does indeed work whereas before it did not.",['packages/react-dom-bindings/src/shared/CSSProperty.js'],"In React, the `scale` property is not currently recognized as a unitless property. This means that when trying to apply a scale value directly in an inline style object, such as `<div style={{scale: 2}}>`, it will not work as expected. This PR addresses this issue by adding `scale` to the list of unitless properties, allowing the scale value to be applied correctly in inline styles."
 6bd53a5bdfe24d9a70819c4eba40b488e62900cd,1678747417,"Remove FeatureFlags fork for `react-dom/unstable_testing` (#26383)
 
 This doesn't need its own set of flags. We use things like `__PROFILE__`
 in the regular feature flags file to fork for the `react-dom/profiling`
 build so we can do the same here if needed but I don't think we actually
-need to fork this anywhere as far as I can tell.","['packages/shared/forks/ReactFeatureFlags.testing.js', 'packages/shared/forks/ReactFeatureFlags.testing.www.js', 'scripts/rollup/forks.js']",
+need to fork this anywhere as far as I can tell.","['packages/shared/forks/ReactFeatureFlags.testing.js', 'packages/shared/forks/ReactFeatureFlags.testing.www.js', 'scripts/rollup/forks.js']","There seems to be an unnecessary fork in the feature flags specifically for `react-dom/unstable_testing`. The commit suggests that the existing feature flags file can handle the profiling build, and therefore this separate fork is not required."
 353c30252f67145fa8241b6979d570cb152c2b22,1669996435,"Hold host functions in var (#25741)
 
 Calling any function on `nativeFabricUIManager`, for example
 `nativeFabricUIManager.measure`, results in a round trip to the host
 platform through jsi layer. It is the same for repeated calls to same
 host function. This is unnecessary overload which can be avoided by
-retaining host function in a variable.","['packages/react-native-renderer/src/ReactFabric.js', 'packages/react-native-renderer/src/ReactFabricGlobalResponderHandler.js', 'packages/react-native-renderer/src/ReactNativeFiberInspector.js', 'packages/react-native-renderer/src/ReactNativeRenderer.js', 'packages/react-native-renderer/src/__tests__/ReactNativeError-test.internal.js', 'packages/react-native-renderer/src/__tests__/ReactNativeEvents-test.internal.js', 'packages/react-native-renderer/src/__tests__/ReactNativeMount-test.internal.js', 'packages/react-native-renderer/src/__tests__/createReactNativeComponentClass-test.internal.js']",
+retaining host function in a variable.","['packages/react-native-renderer/src/ReactFabric.js', 'packages/react-native-renderer/src/ReactFabricGlobalResponderHandler.js', 'packages/react-native-renderer/src/ReactNativeFiberInspector.js', 'packages/react-native-renderer/src/ReactNativeRenderer.js', 'packages/react-native-renderer/src/__tests__/ReactNativeError-test.internal.js', 'packages/react-native-renderer/src/__tests__/ReactNativeEvents-test.internal.js', 'packages/react-native-renderer/src/__tests__/ReactNativeMount-test.internal.js', 'packages/react-native-renderer/src/__tests__/createReactNativeComponentClass-test.internal.js']","Calling any function on `nativeFabricUIManager` results in a round trip to the host platform through the jsi. This includes repeated calls to the same host function, causing unnecessary overload. To avoid this, we should retain the host function in a variable."
 0f3838a01b0fda0ac5fd054c6be13166697a113c,1572905225,"Remove `debugRenderPhaseSideEffects` flag (#17270)
 
 There are two similar flags, `debugRenderPhaseSideEffects` and
@@ -1412,7 +1462,7 @@ we would one day turn it on for all components, even outside strict
 mode. But what we'll do instead is migrate everyone to strict mode.
 
 The only place `debugRenderPhaseSideEffects` was being used was in
-an internal test file. I rewrote those tests to use public APIs.","['packages/react-reconciler/src/ReactFiberBeginWork.js', 'packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/ReactUpdateQueue.js', 'packages/react/src/__tests__/ReactDOMTracing-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js', 'packages/react/src/__tests__/ReactProfilerDOM-test.internal.js', 'packages/react/src/__tests__/ReactStrictMode-test.internal.js', 'packages/react/src/__tests__/ReactStrictMode-test.js', 'packages/shared/ReactFeatureFlags.js', 'packages/shared/forks/ReactFeatureFlags.native-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-oss.js', 'packages/shared/forks/ReactFeatureFlags.persistent.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.www.js', 'packages/shared/forks/ReactFeatureFlags.www.js']",
+an internal test file. I rewrote those tests to use public APIs.","['packages/react-reconciler/src/ReactFiberBeginWork.js', 'packages/react-reconciler/src/ReactFiberClassComponent.js', 'packages/react-reconciler/src/ReactUpdateQueue.js', 'packages/react/src/__tests__/ReactDOMTracing-test.internal.js', 'packages/react/src/__tests__/ReactProfiler-test.internal.js', 'packages/react/src/__tests__/ReactProfilerDOM-test.internal.js', 'packages/react/src/__tests__/ReactStrictMode-test.internal.js', 'packages/react/src/__tests__/ReactStrictMode-test.js', 'packages/shared/ReactFeatureFlags.js', 'packages/shared/forks/ReactFeatureFlags.native-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-oss.js', 'packages/shared/forks/ReactFeatureFlags.persistent.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.www.js', 'packages/shared/forks/ReactFeatureFlags.www.js']","The `debugRenderPhaseSideEffects` flag is no longer being used and is only present in an internal test file. It appears that this flag was initially intended for use outside of strict mode, but the decision has been made to migrate everyone to strict mode instead. To align with this decision, the tests in the internal file have been rewritten to use public APIs instead of relying on this flag."
 d49e0e0be0941490fe709f80de137516ba4c0ee3,1677772491,"Removed unused imperative events implementation from React Native renderer (#26282)
 
 ## Summary
@@ -1439,7 +1489,7 @@ I'll submit more PRs after this for the rest of the refactor.
 
 ## How did you test this change?
 
-Existing jest tests. Will test a React sync internally at Meta.","['packages/react-native-renderer/src/ReactFabricEventEmitter.js', 'packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/ReactNativeBridgeEventPlugin.js', 'packages/react-native-renderer/src/ReactNativeEventEmitter.js', 'packages/react-native-renderer/src/ReactNativeGetListener.js', 'packages/react-native-renderer/src/ReactNativeGetListeners.js', 'packages/react-native-renderer/src/__mocks__/react-native/Libraries/ReactPrivate/CustomEvent.js', 'packages/react-native-renderer/src/__mocks__/react-native/Libraries/ReactPrivate/ReactNativePrivateInterface.js', 'packages/react-native-renderer/src/legacy-events/PropagationPhases.js', 'scripts/flow/react-native-host-hooks.js']",
+Existing jest tests. Will test a React sync internally at Meta.","['packages/react-native-renderer/src/ReactFabricEventEmitter.js', 'packages/react-native-renderer/src/ReactFabricHostConfig.js', 'packages/react-native-renderer/src/ReactNativeBridgeEventPlugin.js', 'packages/react-native-renderer/src/ReactNativeEventEmitter.js', 'packages/react-native-renderer/src/ReactNativeGetListener.js', 'packages/react-native-renderer/src/ReactNativeGetListeners.js', 'packages/react-native-renderer/src/__mocks__/react-native/Libraries/ReactPrivate/CustomEvent.js', 'packages/react-native-renderer/src/__mocks__/react-native/Libraries/ReactPrivate/ReactNativePrivateInterface.js', 'packages/react-native-renderer/src/legacy-events/PropagationPhases.js', 'scripts/flow/react-native-host-hooks.js']","The current implementation of the React Native renderer has some unused imperative event handlers that are exposing private parts in the public instance exported by refs. These methods are unused and are causing unnecessary complexity and potential issues. Therefore, they need to be removed to properly separate the private and public parts of the interface between React and React Native. This change is a manual revert of a previous implementation (#23386) and will be followed by further PRs to complete the refactor. The change has been tested using existing jest tests and a React sync internally at Meta."
 aef7ce5547c9489dc48e31f69b002cd17206e0cb,1683153417,"[Flight] Progressively Enhanced Server Actions (#26774)
 
 This automatically exposes `$$FORM_ACTIONS` on Server References coming
@@ -1459,7 +1509,11 @@ you can just invoke it.
 I updated the fixture which now has a ""Server State"" that gets
 automatically refreshed. This also lets us visualize form fields.
 There's no ""Action State"" here for showing error messages that are not
-thrown, that's still up to user space.","['fixtures/flight/server/global.js', 'fixtures/flight/server/region.js', 'fixtures/flight/src/App.js', 'fixtures/flight/src/Button.js', 'fixtures/flight/src/Form.js', 'fixtures/flight/src/ServerState.js', 'fixtures/flight/src/actions.js', 'fixtures/flight/src/index.js', 'packages/react-client/src/ReactFlightClient.js', 'packages/react-client/src/ReactFlightReplyClient.js', 'packages/react-client/src/ReactFlightServerReferenceRegistry.js', 'packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js', 'packages/react-server-dom-webpack/src/ReactFlightDOMServerBrowser.js', 'packages/react-server-dom-webpack/src/ReactFlightDOMServerEdge.js', 'packages/react-server-dom-webpack/src/ReactFlightDOMServerNode.js', 'packages/react-server-dom-webpack/src/__tests__/ReactFlightDOMForm-test.js', 'packages/react-server/src/ReactFlightActionServer.js']",
+thrown, that's still up to user space.","['fixtures/flight/server/global.js', 'fixtures/flight/server/region.js', 'fixtures/flight/src/App.js', 'fixtures/flight/src/Button.js', 'fixtures/flight/src/Form.js', 'fixtures/flight/src/ServerState.js', 'fixtures/flight/src/actions.js', 'fixtures/flight/src/index.js', 'packages/react-client/src/ReactFlightClient.js', 'packages/react-client/src/ReactFlightReplyClient.js', 'packages/react-client/src/ReactFlightServerReferenceRegistry.js', 'packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js', 'packages/react-server-dom-webpack/src/ReactFlightDOMServerBrowser.js', 'packages/react-server-dom-webpack/src/ReactFlightDOMServerEdge.js', 'packages/react-server-dom-webpack/src/ReactFlightDOMServerNode.js', 'packages/react-server-dom-webpack/src/__tests__/ReactFlightDOMForm-test.js', 'packages/react-server/src/ReactFlightActionServer.js']","When using Flight's Server References in a form action, there is a need to encode the ID for the server reference as a hidden field or as part of the name of a button. However, if the Server Action is a bound function and has complex data associated with it, this additional data needs to be encoded as additional form fields. 
+
+To process a POST on the server, a `decodeAction` helper was added. This helper can take a progressive post from FormData and give you a prebound function with the correct closure and FormData, making it easier to invoke.
+
+The fixture was also updated to include a ""Server State"" that gets automatically refreshed, allowing for better visualization of form fields. However, there is still no ""Action State"" implemented for showing error messages that are not thrown, as that responsibility remains in user space."
 435cff9866d38d137aafe6396c776437710a8481,1616524778,"[Fizz] Expose callbacks in options for when various stages of the content is done (#21056)
 
 * Report errors to a global handler
@@ -1473,7 +1527,7 @@ This allows you to log errors or set things like status codes.
 This is typically not needed because if you want to stream when the
 root is ready you can just start writing immediately.
 
-* Rename onComplete -> onCompleteAll","['packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js', 'packages/react-dom/src/server/ReactDOMFizzServerBrowser.js', 'packages/react-dom/src/server/ReactDOMFizzServerNode.js', 'packages/react-noop-renderer/src/ReactNoopServer.js', 'packages/react-server/src/ReactFizzServer.js']",
+* Rename onComplete -> onCompleteAll","['packages/react-dom/src/__tests__/ReactDOMFizzServer-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzServerBrowser-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzServerNode-test.js', 'packages/react-dom/src/server/ReactDOMFizzServerBrowser.js', 'packages/react-dom/src/server/ReactDOMFizzServerNode.js', 'packages/react-noop-renderer/src/ReactNoopServer.js', 'packages/react-server/src/ReactFizzServer.js']","When working with various stages of the content, there is currently no way to easily handle errors or set specific status codes. Additionally, there is no built-in callback for when all stages of the content are complete."
 544d5c720812c95131f7f572e401fadd3c65d27e,1509454961,"Fixed invalid prop types error message to be more specific (#11308)
 
 * Modified tests and corrected error message. #3
@@ -1521,7 +1575,7 @@ The message didn't make sense because it appears for *any* attributes, not just 
 * Add missing whitespace
 
 * Revert size changes
-","['packages/react-dom/src/__tests__/ReactDOMAttribute-test.js', 'packages/react-dom/src/__tests__/ReactDOMComponent-test.js', 'packages/react-dom/src/__tests__/ReactDOMFiber-test.js', 'packages/react-dom/src/client/ReactDOMFiberComponent.js', 'packages/react-dom/src/shared/ReactDOMUnknownPropertyHook.js']",
+","['packages/react-dom/src/__tests__/ReactDOMAttribute-test.js', 'packages/react-dom/src/__tests__/ReactDOMComponent-test.js', 'packages/react-dom/src/__tests__/ReactDOMFiber-test.js', 'packages/react-dom/src/client/ReactDOMFiberComponent.js', 'packages/react-dom/src/shared/ReactDOMUnknownPropertyHook.js']","The error message for invalid prop types is not specific enough. It appears for any attributes, not just numeric ones. Additionally, the message for false event handlers is also unclear. The commit aims to fix these issues by modifying the error messages to provide more clarity and adding a special message for false event handlers."
 d1c25558614164936bb90b6c6dc590106381c446,1568751424,"[react-devtools-shared] Added string type check for object name prop in getDisplayName function (#16798)
 
 * [react-devtools-shared] Added string type check for object name prop in getDisplayName function from utils.js file; tests included;
@@ -1531,7 +1585,7 @@ d1c25558614164936bb90b6c6dc590106381c446,1568751424,"[react-devtools-shared] Add
 * Tweaked tests to use real functions
 
 This more closely simulates how the utility is being used in production, and would catch cases like anonymous functions (with empty string names).
-","['packages/react-devtools-shared/src/__tests__/utils-test.js', 'packages/react-devtools-shared/src/utils.js']",
+","['packages/react-devtools-shared/src/__tests__/utils-test.js', 'packages/react-devtools-shared/src/utils.js']","The getDisplayName function in the utils.js file of [react-devtools-shared] does not currently have a string type check for the object name prop. This can lead to issues, such as not catching empty string names for anonymous functions, when using the utility in production. This commit adds a string type check for the object name prop in the getDisplayName function and includes tests to ensure its correctness."
 cae635054e17a6f107a39d328649137b83f25972,1624733483,"`act`: Resolve to return value of scope function (#21759)
 
 When migrating some internal tests I found it annoying that I couldn't
@@ -1559,12 +1613,12 @@ const renderer = await act(() => {
   return ReactTestRenderer.create(<App />);
 })
 renderer.root.findByType(Component);
-```","['packages/react-reconciler/src/__tests__/ReactIsomorphicAct-test.js', 'packages/react-test-renderer/src/ReactTestRenderer.js', 'packages/react/src/ReactAct.js']",
+```","['packages/react-reconciler/src/__tests__/ReactIsomorphicAct-test.js', 'packages/react-test-renderer/src/ReactTestRenderer.js', 'packages/react/src/ReactAct.js']","It is currently not possible to return a value from the `act` scope, which can be inconvenient and problematic when using type systems. This commit aims to resolve this issue by modifying the `act` scope to return the value of the scope function."
 0e0b1a45fa09c0a8b162cde655016af97eda5c88,1646242008,"Show DevTools backend and frontend versions in UI (#23399)
 
 This information can help with bug investigation for renderers (like React Native) that embed the DevTools backend into their source (separately from the DevTools frontend, which gets run by the user).
 
-If the DevTools backend is too old to report a version, or if the version reported is the same as the frontend (as will be the case with the browser extension) then only a single version string will be shown, as before. If a different version is reported, then both will be shown separately.","['packages/react-devtools-shared/src/backend/agent.js', 'packages/react-devtools-shared/src/bridge.js', 'packages/react-devtools-shared/src/devtools/store.js', 'packages/react-devtools-shared/src/devtools/views/Settings/GeneralSettings.js', 'packages/react-devtools-shell/src/app/index.js']",
+If the DevTools backend is too old to report a version, or if the version reported is the same as the frontend (as will be the case with the browser extension) then only a single version string will be shown, as before. If a different version is reported, then both will be shown separately.","['packages/react-devtools-shared/src/backend/agent.js', 'packages/react-devtools-shared/src/bridge.js', 'packages/react-devtools-shared/src/devtools/store.js', 'packages/react-devtools-shared/src/devtools/views/Settings/GeneralSettings.js', 'packages/react-devtools-shell/src/app/index.js']","When investigating bugs for renderers that embed the DevTools backend separately from the frontend, it can be helpful to have the backend and frontend versions displayed in the UI. However, if the DevTools backend is too old to report a version or if the reported version is the same as the frontend (such as with the browser extension), only a single version string is shown. If a different version is reported, both the backend and frontend versions will be displayed separately."
 6cd365cac69682f778e00238d8aa5c69730c13af,1572381505,"Don't treat the last row in hidden as deleted if already mounted (#17206)
 
 Already mounted rows that resuspend may be considered as part of a tail
@@ -1573,7 +1627,7 @@ they don't get deleted. We deal with that in cutOffTailIfNeeded.
 
 However, if they're also the first to suspend in the ""hidden"" case, we have
 a special case that deletes the actual rendered row. This needs to consider
-if that row was already mounted or things go wrong.","['packages/react-reconciler/src/ReactFiberCompleteWork.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseList-test.internal.js']",
+if that row was already mounted or things go wrong.","['packages/react-reconciler/src/ReactFiberCompleteWork.js', 'packages/react-reconciler/src/__tests__/ReactSuspenseList-test.internal.js']","If an already mounted row resuspends and is considered part of a tail, it should not be treated as deleted when in the ""hidden"" case. Currently, if the row is the first to suspend in the ""hidden"" case, there is a special case that deletes the actual rendered row. However, this special case does not consider whether the row was already mounted, leading to issues."
 8227e54ccf32f47e4c6bf5f30d08f84b8fed455d,1526483262,"Quick fix for ReactScheduler type inconsistency (#12828)
 
 **what is the change?:**
@@ -1586,7 +1640,7 @@ For correctness and to unblock something @gaearon is working on. A bit
 surprised Flow didn't catch this in the first place.
 
 **test plan:**
-Ran tests, flow, lint.",['packages/react-scheduler/src/ReactScheduler.js'],
+Ran tests, flow, lint.",['packages/react-scheduler/src/ReactScheduler.js'],"There was a type inconsistency in the 'callback' parameter in some cases, where it was defined as taking two arguments instead of indicating the second argument passed to 'scheduleWork'. This inconsistency was causing correctness issues and was blocking the progress of a certain task. It's surprising that Flow didn't catch this earlier."
 722bc046dcd748dde7109bc959318d3b14cf5196,1595886164,"Don't rely on `didTimeout` for SyncBatched (#19469)
 
 Tasks with SyncBatchedPriority — used by Blocking Mode — should always
@@ -1605,7 +1659,7 @@ that ourselves.
 
 This will allow us to remove the `didTimeout` check. And it further
 decouples us from the Scheduler priority, so we can eventually remove
-that, too.","['packages/react-reconciler/src/ReactFiberLane.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js']",
+that, too.","['packages/react-reconciler/src/ReactFiberLane.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.new.js', 'packages/react-reconciler/src/ReactFiberWorkLoop.old.js']","Tasks with SyncBatchedPriority, which are used in Blocking Mode, are currently being rendered through the performConcurrentWorkOnRoot path instead of the performSyncWorkOnRoot path. This leads to a check for didTimeout to see if the task expired. However, since SyncBatchedPriority translates to ImmediatePriority, didTimeout is always true, resulting in the task being marked as expired and then re-entering the performSyncWorkOnRoot path. This process is unnecessarily convoluted and we should not rely on Scheduler to determine whether SyncBatchedPriority work is synchronous. We need to handle this ourselves to remove the didTimeout check and further decouple from the Scheduler priority. Eventually, we may be able to remove the Scheduler priority altogether."
 05a55a4b09b7b7c8f63778fb8252a001ca66f8d7,1642620847,"Fix change events for custom elements (#22938)
 
 * Bypass react event system for custom elements
@@ -1658,13 +1712,13 @@ that, too.","['packages/react-reconciler/src/ReactFiberLane.js', 'packages/react
 
 * Actually fix gating
 
-Co-authored-by: Dan Abramov <dan.abramov@me.com>","['packages/react-dom/src/__tests__/DOMPropertyOperations-test.js', 'packages/react-dom/src/events/plugins/ChangeEventPlugin.js']",
+Co-authored-by: Dan Abramov <dan.abramov@me.com>","['packages/react-dom/src/__tests__/DOMPropertyOperations-test.js', 'packages/react-dom/src/events/plugins/ChangeEventPlugin.js']","When using custom elements, there may be issues with the react event system not properly handling change events. The events may not be triggered correctly or may be triggered multiple times. Various attempts have been made to fix this issue, such as bypassing the react event system and trying to fix it instead. The issue seems to persist even after removing unnecessary changes and cleaning up the code. It is suggested to focus on supporting only bubbling events and to run the form control behavior before the custom element behavior. Additionally, there are missing gating and test adjustments that need to be addressed."
 27b5699694f20220e0448f0ba3eb6bfa0d3a64ed,1644619917,"Simplify cache pool contexts (#23280)
 
 The `pooledCache` variable always points to either `root.pooledCache`
 or the stack cursor that is used to track caches that were resumed from
 a previous render. We can get rid of it by reading from those instead.
-This simplifies the code a lot and is harder to mess up, I think.","['packages/react-reconciler/src/ReactFiberCacheComponent.new.js', 'packages/react-reconciler/src/ReactFiberCacheComponent.old.js', 'packages/react-reconciler/src/__tests__/ReactCache-test.js']",
+This simplifies the code a lot and is harder to mess up, I think.","['packages/react-reconciler/src/ReactFiberCacheComponent.new.js', 'packages/react-reconciler/src/ReactFiberCacheComponent.old.js', 'packages/react-reconciler/src/__tests__/ReactCache-test.js']","Reading from `pooledCache` variable to track caches that were resumed from a previous render can lead to potential issues. By simplifying the code and directly reading from `root.pooledCache` or the stack cursor, the code becomes less prone to mistakes."
 09916479219a61ae86d2ec8ce159a161337b9007,1613595642,"Use setImmediate when available over MessageChannel (#20834)
 
 * Move direct port access into a function
@@ -1685,7 +1739,7 @@ This simplifies the code a lot and is harder to mess up, I think.","['packages/r
 
 * Use VARIANT to reenable tests
 
-* lol","['packages/scheduler/src/SchedulerFeatureFlags.js', 'packages/scheduler/src/__tests__/SchedulerDOMSetImmediate-test.js', 'packages/scheduler/src/forks/SchedulerDOM.js', 'packages/scheduler/src/forks/SchedulerFeatureFlags.www.js', 'scripts/jest/TestFlags.js']",
+* lol","['packages/scheduler/src/SchedulerFeatureFlags.js', 'packages/scheduler/src/__tests__/SchedulerDOMSetImmediate-test.js', 'packages/scheduler/src/forks/SchedulerDOM.js', 'packages/scheduler/src/forks/SchedulerFeatureFlags.www.js', 'scripts/jest/TestFlags.js']","When available, it is preferable to use setImmediate over MessageChannel."
 c826dc50de288758a0b783b2fd37b40a3b512fc4,1681936268,"Add (Client) Functions as Form Actions (#26674)
 
 This lets you pass a function to `<form action={...}>` or `<button
@@ -1714,7 +1768,11 @@ URLs are invoked which would be a different error message but it's still
 there to notify the user that something went wrong in the plumbing.
 
 Next up is improving the SSR state with action replaying and progressive
-enhancement.","['fixtures/flight/src/Button.js', 'fixtures/flight/src/Form.js', 'packages/react-dom-bindings/src/client/ReactDOMComponent.js', 'packages/react-dom-bindings/src/events/DOMPluginEventSystem.js', 'packages/react-dom-bindings/src/events/plugins/FormActionEventPlugin.js', 'packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js', 'packages/react-dom-bindings/src/shared/ReactDOMUnknownPropertyHook.js', 'packages/react-dom/src/__tests__/ReactDOMComponent-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzForm-test.js', 'packages/react-dom/src/__tests__/ReactDOMForm-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerIntegrationUntrustedURL-test.js', 'packages/shared/ReactFeatureFlags.js', 'packages/shared/forks/ReactFeatureFlags.native-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-oss.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.native.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.www.js', 'packages/shared/forks/ReactFeatureFlags.www.js']",
+enhancement.","['fixtures/flight/src/Button.js', 'fixtures/flight/src/Form.js', 'packages/react-dom-bindings/src/client/ReactDOMComponent.js', 'packages/react-dom-bindings/src/events/DOMPluginEventSystem.js', 'packages/react-dom-bindings/src/events/plugins/FormActionEventPlugin.js', 'packages/react-dom-bindings/src/server/ReactFizzConfigDOM.js', 'packages/react-dom-bindings/src/shared/ReactDOMUnknownPropertyHook.js', 'packages/react-dom/src/__tests__/ReactDOMComponent-test.js', 'packages/react-dom/src/__tests__/ReactDOMFizzForm-test.js', 'packages/react-dom/src/__tests__/ReactDOMForm-test.js', 'packages/react-dom/src/__tests__/ReactDOMServerIntegrationUntrustedURL-test.js', 'packages/shared/ReactFeatureFlags.js', 'packages/shared/forks/ReactFeatureFlags.native-fb.js', 'packages/shared/forks/ReactFeatureFlags.native-oss.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.native.js', 'packages/shared/forks/ReactFeatureFlags.test-renderer.www.js', 'packages/shared/forks/ReactFeatureFlags.www.js']","When using `<form action={...}>` or `<button formAction={...}>` or `<input type=""submit formAction={...}>`, passing a function as the form action could lead to issues. This functionality is meant to behave like a `javascript:` URL, but it is not fully implemented in that way. This change aims to provide convenience by allowing the use of the `onSubmit` pattern of `e => { e.preventDefault(); const formData = new FormData(e.target); ... }`. 
+
+Currently, this function is synchronous, but there are plans to extend its functionality to accept async functions, handle pending states, and manage errors. This implementation sets `javascript:` URLs, which triggers an error message if something goes wrong instead of navigating away. This error message is meant to notify the user that there was an issue with the plumbing, such as calling `stopPropagation` or using `form.submit()` instead of `form.requestSubmit()`. However, if CSP is used to ban `javascript:` URLs, different error messages will be triggered.
+
+The next steps involve improving the server-side rendering state with action replaying and progressive enhancement."
 990098f88aef825762f72e76ae84cfe1520222c2,1645660156,"Re-arrange main ReactFeatureFlags module (#23350)
 
 @sebmarkbage and I audited the feature flags file to review the status
@@ -1723,4 +1781,4 @@ comments to the main ReactFeatureFlags module and rearranged them
 into groups.
 
 I haven't changed the value of any flags, yet. There are a few we're
-going to land but I'll do them as separate PRs.",['packages/shared/ReactFeatureFlags.js'],
+going to land but I'll do them as separate PRs.",['packages/shared/ReactFeatureFlags.js'],The main ReactFeatureFlags module has been re-arranged and updated with additional comments to review the status of each feature or experiment. No changes have been made to the values of any flags at this time.
