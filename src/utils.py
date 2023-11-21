@@ -18,6 +18,9 @@ ENCODING = 'p50k_base'
 enc = tiktoken.get_encoding(ENCODING)
 assert enc.decode(enc.encode("hello world")) == "hello world"
 
+def print_random_commit_message(df):
+    print(df['commit_message'].sample().values[0])
+
 def tokenize(text):
     return ' '.join(map(str, enc.encode(text, disallowed_special=())))
 
