@@ -21,7 +21,11 @@ nvidia-smi
 # repo_path="2_7/apache_kafka"
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
-repo_path="2_8/pytorch_pytorch"
+# repo_path="2_8/pytorch_pytorch" ???????
+# repo_path="2_8/django_django"
+# repo_path="2_7/pandas-dev_pandas"
+# repo_path="2_7/julialang_julia"
+repo_path="2_7/ruby_ruby"
 index_path="${repo_path}/index_commit_tokenized"
 k=1000 # initial ranker depth
 n=100 # number of samples to evaluate on
@@ -62,9 +66,9 @@ python -u src/BERTReranker_v4.py \
     --rerank_depth $rerank_depth \
     --use_gpu \
     --sanity_check \
-    --do_train \
     --do_eval \
-    --eval_before_training
+    --do_train \
+    --eval_before_training \
     # --no_bm25 \
     # --debug \
     # --overwrite_cache \
