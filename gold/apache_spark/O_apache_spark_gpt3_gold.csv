@@ -1,0 +1,529 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt3
+3a94fb3dd92a05676a3c11cbcea314dd296ec059,1562806654,"[SPARK-28281][SQL][PYTHON][TESTS] Convert and port 'having.sql' into UDF test base
+
+## What changes were proposed in this pull request?
+
+This PR adds some tests converted from having.sql to test UDFs following the combination guide in [SPARK-27921](url)
+<details><summary>Diff comparing to 'having.sql'</summary>
+<p>
+
+```diff
+diff --git a/sql/core/src/test/resources/sql-tests/results/having.sql.out b/sql/core/src/test/resources/sql-tests/results/udf/udf-having.sql.out
+index d87ee52216..7cea2e5128 100644
+--- a/sql/core/src/test/resources/sql-tests/results/having.sql.out
++++ b/sql/core/src/test/resources/sql-tests/results/udf/udf-having.sql.out
+ -16,34 +16,34  struct<>
+
+ -- !query 1
+-SELECT k, sum(v) FROM hav GROUP BY k HAVING sum(v) > 2
++SELECT udf(k) AS k, udf(sum(v)) FROM hav GROUP BY k HAVING udf(sum(v)) > 2
+ -- !query 1 schema
+-struct<k:string,sum(v):bigint>
++struct<k:string,udf(sum(cast(v as bigint))):string>
+ -- !query 1 output
+ one    6
+ three  3
+
+ -- !query 2
+-SELECT count(k) FROM hav GROUP BY v + 1 HAVING v + 1 = 2
++SELECT udf(count(udf(k))) FROM hav GROUP BY v + 1 HAVING v + 1 = udf(2)
+ -- !query 2 schema
+-struct<count(k):bigint>
++struct<udf(count(udf(k))):string>
+ -- !query 2 output
+ 1
+
+ -- !query 3
+-SELECT MIN(t.v) FROM (SELECT * FROM hav WHERE v > 0) t HAVING(COUNT(1) > 0)
++SELECT udf(MIN(t.v)) FROM (SELECT * FROM hav WHERE v > 0) t HAVING(udf(COUNT(udf(1))) > 0)
+ -- !query 3 schema
+-struct<min(v):int>
++struct<udf(min(v)):string>
+ -- !query 3 output
+ 1
+
+ -- !query 4
+-SELECT a + b FROM VALUES (1L, 2), (3L, 4) AS T(a, b) GROUP BY a + b HAVING a + b > 1
++SELECT udf(a + b) FROM VALUES (1L, 2), (3L, 4) AS T(a, b) GROUP BY a + b HAVING a + b > udf(1)
+ -- !query 4 schema
+-struct<(a + CAST(b AS BIGINT)):bigint>
++struct<udf((a + cast(b as bigint))):string>
+ -- !query 4 output
+ 3
+ 7
+
+```
+
+</p>
+</details>
+
+## How was this patch tested?
+
+Tested as guided in SPARK-27921.
+
+Closes #25093 from huaxingao/spark-28281.
+
+Authored-by: Huaxin Gao <huaxing@us.ibm.com>
+Signed-off-by: HyukjinKwon <gurwls223@apache.org>
+",['sql/core/src/test/resources/sql-tests/inputs/udf/udf-having.sql'],"The 'having.sql' file needs to be converted and ported into UDF (User-Defined Function) test base. This PR adds some tests that have been converted from 'having.sql' to test UDFs. The changes made in this PR are in line with the combination guide mentioned in [SPARK-27921]. The diff shows the changes made to 'having.sql'.
+
+The changes proposed in this PR have been tested as guided in [SPARK-27921]."
+19854371104451b5c4cb266aaee6b33a5049b145,1587470133,"[SPARK-31474][SQL] Consistency between dayofweek/dow in extract exprsession and dayofweek function
+
+### What changes were proposed in this pull request?
+```sql
+spark-sql> SELECT extract(dayofweek from '2009-07-26');
+1
+spark-sql> SELECT extract(dow from '2009-07-26');
+0
+spark-sql> SELECT extract(isodow from '2009-07-26');
+7
+spark-sql> SELECT dayofweek('2009-07-26');
+1
+spark-sql> SELECT weekday('2009-07-26');
+6
+```
+Currently, there are 4 types of day-of-week range:
+1. the function `dayofweek`(2.3.0) and extracting `dayofweek`(2.4.0) result as of Sunday(1) to Saturday(7)
+2. extracting `dow`(3.0.0) results as of Sunday(0) to Saturday(6)
+3. extracting` isodow` (3.0.0) results as of Monday(1) to Sunday(7)
+4. the function `weekday`(2.4.0) results as of Monday(0) to Sunday(6)
+
+Actually, extracting `dayofweek` and `dow` are both derived from PostgreSQL but have different meanings.
+https://issues.apache.org/jira/browse/SPARK-23903
+https://issues.apache.org/jira/browse/SPARK-28623
+
+In this PR, we make extracting `dow` as same as extracting `dayofweek` and the `dayofweek` function for historical reason and not breaking anything.
+
+Also, add more documentation to the extracting function to make extract field more clear to understand.
+
+### Why are the changes needed?
+
+Consistency insurance
+
+### Does this PR introduce any user-facing change?
+
+yes, doc updated and extract `dow` is as same as `dayofweek`
+
+### How was this patch tested?
+
+1. modified ut
+2. local SQL doc verification
+#### before
+![image](https://user-images.githubusercontent.com/8326978/79601949-3535b100-811c-11ea-957b-a33d68641181.png)
+
+#### after
+![image](https://user-images.githubusercontent.com/8326978/79601847-12a39800-811c-11ea-8ff6-aa329255d099.png)
+
+Closes #28248 from yaooqinn/SPARK-31474.
+
+Authored-by: Kent Yao <yaooqinn@hotmail.com>
+Signed-off-by: Wenchen Fan <wenchen@databricks.com>
+",['sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/datetimeExpressions.scala'],"There seems to be inconsistency in the day-of-week range between the `dayofweek` function and the `dow` extraction. Currently, `dayofweek` returns the range from Sunday(1) to Saturday(7), while `dow` extraction returns the range from Sunday (0) to Saturday(6). Additionally, the `isodow` extraction returns the range from Monday(1) to Sunday(7). This PR aims to make the `dow` extraction consistent with the `dayofweek` function by changing the range to Sunday(1) to Saturday(7). The purpose of this change is to ensure consistency in the behavior of these functions. Additionally, more documentation is added to clarify the extract field. The changes were tested by modifying unit tests and verifying the local SQL documentation."
+9c7aa90c771868da727073f9941b8b2c4b856946,1678692169,"[SPARK-42577][CORE] Add max attempts limitation for stages to avoid potential infinite retry
+
+### What changes were proposed in this pull request?
+Currently a stage will be resubmitted in a few scenarios:
+1. Task failed with `FetchFailed` will trigger stage re-submit;
+2. Barrier task failed;
+3. Shuffle data loss due to executor/host decommissioned;
+
+For the first 2 scenarios, there is a config `spark.stage.maxConsecutiveAttempts` to limit the retry times. While for the 3rd scenario, there'll be potential risks for inifinite retry if there are always executors hosting the shuffle data from successful tasks got killed/lost, the stage will be re-run again and again.
+
+To avoid the potential risk, the proposal in this PR is to add a new config `spark.stage.maxConsecutiveAttempts` to limit the overall max attempts number for each stage, the stage will be aborted once the retry times beyond the limitation.
+
+### Why are the changes needed?
+To avoid the potential risks for stage infinite retry.
+
+### Does this PR introduce _any_ user-facing change?
+Added limitation for stage retry times, so jobs may fail if they need to retry for mutiplte times beyond the limitation.
+
+### How was this patch tested?
+Added new UT.
+
+Closes #40286 from ivoson/SPARK-42577.
+
+Authored-by: Tengfei Huang <tengfei.h@gmail.com>
+Signed-off-by: Mridul Muralidharan <mridul<at>gmail.com>
+","['core/src/main/scala/org/apache/spark/internal/config/package.scala', 'core/src/main/scala/org/apache/spark/scheduler/DAGScheduler.scala', 'core/src/main/scala/org/apache/spark/scheduler/Stage.scala', 'core/src/test/scala/org/apache/spark/scheduler/DAGSchedulerSuite.scala']","Currently, there is a potential risk for infinite retries of stages in certain scenarios, such as task failures with `FetchFailed`, failed barrier tasks, and shuffle data loss due to executor or host decommissioning. These scenarios do have a configuration option, `spark.stage.maxConsecutiveAttempts`, to limit the number of retries. However, if there are always executors hosting the shuffle data from successful tasks being killed or lost, the stage will be re-run indefinitely.
+
+To address this potential risk, this PR proposes adding a new configuration option, `spark.stage.maxConsecutiveAttempts`, to limit the overall maximum number of attempts for each stage. Once the number of retries exceeds this limitation, the stage will be aborted.
+
+These changes are necessary to prevent the potential issue of stages getting stuck in infinite retries.
+
+This PR does not introduce any user-facing changes, except for potentially causing jobs to fail if they need to retry beyond the defined limitation.
+
+Testing for this patch includes the addition of new unit tests.
+
+Closes #40286."
+00d169156d4b1c91d2bcfd788b254b03c509dc41,1516488589,"[SPARK-21786][SQL] The 'spark.sql.parquet.compression.codec' and 'spark.sql.orc.compression.codec' configuration doesn't take effect on hive table writing
+
+[SPARK-21786][SQL] The 'spark.sql.parquet.compression.codec' and 'spark.sql.orc.compression.codec' configuration doesn't take effect on hive table writing
+
+What changes were proposed in this pull request?
+
+Pass ‘spark.sql.parquet.compression.codec’ value to ‘parquet.compression’.
+Pass ‘spark.sql.orc.compression.codec’ value to ‘orc.compress’.
+
+How was this patch tested?
+
+Add test.
+
+Note:
+This is the same issue mentioned in #19218 . That branch was deleted mistakenly, so make a new pr instead.
+
+gatorsmile maropu dongjoon-hyun discipleforteen
+
+Author: fjh100456 <fu.jinhua6@zte.com.cn>
+Author: Takeshi Yamamuro <yamamuro@apache.org>
+Author: Wenchen Fan <wenchen@databricks.com>
+Author: gatorsmile <gatorsmile@gmail.com>
+Author: Yinan Li <liyinan926@gmail.com>
+Author: Marcelo Vanzin <vanzin@cloudera.com>
+Author: Juliusz Sompolski <julek@databricks.com>
+Author: Felix Cheung <felixcheung_m@hotmail.com>
+Author: jerryshao <sshao@hortonworks.com>
+Author: Li Jin <ice.xelloss@gmail.com>
+Author: Gera Shegalov <gera@apache.org>
+Author: chetkhatri <ckhatrimanjal@gmail.com>
+Author: Joseph K. Bradley <joseph@databricks.com>
+Author: Bago Amirbekian <bago@databricks.com>
+Author: Xianjin YE <advancedxy@gmail.com>
+Author: Bruce Robbins <bersprockets@gmail.com>
+Author: zuotingbing <zuo.tingbing9@zte.com.cn>
+Author: Kent Yao <yaooqinn@hotmail.com>
+Author: hyukjinkwon <gurwls223@gmail.com>
+Author: Adrian Ionescu <adrian@databricks.com>
+
+Closes #20087 from fjh100456/HiveTableWriting.
+","['sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/orc/OrcOptions.scala', 'sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/parquet/ParquetOptions.scala', 'sql/hive/src/main/scala/org/apache/spark/sql/hive/execution/HiveOptions.scala', 'sql/hive/src/main/scala/org/apache/spark/sql/hive/execution/SaveAsHiveFile.scala', 'sql/hive/src/test/scala/org/apache/spark/sql/hive/CompressionCodecSuite.scala']","The 'spark.sql.parquet.compression.codec' and 'spark.sql.orc.compression.codec' configuration settings are not taking effect when writing to a Hive table. This issue was mentioned in a previous pull request (#19218), but that branch was mistakenly deleted. This pull request proposes passing the values of 'spark.sql.parquet.compression.codec' to 'parquet.compression' and 'spark.sql.orc.compression.codec' to 'orc.compress' in order to resolve the issue. The patch includes a new test for verification."
+e92b75482fd4e5e3533a7f76f205faca94c71a7b,1572328447,"[SPARK-29612][SQL] ALTER TABLE (RECOVER PARTITIONS) should look up catalog/table like v2 commands
+
+### What changes were proposed in this pull request?
+Add AlterTableRecoverPartitionsStatement and make ALTER TABLE ... RECOVER PARTITIONS go through the same catalog/table resolution framework of v2 commands.
+
+### Why are the changes needed?
+It's important to make all the commands have the same table resolution behavior, to avoid confusing end-users. e.g.
+```
+USE my_catalog
+DESC t // success and describe the table t from my_catalog
+ALTER TABLE t RECOVER PARTITIONS  // report table not found as there is no table t in the session catalog
+```
+
+### Does this PR introduce any user-facing change?
+Yes. When running ALTER TABLE ... RECOVER PARTITIONS Spark fails the command if the current catalog is set to a v2 catalog, or the table name specified a v2 catalog.
+
+### How was this patch tested?
+Unit tests.
+
+Closes #26269 from huaxingao/spark-29612.
+
+Authored-by: Huaxin Gao <huaxing@us.ibm.com>
+Signed-off-by: Wenchen Fan <wenchen@databricks.com>
+","['sql/catalyst/src/main/antlr4/org/apache/spark/sql/catalyst/parser/SqlBase.g4', 'sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/parser/AstBuilder.scala', 'sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/plans/logical/statements.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/parser/DDLParserSuite.scala', 'sql/core/src/main/scala/org/apache/spark/sql/catalyst/analysis/ResolveSessionCatalog.scala', 'sql/core/src/main/scala/org/apache/spark/sql/execution/SparkSqlParser.scala', 'sql/core/src/test/scala/org/apache/spark/sql/connector/DataSourceV2SQLSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/execution/command/DDLParserSuite.scala']","The current behavior of the ALTER TABLE ... RECOVER PARTITIONS command may confuse end-users. When running this command, if the current catalog is set to a v2 catalog or if the table name specified a v2 catalog, Spark fails the command. To avoid this confusion and provide consistent table resolution behavior, the proposed changes add AlterTableRecoverPartitionsStatement and make the ALTER TABLE ... RECOVER PARTITIONS command go through the same catalog/table resolution framework as v2 commands. These changes were tested with unit tests."
+21b13506cd822ed7db343bff4ca25d9555178f10,1605792670,"[SPARK-33442][SQL] Change Combine Limit to Eliminate limit using max row
+
+### What changes were proposed in this pull request?
+
+Change `CombineLimits` name to `EliminateLimits` and add check if `Limit` child max row <= limit.
+
+### Why are the changes needed?
+
+In Add-hoc scene, we always add limit for the query if user have no special limit value, but not all limit is nesessary.
+
+A general negative example is
+```
+select count(*) from t limit 100000;
+```
+
+It will be great if we can eliminate limit at Spark side.
+
+Also, we make a benchmark for this case
+```
+runBenchmark(""Sort and Limit"") {
+  val N = 100000
+  val benchmark = new Benchmark(""benchmark sort and limit"", N)
+
+  benchmark.addCase(""TakeOrderedAndProject"", 3) { _ =>
+    spark.range(N).toDF(""c"").repartition(200).sort(""c"").take(200000)
+  }
+
+  benchmark.addCase(""Sort And Limit"", 3) { _ =>
+    withSQLConf(""spark.sql.execution.topKSortFallbackThreshold"" -> ""-1"") {
+      spark.range(N).toDF(""c"").repartition(200).sort(""c"").take(200000)
+    }
+  }
+
+  benchmark.addCase(""Sort"", 3) { _ =>
+    spark.range(N).toDF(""c"").repartition(200).sort(""c"").collect()
+  }
+  benchmark.run()
+}
+```
+
+and the result is
+```
+Java HotSpot(TM) 64-Bit Server VM 1.8.0_191-b12 on Mac OS X 10.15.6
+Intel(R) Core(TM) i5-5257U CPU  2.70GHz
+benchmark sort and limit:                 Best Time(ms)   Avg Time(ms)   Stdev(ms)    Rate(M/s)   Per Row(ns)   Relative
+------------------------------------------------------------------------------------------------------------------------
+TakeOrderedAndProject                              1833           2259         382          0.1       18327.1       1.0X
+Sort And Limit                                     1417           1658         285          0.1       14167.5       1.3X
+Sort                                               1324           1484         225          0.1       13238.3       1.4X
+```
+
+It shows that it makes sense to replace `TakeOrderedAndProjectExec` with `Sort + Project`.
+
+### Does this PR introduce _any_ user-facing change?
+
+No.
+
+### How was this patch tested?
+
+Add test.
+
+Closes #30368 from ulysses-you/SPARK-33442.
+
+Authored-by: ulysses <youxiduo@weidian.com>
+Signed-off-by: Wenchen Fan <wenchen@databricks.com>
+","['sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/optimizer/Optimizer.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/optimizer/CombiningLimitsSuite.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/optimizer/LimitPushdownSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/streaming/StreamSuite.scala']","The current implementation adds a limit for every query in the Add-hoc scene, even if the user does not specify a special limit value. This can lead to unnecessary limits being applied at the Spark side. The proposed change aims to change the name of `CombineLimits` to `EliminateLimits` and add a check to see if the `Limit` child's max row is less than or equal to the limit.
+
+To support this change, a benchmark was conducted comparing different cases involving sorting and limiting. The results show that replacing `TakeOrderedAndProjectExec` with `Sort + Project` can improve performance.
+
+This PR does not introduce any user-facing changes and includes tests.
+
+Closes #30368."
+07ecbc4049aa7f8daa11e6a924c37c1db2f53c73,1633717812,"[SPARK-36913][SQL] Implement createIndex and IndexExists in DS V2 JDBC (MySQL dialect)
+
+### What changes were proposed in this pull request?
+Implementing `createIndex`/`IndexExists` in DS V2 JDBC
+
+### Why are the changes needed?
+This is a subtask of the V2 Index support. I am implementing index support for DS V2 JDBC so we can have a POC and an end to end testing. This PR implements `createIndex` and `IndexExists`. Next PR will implement `listIndexes` and `dropIndex`. I intentionally make the PR small so it's easier to review.
+
+Index is not supported by h2 database and create/drop index are not standard SQL syntax. This PR only implements `createIndex` and `IndexExists` in `MySQL` dialect.
+
+### Does this PR introduce _any_ user-facing change?
+Yes, `createIndex`/`IndexExist` in DS V2 JDBC
+
+### How was this patch tested?
+new test
+
+Closes #34164 from huaxingao/createIndexJDBC.
+
+Authored-by: Huaxin Gao <huaxin_gao@apple.com>
+Signed-off-by: Liang-Chi Hsieh <viirya@gmail.com>
+","['external/docker-integration-tests/src/test/scala/org/apache/spark/sql/jdbc/v2/MySQLIntegrationSuite.scala', 'external/docker-integration-tests/src/test/scala/org/apache/spark/sql/jdbc/v2/V2JDBCTest.scala', 'sql/catalyst/src/main/java/org/apache/spark/sql/connector/catalog/index/SupportsIndex.java', 'sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/analysis/AlreadyExistException.scala', 'sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/jdbc/JdbcUtils.scala', 'sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/v2/jdbc/JDBCTable.scala', 'sql/core/src/main/scala/org/apache/spark/sql/execution/datasources/v2/jdbc/JDBCTableCatalog.scala', 'sql/core/src/main/scala/org/apache/spark/sql/jdbc/JdbcDialects.scala', 'sql/core/src/main/scala/org/apache/spark/sql/jdbc/MySQLDialect.scala']","Currently, the DS V2 JDBC does not have support for creating indexes and checking if indexes exist. This PR aims to implement the `createIndex` and `IndexExists` functionalities in the DS V2 JDBC, which is a subtask of the V2 Index support. The reason for these changes is to have a proof of concept (POC) and end-to-end testing for the index support.
+
+It is important to note that the h2 database does not support indexes, and `createIndex` and `dropIndex` are not standard SQL syntax. Therefore, this PR focuses on implementing `createIndex` and `IndexExists` specifically for the `MySQL` dialect.
+
+This patch introduces user-facing changes, as it enables the usage of `createIndex` and `IndexExists` in the DS V2 JDBC. The changes were tested with a new test.
+
+Closes #34164."
+a28728a9afcff94194147573e07f6f4d0463687e,1505443990,"[SPARK-21513][SQL][FOLLOWUP] Allow UDF to_json support converting MapType to json for PySpark and SparkR
+
+## What changes were proposed in this pull request?
+In previous work SPARK-21513, we has allowed `MapType` and `ArrayType` of `MapType`s convert to a json string but only for Scala API. In this follow-up PR, we will make SparkSQL support it for PySpark and SparkR, too. We also fix some little bugs and comments of the previous work in this follow-up PR.
+
+### For PySpark
+```
+>>> data = [(1, {""name"": ""Alice""})]
+>>> df = spark.createDataFrame(data, (""key"", ""value""))
+>>> df.select(to_json(df.value).alias(""json"")).collect()
+[Row(json=u'{""name"":""Alice"")']
+>>> data = [(1, [{""name"": ""Alice""}, {""name"": ""Bob""}])]
+>>> df = spark.createDataFrame(data, (""key"", ""value""))
+>>> df.select(to_json(df.value).alias(""json"")).collect()
+[Row(json=u'[{""name"":""Alice""},{""name"":""Bob""}]')]
+```
+### For SparkR
+```
+# Converts a map into a JSON object
+df2 <- sql(""SELECT map('name', 'Bob')) as people"")
+df2 <- mutate(df2, people_json = to_json(df2$people))
+# Converts an array of maps into a JSON array
+df2 <- sql(""SELECT array(map('name', 'Bob'), map('name', 'Alice')) as people"")
+df2 <- mutate(df2, people_json = to_json(df2$people))
+```
+## How was this patch tested?
+Add unit test cases.
+
+cc viirya HyukjinKwon
+
+Author: goldmedal <liugs963@gmail.com>
+
+Closes #19223 from goldmedal/SPARK-21513-fp-PySaprkAndSparkR.
+","['python/pyspark/sql/functions.py', 'sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/jsonExpressions.scala', 'sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/json/JacksonGenerator.scala']","The previous work (SPARK-21513) allowed `MapType` and `ArrayType` of `MapType`s to be converted into a JSON string, but only for the Scala API. This follow-up PR aims to make SparkSQL support this functionality for PySpark and SparkR as well. The PR also includes fixes for some minor bugs and comments from the previous work. The changes proposed in this PR were tested by adding unit test cases."
+ef1e8495ba9fae2f803d0b8653ced07baf4aab14,1570516745,"[SPARK-29366][SQL] Subqueries created for DPP are not printed in EXPLAIN FORMATTED
+
+### What changes were proposed in this pull request?
+The subquery expressions introduced by DPP are not printed in the newer explain command.
+This PR fixes the code that computes the list of subqueries in the plan.
+
+**SQL**
+df1 and df2 are partitioned on k.
+```
+SELECT df1.id, df2.k
+FROM df1 JOIN df2 ON df1.k = df2.k AND df2.id < 2
+```
+
+**Before**
+```
+|== Physical Plan ==
+* Project (9)
++- * BroadcastHashJoin Inner BuildRight (8)
+   :- * ColumnarToRow (2)
+   :  +- Scan parquet default.df1 (1)
+   +- BroadcastExchange (7)
+      +- * Project (6)
+         +- * Filter (5)
+            +- * ColumnarToRow (4)
+               +- Scan parquet default.df2 (3)
+
+(1) Scan parquet default.df1
+Output: [id#19L, k#20L]
+
+(2) ColumnarToRow [codegen id : 2]
+Input: [id#19L, k#20L]
+
+(3) Scan parquet default.df2
+Output: [id#21L, k#22L]
+
+(4) ColumnarToRow [codegen id : 1]
+Input: [id#21L, k#22L]
+
+(5) Filter [codegen id : 1]
+Input     : [id#21L, k#22L]
+Condition : (isnotnull(id#21L) AND (id#21L < 2))
+
+(6) Project [codegen id : 1]
+Output    : [k#22L]
+Input     : [id#21L, k#22L]
+
+(7) BroadcastExchange
+Input: [k#22L]
+
+(8) BroadcastHashJoin [codegen id : 2]
+Left keys: List(k#20L)
+Right keys: List(k#22L)
+Join condition: None
+
+(9) Project [codegen id : 2]
+Output    : [id#19L, k#22L]
+Input     : [id#19L, k#20L, k#22L]
+```
+**After**
+```
+|== Physical Plan ==
+* Project (9)
++- * BroadcastHashJoin Inner BuildRight (8)
+   :- * ColumnarToRow (2)
+   :  +- Scan parquet default.df1 (1)
+   +- BroadcastExchange (7)
+      +- * Project (6)
+         +- * Filter (5)
+            +- * ColumnarToRow (4)
+               +- Scan parquet default.df2 (3)
+
+(1) Scan parquet default.df1
+Output: [id#19L, k#20L]
+
+(2) ColumnarToRow [codegen id : 2]
+Input: [id#19L, k#20L]
+
+(3) Scan parquet default.df2
+Output: [id#21L, k#22L]
+
+(4) ColumnarToRow [codegen id : 1]
+Input: [id#21L, k#22L]
+
+(5) Filter [codegen id : 1]
+Input     : [id#21L, k#22L]
+Condition : (isnotnull(id#21L) AND (id#21L < 2))
+
+(6) Project [codegen id : 1]
+Output    : [k#22L]
+Input     : [id#21L, k#22L]
+
+(7) BroadcastExchange
+Input: [k#22L]
+
+(8) BroadcastHashJoin [codegen id : 2]
+Left keys: List(k#20L)
+Right keys: List(k#22L)
+Join condition: None
+
+(9) Project [codegen id : 2]
+Output    : [id#19L, k#22L]
+Input     : [id#19L, k#20L, k#22L]
+
+===== Subqueries =====
+
+Subquery:1 Hosting operator id = 1 Hosting Expression = k#20L IN subquery25
+* HashAggregate (16)
++- Exchange (15)
+   +- * HashAggregate (14)
+      +- * Project (13)
+         +- * Filter (12)
+            +- * ColumnarToRow (11)
+               +- Scan parquet default.df2 (10)
+
+(10) Scan parquet default.df2
+Output: [id#21L, k#22L]
+
+(11) ColumnarToRow [codegen id : 1]
+Input: [id#21L, k#22L]
+
+(12) Filter [codegen id : 1]
+Input     : [id#21L, k#22L]
+Condition : (isnotnull(id#21L) AND (id#21L < 2))
+
+(13) Project [codegen id : 1]
+Output    : [k#22L]
+Input     : [id#21L, k#22L]
+
+(14) HashAggregate [codegen id : 1]
+Input: [k#22L]
+
+(15) Exchange
+Input: [k#22L]
+
+(16) HashAggregate [codegen id : 2]
+Input: [k#22L]
+```
+### Why are the changes needed?
+Without the fix, the subqueries are not printed in the explain plan.
+
+### Does this PR introduce any user-facing change?
+Yes. the explain output will be different.
+
+### How was this patch tested?
+Added a test case in ExplainSuite.
+
+Closes #26039 from dilipbiswal/explain_subquery_issue.
+
+Authored-by: Dilip Biswal <dkbiswal@gmail.com>
+Signed-off-by: Xiao Li <gatorsmile@gmail.com>
+","['sql/core/src/main/scala/org/apache/spark/sql/execution/ExplainUtils.scala', 'sql/core/src/test/scala/org/apache/spark/sql/ExplainSuite.scala']","The subquery expressions created for DPP are not being printed in the EXPLAIN FORMATTED command. This can result in a lack of visibility into the subqueries used in the plan, making it harder to understand and optimize query performance. This commit fixes the code responsible for computing the list of subqueries in the plan, ensuring that they are properly printed in the explain output."
+c37b726bd09d34e1115a8af1969485e60dc02592,1638455582,"[SPARK-37442][SQL] InMemoryRelation statistics bug causing broadcast join failures with AQE enabled
+
+### What changes were proposed in this pull request?
+Immediately materialize underlying rdd cache (using .count) for an InMemoryRelation when `buildBuffers` is called.
+
+### Why are the changes needed?
+
+Currently, when `CachedRDDBuilder.buildBuffers` is called, `InMemoryRelation.computeStats` will try to read the accumulators to determine what the relation size is. However, the accumulators are not actually accurate until the cachedRDD is executed and finishes. While this has not happened, the accumulators will report a range from 0 bytes to the accumulator value when the cachedRDD finishes. In AQE, join planning can happen during this time and, if it reads the size as 0 bytes, will likely plan a broadcast join mistakenly believing the build side is very small. If the InMemoryRelation is actually very large in size, then this will cause many issues during execution such as job failure due to broadcasting over 8GB.
+
+### Does this PR introduce _any_ user-facing change?
+
+Yes. Before, cache materialization doesn't happen until the job starts to run. Now, it happens when trying to get the rdd representing an InMemoryRelation.
+
+### How was this patch tested?
+
+Tests added
+
+Closes #34684 from ChenMichael/SPARK-37442-InMemoryRelation-statistics-inaccurate-during-join-planning.
+
+Authored-by: Michael Chen <mike.chen@workday.com>
+Signed-off-by: Wenchen Fan <wenchen@databricks.com>
+","['sql/core/src/main/scala/org/apache/spark/sql/execution/columnar/InMemoryRelation.scala', 'sql/core/src/test/scala/org/apache/spark/sql/execution/adaptive/AdaptiveQueryExecSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/execution/joins/BroadcastJoinSuite.scala']","`InMemoryRelation` currently has a bug where the statistics are inaccurate during join planning, causing broadcast join failures when Adaptive Query Execution (AQE) is enabled. When `CachedRDDBuilder.buildBuffers` is called, `InMemoryRelation.computeStats` tries to read the accumulators to determine the relation size. However, the accumulators are not accurate until the `cachedRDD` is executed and finished. This leads to incorrect size reporting, with the accumulators showing a range from 0 bytes to the accumulator value when the `cachedRDD` finishes. This causes issues during join planning, as the incorrect size can mistakenly lead to planning a broadcast join. This can result in job failures due to broadcasting over a large size limit. To fix this, the changes proposed in this pull request immediately materialize the underlying RDD cache by using `.count()` when `buildBuffers` is called."

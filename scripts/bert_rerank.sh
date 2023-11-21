@@ -5,7 +5,7 @@
 #SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=8
-#SBATCH --mem=32G
+#SBATCH --mem=30G
 #SBATCH --time=24:00:00
 #SBATCH --gpus=1
 
@@ -23,9 +23,12 @@ nvidia-smi
 # repo_path="2_8/angular_angular"
 # repo_path="2_8/pytorch_pytorch" ???????
 # repo_path="2_8/django_django"
-# repo_path="2_7/pandas-dev_pandas"
+# repo_path="2_7/pandas-dev_pandas" ???????
 # repo_path="2_7/julialang_julia"
-repo_path="2_7/ruby_ruby"
+# repo_path="2_7/ruby_ruby"
+# repo_path="2_8/ansible_ansible"
+# repo_path="2_7/moby_moby"
+repo_path="2_7/jupyter_notebook"
 index_path="${repo_path}/index_commit_tokenized"
 k=1000 # initial ranker depth
 n=100 # number of samples to evaluate on
