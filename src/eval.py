@@ -104,22 +104,22 @@ class ModelEvaluator:
             results.append(evaluation)
         return results
 
-    def evaluate_sampling(self, n=100, k=1000, output_file_path=None, skip_existing=False, aggregation_strategy=None, rerankers=None, repo_path=None):
-        if repo_path is None:
-            print("Repo path not provided, using current working directory")
-            repo_path = os.getcwd()
+    def evaluate_sampling(self, n=100, k=1000, output_file_path=None, replace_existing_eval=True, aggregation_strategy=None, rerankers=None): #, repo_path=None):
+        # if repo_path is None:
+        #     print("Repo path not provided, using current working directory")
+            # repo_path = os.getcwd()
         if rerankers is None:
             rerankers = []
 
         if output_file_path is None:
-            print("WARNING: Output file path not provided, using default")
-            output_file_path = os.path.join(repo_path, f'{self.model.__class__.__name__}_results.txt')
+            print("WARNING: Output file path not provided, not writing results to file")
+            # output_file_path = os.path.join(repo_path, f'{self.model.__class__.__name__}_results.txt')
 
         # output_file_path = os.path.join(repo_path, output_file)
         model_name = self.model.__class__.__name__
 
-        if skip_existing and os.path.exists(output_file_path):
-            print(f'Output file {output_file_path} already exists, skipping...')
+        if replace_existing_eval and os.path.exists(output_file_path):
+            print(f'Output file {output_file_path} already exists, set replace_existing_eval flag to False, skipping...')
             return
 
         sampled_commits = self.sample_commits(n)
@@ -127,13 +127,20 @@ class ModelEvaluator:
 
         avg_scores = {metric: round(np.mean([result[metric] for result in results]), 4) for metric in results[0]}
 
-        with open(output_file_path, "w") as file:
-            file.write(f"Model Name: {model_name}\n")
-            file.write(f"Sample Size: {n}\n")
-            file.write("Evaluation Metrics:\n")
-            for key, value in avg_scores.items():
-                file.write(f"{key}: {value}\n")
+        if output_file_path is not None:
+            with open(output_file_path, "w") as file:
+                file.write(f"Model Name: {model_name}\n")
+                # write name of each reranker
+                if len(rerankers) > 0:
+                    file.write("Rerankers:\n")
+                    for reranker in rerankers:
+                        file.write(f"{reranker.__class__.__name__} @ {reranker.rerank_depth}\n")
 
-        print(f'Evaluation results written to {output_file_path}')
+                file.write(f"Sample Size: {n}\n")
+                file.write("Evaluation Metrics:\n")
+                for key, value in avg_scores.items():
+                    file.write(f"{key}: {value}\n")
+
+            print(f'Evaluation results written to {output_file_path}')
 
         return avg_scores
