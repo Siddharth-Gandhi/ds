@@ -7,6 +7,7 @@ from typing import List
 import evaluate
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.init as init
 
@@ -202,6 +203,7 @@ def main(args):
         print(torch.cuda.get_device_name(torch.cuda.current_device()))
     metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
     repo_path = args.repo_path
+    repo_name = repo_path.split('/')[-1]
     index_path = args.index_path
     # TODO remove K and n everywhere
     K = args.k
@@ -254,6 +256,7 @@ def main(args):
         'bm25_aggr_strategy': BM25_AGGR_STRAT,
     }
 
+
     if not args.no_bm25:
         print('Running BM25...')
         bm25_output_path = os.path.join(eval_path, f'bm25_baseline_metrics.txt')
@@ -276,7 +279,7 @@ def main(args):
         # get results without training first
         print('Evaluating model before training...')
         bert_without_trainint_output_path = os.path.join(eval_path, f'bert_without_training.txt')
-        bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, replace_existing_eval=args.replace_existing_eval)
+        bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
         print("BERT Evaluation without training")
         print(bert_without_training_eval)
 
@@ -393,11 +396,55 @@ def main(args):
         bert_reranker.model.to(bert_reranker.device)
         rerankers = [bert_reranker]
 
-        bert_with_trainint_output_path = os.path.join(eval_path, f'bert_with_training.txt')
-        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, replace_existing_eval=args.replace_existing_eval)
+        bert_with_training_output_path = os.path.join(eval_path, f'bert_with_training.txt')
+        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
         print("BERT Evaluation with training")
         print(bert_with_training_eval)
+
+    if args.eval_gold:
+        gold_dir = os.path.join('gold', repo_name)
+        if not os.path.exists(gold_dir):
+            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+        # check if gold data exists
+        gold_data_path = os.path.join(gold_dir, f'{repo_name}_{args.openai_model}_gold.parquet')
+        if not os.path.exists(gold_data_path):
+            raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
+        print(f'Model: {args.openai_model}')
+        gold_df = pd.read_parquet(gold_data_path)
+        # assert all transformed_message_gpt3 are not NaN
+        # rename the column transformed_message_gpt3 to transformed_message_{oai_model}
+        gold_df = gold_df.rename(columns={'transformed_message_gpt3': f'transformed_message_{args.openai_model}'})
+        assert gold_df[f'transformed_message_{args.openai_model}'].notnull().all()
+        # rename commit_message to original_message
+        gold_df = gold_df.rename(columns={'commit_message': 'original_message'})
+        # rename transformed_message to commit_message
+        gold_df = gold_df.rename(columns={f'transformed_message_{args.openai_model}': 'commit_message'})
+        print(f'Found gold data for {repo_name} with shape {gold_df.shape} at {gold_data_path}')
+        print(gold_df.info())
+
+        # run BM25 on gold data first
+        print('Running BM25 on gold data...')
+        bm25_gold_output_path = os.path.join(eval_path, f'bm25_{args.openai_model}_gold_metrics.txt')
+        bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
+        print("BM25 Gold Evaluation")
+        print(bm25_gold_eval)
+
+        # get results after training
+        if not os.path.exists(best_model_path):
+            raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
+        print(f'Evaluating model from {best_model_path}...')
+        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
+        bert_reranker.model.to(bert_reranker.device)
+        rerankers = [bert_reranker]
+
+        # get gold eval with reranking
+        print('Running BERT on gold data...')
+        bert_gold_output_path = os.path.join(eval_path, f'bert_{args.openai_model}_gold.txt')
+        bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
+
+        print("BERT Gold Evaluation")
+        print(bert_gold_eval)
 
 
 
@@ -426,7 +473,9 @@ if __name__ == '__main__':
     parser.add_argument('--rerank_depth', type=int, default=250, help='Number of commits to rerank (default: 250)')
     parser.add_argument('--do_train', action='store_true', help='Train the model.')
     parser.add_argument('--do_eval', action='store_true', help='Evaluate the model.')
-    parser.add_argument('--replace_existing_eval', action='store_true', help='Replace evaluation files if they already exist.')
+    parser.add_argument('--eval_gold', action='store_true', help='Evaluate the model on gold data.')
+    parser.add_argument('--openai_model', choices=['gpt3', 'gpt4'], help='OpenAI model to use for transforming commit messages.')
+    parser.add_argument('--overwrite_eval', action='store_true', help='Replace evaluation files if they already exist.')
     parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
     parser.add_argument('--eval_before_training', action='store_true', help='Evaluate the model before training.')

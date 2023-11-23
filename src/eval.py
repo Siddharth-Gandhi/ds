@@ -104,7 +104,7 @@ class ModelEvaluator:
             results.append(evaluation)
         return results
 
-    def evaluate_sampling(self, n=100, k=1000, output_file_path=None, replace_existing_eval=True, aggregation_strategy=None, rerankers=None): #, repo_path=None):
+    def evaluate_sampling(self, n=100, k=1000, output_file_path=None, overwrite_eval=False, aggregation_strategy=None, rerankers=None, gold_df=None): #, repo_path=None):
         # if repo_path is None:
         #     print("Repo path not provided, using current working directory")
             # repo_path = os.getcwd()
@@ -118,12 +118,16 @@ class ModelEvaluator:
         # output_file_path = os.path.join(repo_path, output_file)
         model_name = self.model.__class__.__name__
 
-        if replace_existing_eval and os.path.exists(output_file_path):
-            print(f'Output file {output_file_path} already exists, set replace_existing_eval flag to False, skipping...')
+        if not overwrite_eval and output_file_path and os.path.exists(output_file_path):
+            print(f'Output file {output_file_path} already exists, set overwrite_eval flag to False, skipping...')
             return
-
-        sampled_commits = self.sample_commits(n)
-        results = self.evaluate_df(sampled_commits, k, aggregation_strategy, rerankers)
+        if gold_df is None:
+            sampled_commits = self.sample_commits(n)
+            results = self.evaluate_df(sampled_commits, k, aggregation_strategy, rerankers)
+        else:
+            print(f'Found gold_df, evaluating on {len(gold_df)} commits')
+            print(gold_df.info())
+            results = self.evaluate_df(gold_df, k, aggregation_strategy, rerankers)
 
         avg_scores = {metric: round(np.mean([result[metric] for result in results]), 4) for metric in results[0]}
 

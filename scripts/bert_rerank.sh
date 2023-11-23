@@ -2,7 +2,7 @@
 #SBATCH --job-name=bert_rerank
 #SBATCH --output=logs/bert_rerank/bert_rerank_output_%A.log
 #SBATCH --partition=gpu
-#SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
+# SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=8
 #SBATCH --mem=30G
@@ -22,13 +22,13 @@ nvidia-smi
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
 # repo_path="2_8/pytorch_pytorch" ???????
-# repo_path="2_8/django_django"
+repo_path="2_8/django_django"
 # repo_path="2_7/pandas-dev_pandas" ???????
 # repo_path="2_7/julialang_julia"
 # repo_path="2_7/ruby_ruby"
 # repo_path="2_8/ansible_ansible"
 # repo_path="2_7/moby_moby"
-repo_path="2_7/jupyter_notebook"
+# repo_path="2_7/jupyter_notebook"
 index_path="${repo_path}/index_commit_tokenized"
 k=1000 # initial ranker depth
 n=100 # number of samples to evaluate on
@@ -49,6 +49,7 @@ use_gpu=True # whether to use gpu or not
 rerank_depth=250 # depth to go while reranking
 do_train=True # whether to train or not
 do_eval=True # whether to evaluate or not
+openai_model="gpt4" # openai model to use
 
 python -u src/BERTReranker_v4.py \
     --repo_path $repo_path \
@@ -67,11 +68,13 @@ python -u src/BERTReranker_v4.py \
     --psg_cnt $psg_cnt \
     --aggregation_strategy $aggregation_strategy \
     --rerank_depth $rerank_depth \
+    --openai_model $openai_model \
     --use_gpu \
-    --sanity_check \
-    --do_eval \
-    --do_train \
-    --eval_before_training \
+    --eval_gold \
+    # --sanity_check \
+    # --do_eval \
+    # --do_train \
+    # --eval_before_training \
     # --no_bm25 \
     # --debug \
     # --overwrite_cache \
