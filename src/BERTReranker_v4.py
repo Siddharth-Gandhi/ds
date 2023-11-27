@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 from typing import List
 
 import numpy as np
@@ -184,6 +185,84 @@ def sanity_check(data):
     print(f"Total number of problems in sanity check of training data: {problems}")
     return data
 
+def do_training(triplet_data, bert_reranker, hf_output_dir, args):
+    def tokenize_hf(example):
+        return bert_reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=bert_reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
+    print('Training the model...')
+    print('Label distribution:')
+    print(triplet_data['label'].value_counts())
+
+    if args.sanity_check:
+        print('Running sanity check on training data...')
+        triplet_data = sanity_check(triplet_data)
+
+    # Step 7: convert triplet_data to HuggingFace Dataset
+    # convert triplet_data to HuggingFace Dataset
+    triplet_data['label'] = triplet_data['label'].astype(float)
+    train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
+    train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
+    val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
+
+    # Step 8: tokenize the data
+    tokenized_train_dataset = train_hf_dataset.map(tokenize_hf, batched=True)
+    tokenized_val_dataset = val_hf_dataset.map(tokenize_hf, batched=True)
+
+    # Step 9: set format for pytorch
+    tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage'])
+    tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage'])
+
+    # rename label column to labels
+    tokenized_train_dataset = tokenized_train_dataset.rename_column('label', 'labels')
+    tokenized_val_dataset = tokenized_val_dataset.rename_column('label', 'labels')
+
+    # set format to pytorch
+    tokenized_train_dataset = tokenized_train_dataset.with_format('torch')
+    tokenized_val_dataset = tokenized_val_dataset.with_format('torch')
+    print('Training dataset features:')
+    print(tokenized_train_dataset.features)
+
+    # Step 10: set up training arguments
+    train_args = TrainingArguments(
+        output_dir=hf_output_dir,
+        evaluation_strategy='epoch',
+        save_strategy='epoch',
+        num_train_epochs=args.num_epochs,
+        metric_for_best_model='eval_loss',
+        load_best_model_at_end=True,
+        save_total_limit=2,
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        logging_steps=1000,
+        fp16=True,
+        dataloader_num_workers=args.num_workers,
+        )
+
+    small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
+    small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
+
+    if args.debug:
+        print('Running in debug mode, using small datasets')
+        tokenized_train_dataset = small_train_dataset
+        tokenized_val_dataset = small_val_dataset
+
+    # Step 11: set up trainer
+    trainer = Trainer(
+        model = bert_reranker.model,
+        args = train_args,
+        train_dataset = tokenized_train_dataset, # type: ignore
+        eval_dataset = tokenized_val_dataset, # type: ignore
+        # compute_metrics=compute_metrics,
+    )
+
+    # Step 12: train the model
+    trainer.train()
+
+    # Step 13: save the model
+    best_model_path = os.path.join(hf_output_dir, 'best_model')
+    trainer.save_model(best_model_path)
+    print(f'Saved model to {best_model_path}')
+    print('Training complete')
+
 
 def main(args):
     # print torch devices available
@@ -262,8 +341,7 @@ def main(args):
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
     # training methods
-    def tokenize_hf(example):
-        return bert_reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=bert_reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
+
 
     if args.eval_before_training:
         # get results without training first
@@ -305,88 +383,29 @@ def main(args):
         # TODO: filter eval commits from here
         triplet_data = prepare_triplet_data_from_df(recent_df, bm25_searcher, search_depth=params['train_depth'], num_positives=params['num_positives'], num_negatives=params['num_negatives'], cache_file=triplet_cache, overwrite=args.overwrite_cache)
 
-        print('Label distribution:')
-        print(triplet_data['label'].value_counts())
+        do_training(triplet_data, bert_reranker, hf_output_dir, args)
 
-        if args.sanity_check:
-            print('Running sanity check on training data...')
-            triplet_data = sanity_check(triplet_data)
 
-        # Step 7: convert triplet_data to HuggingFace Dataset
-        # convert triplet_data to HuggingFace Dataset
-        triplet_data['label'] = triplet_data['label'].astype(float)
-        train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
-        train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
-        val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
-
-        # Step 8: tokenize the data
-        tokenized_train_dataset = train_hf_dataset.map(tokenize_hf, batched=True)
-        tokenized_val_dataset = val_hf_dataset.map(tokenize_hf, batched=True)
-
-        # Step 9: set format for pytorch
-        tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage'])
-        tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage'])
-
-        # rename label column to labels
-        tokenized_train_dataset = tokenized_train_dataset.rename_column('label', 'labels')
-        tokenized_val_dataset = tokenized_val_dataset.rename_column('label', 'labels')
-
-        # set format to pytorch
-        tokenized_train_dataset = tokenized_train_dataset.with_format('torch')
-        tokenized_val_dataset = tokenized_val_dataset.with_format('torch')
-        print('Training dataset features:')
-        print(tokenized_train_dataset.features)
-
-        # Step 10: set up training arguments
-        train_args = TrainingArguments(
-            output_dir=hf_output_dir,
-            evaluation_strategy='epoch',
-            save_strategy='epoch',
-            num_train_epochs=args.num_epochs,
-            metric_for_best_model='eval_loss',
-            load_best_model_at_end=True,
-            save_total_limit=2,
-            per_device_train_batch_size=args.batch_size,
-            per_device_eval_batch_size=args.batch_size,
-            logging_steps=100,
-            )
-
-        small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
-        small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
-
-        if args.debug:
-            print('Running in debug mode, using small datasets')
-            tokenized_train_dataset = small_train_dataset
-            tokenized_val_dataset = small_val_dataset
-
-        # Step 11: set up trainer
-        trainer = Trainer(
-            model = bert_reranker.model,
-            args = train_args,
-            train_dataset = tokenized_train_dataset, # type: ignore
-            eval_dataset = tokenized_val_dataset, # type: ignore
-            # compute_metrics=compute_metrics,
-        )
-
-        # Step 12: train the model
-        trainer.train()
-
-        # Step 13: save the model
-        best_model_path = os.path.join(hf_output_dir, 'best_model')
-        trainer.save_model(best_model_path)
-        print(f'Saved model to {best_model_path}')
-        print('Training complete')
-
-    if args.do_eval:
-        # get results after training
-        if not os.path.exists(best_model_path):
-            raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
-        print(f'Evaluating model from {best_model_path}...')
-        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
+    # load the best model from args.best_model_path for do_eval and eval_gold
+    if args.do_eval or args.eval_gold:
+        if not os.path.exists(args.best_model_path):
+            raise ValueError(f'Best model path {args.best_model_path} does not exist, please train the model first')
+        print(f'Loading model from {args.best_model_path}...')
+        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.best_model_path, num_labels=1, problem_type='regression')
         bert_reranker.model.to(bert_reranker.device)
         rerankers = [bert_reranker]
 
-        bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
+
+    if args.do_eval:
+        # # get results after training
+        # if not os.path.exists(best_model_path):
+        #     raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
+        # print(f'Evaluating model from {best_model_path}...')
+        # bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
+        # bert_reranker.model.to(bert_reranker.device)
+        # rerankers = [bert_reranker]
+
+        bert_with_training_output_path = os.path.join(eval_path, 'multi_bert_with_training.txt')
         bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
         print("BERT Evaluation with training")
@@ -420,21 +439,44 @@ def main(args):
         print("BM25 Gold Evaluation")
         print(bm25_gold_eval)
 
-        # get results after training
-        if not os.path.exists(best_model_path):
-            raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
-        print(f'Evaluating model from {best_model_path}...')
-        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
-        bert_reranker.model.to(bert_reranker.device)
-        rerankers = [bert_reranker]
+        # # get results after training
+        # if not os.path.exists(best_model_path):
+        #     raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
+        # print(f'Evaluating model from {best_model_path}...')
+        # bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
+        # bert_reranker.model.to(bert_reranker.device)
+        # rerankers = [bert_reranker]
 
         # get gold eval with reranking
         print('Running BERT on gold data...')
-        bert_gold_output_path = os.path.join(eval_path, f'bert_{args.openai_model}_gold.txt')
+        bert_gold_output_path = os.path.join(eval_path, f'multi_bert_{args.openai_model}_gold.txt')
         bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
+
+    if args.do_combined_train:
+        print("Performing combined training on multiple repositories...")
+        print(f'Found {len(args.repo_paths)} repositories: {args.repo_paths}')
+        combined_triplet_data = pd.DataFrame()
+        for repo_path in args.repo_paths:
+            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
+            if os.path.exists(triplet_cache):
+                repo_triplet_data = pd.read_pickle(triplet_cache)
+                combined_triplet_data = pd.concat([combined_triplet_data, repo_triplet_data], ignore_index=True)
+            else:
+                print(f"Warning: Triplet cache not found for {repo_path}, skipping this repository.")
+
+        if combined_triplet_data.empty:
+            raise ValueError("No triplet data found in the specified repositories.")
+
+        print(f'Shape of combined triplet data: {combined_triplet_data.shape}')
+
+        combined_hf_output_dir = os.path.join('data', 'combined')
+        if not os.path.exists(combined_hf_output_dir):
+            os.makedirs(combined_hf_output_dir)
+
+        do_training(combined_triplet_data, bert_reranker, combined_hf_output_dir, args)
 
 
 
@@ -469,7 +511,9 @@ if __name__ == '__main__':
     parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
     parser.add_argument('--eval_before_training', action='store_true', help='Evaluate the model before training.')
-
+    parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
+    parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
+    parser.add_argument('--best_model_path', type=str, help='Path to the best model.', required='--do_eval' in sys.argv or '--eval_gold' in sys.argv)
     args = parser.parse_args()
     print(args)
     main(args)

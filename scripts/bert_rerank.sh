@@ -21,8 +21,8 @@ nvidia-smi
 # repo_path="2_7/apache_kafka"
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
-# repo_path="2_8/pytorch_pytorch" ???????
 repo_path="2_8/django_django"
+# repo_path="2_8/pytorch_pytorch" ???????
 # repo_path="2_7/pandas-dev_pandas" ???????
 # repo_path="2_7/julialang_julia"
 # repo_path="2_7/ruby_ruby"
@@ -50,6 +50,22 @@ rerank_depth=250 # depth to go while reranking
 do_train=True # whether to train or not
 do_eval=True # whether to evaluate or not
 openai_model="gpt4" # openai model to use
+best_model_path="data/combined/best_model"
+
+repo_paths=(
+    "2_7/apache_spark"
+    "2_7/apache_kafka"
+    "2_7/facebook_react"
+    "2_8/angular_angular"
+    "2_8/django_django"
+    # "2_8/pytorch_pytorch"
+    # "2_7/pandas-dev_pandas"
+    # "2_7/julialang_julia"
+    # "2_7/ruby_ruby"
+    # "2_8/ansible_ansible"
+    # "2_7/moby_moby"
+    # "2_7/jupyter_notebook"
+)
 
 python -u src/BERTReranker_v4.py \
     --repo_path $repo_path \
@@ -71,12 +87,16 @@ python -u src/BERTReranker_v4.py \
     --openai_model $openai_model \
     --use_gpu \
     --eval_gold \
-    # --sanity_check \
+    --best_model_path $best_model_path \
+    # --do_combined \
+    # --repo_paths "${repo_paths[@]}" \
     # --do_eval \
     # --do_train \
-    # --eval_before_training \
     # --no_bm25 \
+
+    # --sanity_check \
     # --debug \
     # --overwrite_cache \
+    # --eval_before_training \
 
 echo "Job completed"

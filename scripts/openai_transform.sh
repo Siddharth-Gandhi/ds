@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=gpt4
+#SBATCH --job-name=oai
 #SBATCH --output=logs/oai/transform_%A.log
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
