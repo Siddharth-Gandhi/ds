@@ -388,10 +388,11 @@ def main(args):
 
     # load the best model from args.best_model_path for do_eval and eval_gold
     if args.do_eval or args.eval_gold:
-        if not os.path.exists(args.best_model_path):
-            raise ValueError(f'Best model path {args.best_model_path} does not exist, please train the model first')
-        print(f'Loading model from {args.best_model_path}...')
-        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.best_model_path, num_labels=1, problem_type='regression')
+        cur_best_model_path = args.best_model_path or best_model_path
+        if not os.path.exists(cur_best_model_path):
+            raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
+        print(f'Loading model from {cur_best_model_path}...')
+        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
         bert_reranker.model.to(bert_reranker.device)
         rerankers = [bert_reranker]
 
