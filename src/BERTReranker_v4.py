@@ -1,19 +1,15 @@
 import argparse
 import os
-
 from typing import List
 
 import numpy as np
 import pandas as pd
 import torch
-
-# import from_pandas method
 from datasets import Dataset as HFDataset
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import (
-    AutoModel,
     AutoModelForSequenceClassification,
     AutoTokenizer,
     Trainer,
@@ -24,7 +20,6 @@ from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
 from utils import (
     AggregatedSearchResult,
-    TripletDataset,
     get_combined_df,
     prepare_triplet_data_from_df,
     set_seed,
@@ -254,7 +249,7 @@ def main(args):
 
     if not args.no_bm25:
         print('Running BM25...')
-        bm25_output_path = os.path.join(eval_path, f'bm25_baseline_metrics.txt')
+        bm25_output_path = os.path.join(eval_path, 'bm25_baseline_metrics.txt')
         # print(f'BM25 output path: {bm25_output_path}')
         bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], )
         print("BM25 Baseline Evaluation")
@@ -273,7 +268,7 @@ def main(args):
     if args.eval_before_training:
         # get results without training first
         print('Evaluating model before training...')
-        bert_without_trainint_output_path = os.path.join(eval_path, f'bert_without_training.txt')
+        bert_without_trainint_output_path = os.path.join(eval_path, 'bert_without_training.txt')
         bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
         print("BERT Evaluation without training")
         print(bert_without_training_eval)
@@ -296,7 +291,7 @@ def main(args):
         # Step 4: Filter out commits with less than average length commit messages
         average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
         # filter out commits with less than average length
-        recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len]
+        recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len] # type: ignore
         print(f'Number of commits after filtering by commit message length: {len(recent_df)}')
 
         # Step 5: randomly sample 1500 rows from recent_df
@@ -321,8 +316,8 @@ def main(args):
         # convert triplet_data to HuggingFace Dataset
         triplet_data['label'] = triplet_data['label'].astype(float)
         train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
-        train_hf_dataset = HFDataset.from_pandas(train_df, split='train')
-        val_hf_dataset = HFDataset.from_pandas(val_df, split='validation')
+        train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
+        val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
 
         # Step 8: tokenize the data
         tokenized_train_dataset = train_hf_dataset.map(tokenize_hf, batched=True)
@@ -368,8 +363,8 @@ def main(args):
         trainer = Trainer(
             model = bert_reranker.model,
             args = train_args,
-            train_dataset = tokenized_train_dataset,
-            eval_dataset = tokenized_val_dataset,
+            train_dataset = tokenized_train_dataset, # type: ignore
+            eval_dataset = tokenized_val_dataset, # type: ignore
             # compute_metrics=compute_metrics,
         )
 
@@ -391,7 +386,7 @@ def main(args):
         bert_reranker.model.to(bert_reranker.device)
         rerankers = [bert_reranker]
 
-        bert_with_training_output_path = os.path.join(eval_path, f'bert_with_training.txt')
+        bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
         bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
         print("BERT Evaluation with training")
@@ -478,4 +473,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
     main(args)
-
