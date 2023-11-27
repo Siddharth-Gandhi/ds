@@ -139,14 +139,14 @@ def main():
     save_dir = 'gold/'
     # model_name = "gpt-3.5-turbo"
     model_name = "gpt-4"
-    save_model_name = 'gp4' if model_name == 'gpt-4' else 'gpt3.5'
+    save_model_name = 'gpt4' if model_name == 'gpt-4' else 'gpt3.5'
     VERSION = 'v2'
 
     sample_size = 100
     # REPO_LIST = []
     print(os.getcwd())
-    REPO_LIST = ['2_7/facebook_react']
-    # REPO_LIST = ['2_7/facebook_react','2_7/apache_spark', '2_7/apache_kafka', '2_8/angular_angular', '2_8/django_django']
+    # REPO_LIST = ['2_7/facebook_react']
+    REPO_LIST = ['2_7/apache_spark', '2_7/apache_kafka', '2_8/angular_angular', '2_8/django_django']
                 #  '2_7/julialang_julia', '2_7/ruby_ruby','2_8/ansible_ansible', '2_7/moby_moby', '2_7/jupyter_notebook','2_8/pytorch_pytorch']
     # Specify the model name as a variable
     print(f'Total number of repos: {len(REPO_LIST)}')

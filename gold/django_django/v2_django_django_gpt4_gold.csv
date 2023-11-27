@@ -1,0 +1,488 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
+9ba3df82402e7e23b353da20aea6894935241ef9,1518467021,"Refs #29125 -- Made Q.deconstruct() omit 'query_utils' in the path and _connector='AND' since it's a default value.
+","['django/db/models/query_utils.py', 'tests/queries/test_q.py']","`Q.deconstruct()` includes 'query_utils' in the path and does not omit `_connector='AND'` even though it's the default, resulting in potential redundancy and inefficiency."
+0d9ff873d9f93efbba875efbf582db88bb0e30ce,1479336037,"Fixed #27467 -- Made UserAttributeSimilarityValidator max_similarity=0/1 work as documented.
+
+Thanks goblinJoel for the report and feedback.
+","['django/contrib/auth/password_validation.py', 'tests/auth_tests/test_validators.py']",UserAttributeSimilarityValidator does not function as documented when max_similarity is set to 0 or 1.
+a3fffdca2472885a99e1ea9159a685753cd45738,1445090591,"Fixed #25558 -- Fixed nondeterministic test failure on Windows: test_clearsessions_command.
+
+The test session without an expiration date added in refs #22938 wasn't
+always deleted on Windows because get_expiry_age() returns zero and the
+file backend didn't consider that an expired session.
+",['django/contrib/sessions/backends/file.py'],"On Windows, session without an expiration date doesn't get deleted as get_expiry_age() returns zero, causing file backend to not recognize it as expired, leading to nondeterministic test failures in test_clearsessions_command."
+958cdf65ae90d26236d1815bbba804729595ec7a,1621355059,"Fixed #32747 -- Prevented initialization of unused caches.
+
+Thanks Alexander Ebral for the report.
+
+Regression in 98e05ccde440cc9b768952cc10bc8285f4924e1f.
+","['django/core/cache/__init__.py', 'tests/cache/tests.py']",Unused caches are being initialized inadvertently leading to possible performance degradation.
+8c3046daade8d9b019928f96e53629b03060fe73,1660214394,"Refs #28333 -- Moved SQLCompiler's forced column aliasing logic to get_select().
+
+This extends query composability possibilities when dealing with
+subqueries which is necessary to implement window function filtering.
+",['django/db/models/sql/compiler.py'],"Issue with SQLCompiler's forced column aliasing logic, inhibiting query composability when dealing with subqueries needed for window function filtering."
+2d06e3155a13e3ca9e63b97c7c9499a1e1ffd654,1415043083,"Fixed #23300 -- Made assertTemplateUsed throw an error on responses not fetched using the test client.
+
+Thanks zags for the report and bmispelon for the patch.
+","['django/test/testcases.py', 'tests/test_utils/tests.py']","assertTemplateUsed doesn't throw an error when responses are not fetched using the test client, leading to false positives."
+96e7ff5e9ff6362d9a886545869ce4496ca4b0fb,1641547762,"Avoided isinstance(…, Variable) calls in FilterExpression.resolve().
+
+By determining the variable type within __init__() instead of resolve() 
+we can skip an isinstance() check at template runtime. Templates are
+executed in production more often than the parse trees themselves,
+assuming the cached Loader is used.","['django/template/base.py', 'django/templatetags/i18n.py']","During runtime, frequent isinstance() checks within FilterExpression.resolve() can lead to slower execution of templates."
+e595a713cc5ce66dfc5e22f85d671c06d842e99b,1553208521,"Refs #29542, #30158 -- Enabled a HAVING subquery filter test on Oracle.
+
+Now that subquery annotations aren't included in the GROUP BY unless
+explicitly grouped against, the test works on Oracle.
+",['tests/annotations/tests.py'],"Subquery annotations unintentionally included in GROUP BY on Oracle, preventing a HAVING subquery filter test from working."
+04b7b28812fa6b2721096da6e00b929784c00da6,1467971885,"Fixed #26802 -- Prevented crash when attaching bytes as text message
+
+Thanks Tim Graham for the review.
+","['django/core/mail/message.py', 'tests/mail/tests.py']",Crash occurring when attempting to attach bytes as a text message.
+8b7347220f3d86b46f5f87270c6cdcb9960895fd,1406899858,"Fixed #23103 -- Annotated ImageField file with image and content_type attributes.
+
+Thanks Jeremy Dunck for the suggestion and Nick Sanford for review.
+","['django/forms/fields.py', 'tests/forms_tests/tests/test_fields.py']",ImageField file lacks image and content_type attributes causing functional issues.
+064d4b1cb01cbab0461469254a11c918e6b15cbd,1441108779,"Fixed #25320 -- Reverted ManyToManyField.null to False for backwards compatibility.
+
+Thanks Tom Christie for the report and review.
+","['django/contrib/admin/filters.py', 'django/db/models/fields/related.py', 'tests/admin_filters/tests.py', 'tests/model_fields/test_field_flags.py']",Setting ManyToManyField.null to True breaks backwards compatibility.
+f951bb78cbf179f0fb70fe74ae0c218925fd7ede,1461882048,"Refs #26521 -- Adjusted CreateModel bases validation to account for mixins.
+
+Thanks Collin for the report.","['django/db/migrations/operations/models.py', 'tests/migrations/test_operations.py']","CreateModel validation does not properly account for the use of mixins, leading to incorrect base model determination."
+1ed9b9e2e2b62f6ef89558f98d786e9fcd649152,1416074212,"Merge pull request #3536 from Zweedeend/ticket_23837
+
+Fixes #23837: Replace list with deque in migration-planner for improved performance.",['django/db/migrations/graph.py'],Using a list in the migration-planner is causing performance issues.
+a6baada7bdf0c2b14045ee86364f9401c7b91b7c,1470678777,"Fixed #26940 -- Removed makemessages from no_settings_commands whitelist
+
+As makemessages uses several settings for proper run (FILE_CHARSET,
+LOCALE_PATHS, MEDIA_ROOT, and STATIC_ROOT), we should require settings
+configuration for this command.
+",['django/core/management/__init__.py'],"'makemessages' command is running without required settings configuration (FILE_CHARSET, LOCALE_PATHS, MEDIA_ROOT, STATIC_ROOT), causing incorrect execution results."
+bc7e288ca9554ac1a0a19941302dea19df1acd21,1538522120,"Fixed #29745 -- Based Expression equality on detailed initialization signature.
+
+The old implementation considered objects initialized with an equivalent
+signature different if some arguments were provided positionally instead of
+as keyword arguments.
+
+Refs #11964, #26167.","['django/db/models/expressions.py', 'tests/expressions/tests.py']","Objects initialized with equivalent signatures are regarded as different if arguments are provided positionally rather than keyword arguments, leading to unequal expressions."
+722344ee59fb89ea2cd5b906d61b35f76579de4e,1463861025,"Refs #24067 -- Fixed contenttypes rename tests failures on Oracle.
+
+Broke the initial migration in two to work around #25530 and added
+'django.contrib.auth' to the available_apps to make sure its tables are also
+flushed as Oracle doesn't implement cascade deletion in sql_flush().
+
+Thanks Tim for the report.
+","['tests/contenttypes_tests/operations_migrations/0001_initial.py', 'tests/contenttypes_tests/operations_migrations/0002_rename_foo.py', 'tests/contenttypes_tests/tests.py']",Contenttypes rename tests are failing on Oracle due to issues with the initial migration and absence of cascade deletion in sql_flush().
+3b1746d5194778fab15c15dd14c212e0912ec8f3,1603104212,"Fixed #32107 -- Fixed ProtectedError.protected_objects and RestrictedError.restricted_objects.
+
+Regression in 4ca5c565f4dc9e97845036e86416abc5cfde766c and
+ab3cbd8b9a315911248227208630a020cedca08f.
+
+Thanks Vitaliy Yelnik for the report.
+","['django/db/models/deletion.py', 'tests/delete/tests.py']","ProtectedError.protected_objects and RestrictedError.restricted_objects are experiencing regression issues, impacting correct functionality."
+ea596a52d9f905596cc5335930c8f2ac4511204c,1696447850,"Refs #33482 -- Fixed QuerySet selecting and filtering againts Exists() with empty queryset.
+
+Thanks Tobias Bengfort for the report.","['django/db/models/expressions.py', 'tests/expressions/tests.py']",Filtering and selection of QuerySet against Exists() fails when queryset is empty.
+19b866c254b54d904a942f34d662dfacd9005a77,1658909184,"Refs #32948 -- Added Node.__copy__().
+
+This allows the copy.copy() usage in the Q._combine() method to finish
+sooner, instead of having to fallback to using the __reduce_ex__(4)
+method.
+
+Thia also avoids having to fall into copy.copy() at in Q._combine(),
+when combining a Q() with another Q().
+
+Co-authored-by: Keryn Knight <keryn@kerynknight.com>
+","['django/db/models/sql/where.py', 'django/utils/tree.py']",The copy.copy() usage in the Q._combine() method is falling back to the __reduce_ex__(4) method and is not finishing as expected.
+a1ad896422437b376462361560086609538779fc,1473665193,"Refs #27098 -- Added introspection for expression-based index on PostgreSQL
+
+Also test it on PostGIS raster fields.
+","['django/db/backends/postgresql/introspection.py', 'tests/gis_tests/gis_migrations/test_operations.py']","Expression-based indexes on PostgreSQL and PostGIS raster fields lack introspection support, hindering index management and optimization."
+127f9e073d83904defd4bde4eaa4491f3306ca25,1420664062,"Restored support for multiple template names in render(_to_response).
+
+This possibility was documented but not tested.
+
+It had been broken during the multiple template engines refactor.
+","['django/shortcuts.py', 'tests/shortcuts/tests.py', 'tests/shortcuts/urls.py', 'tests/shortcuts/views.py']",Support for multiple template names in render(_to_response) not functional after template engines refactor.
+1521861b3cc07fffdbe95c41000bf8e8ef92cc6b,1429976477,"Fixed #24703 -- Changed squashmigrations to use a MigrationLoader
+
+Changed squashmigrations to not instantiate a MigrationExecutor,
+but to directly use a MigrationLoader instance instead.
+",['django/core/management/commands/squashmigrations.py'],The squashmigrations is instantiating a MigrationExecutor instead of directly using a MigrationLoader instance.
+8274fa60f88607eb0e81908f049c391455956dd8,1392560325,"Made the new template.Context.flatten() method a public API.
+
+That method was introduced in 9db4271bd11ac23a5a5652bbcdf8fb6d4b997651.
+
+Refs #21765.
+","['django/template/context.py', 'tests/template_tests/test_context.py']","The new template.Context.flatten() method is not accessible due to its limited scope, preventing certain functionalities from being implemented."
+ece18207cbb64dd89014e279ac636a6c9829828e,1599035054,"Fixed #31858 -- Reallowed whitespaces in URL paths outside of parameters.
+
+Regression in 22394bd3a18a7d9a8957a0b431f8ae4e5ca03a8c.
+
+Thanks David Smith for the review.
+","['django/urls/resolvers.py', 'tests/urlpatterns/tests.py']","Whitespaces in URL paths outside of parameters are disallowed, causing unintentional regressions."
+973cfd2ef56664480d0e1b112da51793cdf85448,1484315403,"Refs #20483 -- Implemented cascaded flush on Oracle.
+
+The initial implementation added support for PostgreSQL but it is also required
+on Oracle (13b7f299de79e3eb101c3f015386eba39a8f3928).
+
+Thanks Mariusz Felisiak for the foreign key retreival queries.
+",['django/db/backends/oracle/operations.py'],"Oracle database lacks support for cascaded flushing feature, this is affecting the referential integrity performance on foreign keys."
+767c33d1fa9827908192e8ed1ac7f281f56bd811,1425542248,"Fixed #24369 -- Prevented crash when flushing before db migration
+
+Thanks Thomas Tanner for the report and Tim Graham for the review.
+",['django/core/management/commands/flush.py'],Flushing the database prior to migration is causing an unexpected crash.
+76d26d89220f5740103a16bf71df2ae255c00da4,1429921876,"Fixed #24063 -- Allowed locale variants supported by gettext.
+
+The locale code can contain a variant after @, so allowed that.
+","['django/utils/translation/trans_real.py', 'tests/i18n/tests.py']",Locale code with '@' symbol for variants not supported by gettext causing issues with locale generation.
+114b70ccf8dcd7af86d5cd464d66aa7761400884,1391861566,"Fixed #21237 -- Added Australian English (en_AU) to locale conf
+
+Adds Australian English (en_AU) to locale conf, which differs from
+American English in date formatting and spelling, and continues
+to diverge from British English in spelling (and first-day-of-week
+according to the current en_GB locale format.py).
+
+The transifex language project to match this patch has been requested.
+","['django/conf/global_settings.py', 'django/conf/locale/__init__.py', 'django/conf/locale/en_AU/formats.py']",Lack of Australian English (en_AU) in locale conf leading to incorrect date formatting and spelling for Australian users.
+277a4dd4b4cc2a2cad77139882f084480751a95a,1485782538,"Fixed #27793 -- Used stdlib's ipaddress module to validate IP addresses
+
+Thanks Tim Graham for the review.
+","['django/core/validators.py', 'django/utils/ipv6.py']","Issues with IP address validation, as the current method does not use the standard library's ipaddress module."
+dc1dcad0f54677bfdbcf187bbcb8eca5f73b6fca,1532534861,"Refs #24424 -- Added regression tests for MTI-inheritance model removal.
+
+The issue was fixed as a side effect of implementing RemoveField's reduction
+of DeleteModel to a DeleteModel in ad82900ad94ed4bbad050b9993373dafbe66b610.","['tests/migrations/test_autodetector.py', 'tests/migrations/test_operations.py']",Regression issue with RemoveField's reduction of DeleteModel to a DeleteModel not tested for MTI-inheritance model removal.
+d18810131995dac63f9d89b0beaeadfc935130aa,1416292626,"Fixed #23799 -- Made makemigrations respect --no-optimize.
+
+Thanks to yamila-moreno for the idea of a skip message.
+","['django/core/management/commands/squashmigrations.py', 'tests/migrations/test_commands.py']","Makemigrations command is not respecting the `--no-optimize` flag, causing undesired optimized migrations."
+790d108c97f0cf9caa02c72791f2bf158d308fcd,1545510406,"Refs #30033 -- Checked constraints before committing SQLite schema changes.
+
+This order of operations is more in line with SQLite's documented table
+rebuild procedure and ensures that changes aren't committed if foreign key
+integrity is broken.
+",['django/db/backends/sqlite3/schema.py'],"Schema changes in SQLite are being committed before checking constraints, potentially resulting in broken foreign key integrity."
+e4684220af058789a9d2673a3503d2f88d8aa94a,1564653992,"Fixed #30664 -- Fixed migrations crash when altering table on SQLite or altering AutoField/BigAutoField on PostgreSQL for models with quoted db_table.
+","['django/db/backends/postgresql/schema.py', 'django/db/backends/sqlite3/schema.py', 'tests/schema/tests.py']","Migrations crash on SQLite when altering table, and on PostgreSQL when altering AutoField/BigAutoField on models with quoted db_table."
+d15a10afb51619faf14e678deae7dcda720413d9,1643227102,"Adjusted CBV resolver_match example in testing tools docs.
+
+The view_class is available on the view callback, allowing that to be
+checked, rather than the __name__.",['tests/test_client/tests.py'],Existing CBV resolver_match example in testing tools documentation results in incorrect checks due to reliance on __name__ attribute instead of view_class.
+7c54f8cced37313572d72f59bd2ef7ce12aa8fe1,1398869600,"Fixed #22474 -- Made migration recorder aware of multiple databases
+
+Thanks Tim Graham for the review.
+","['django/db/migrations/recorder.py', 'tests/migrations/test_loader.py']","The migration recorder is not recognizing multiple databases, causing issues in environments with more than one database."
+8b9a163afa553ee9d57febae69c9eb0c88259012,1508857416,"Refs #28688 -- Updated a selenium test for admin's URLify.js change.
+
+English words aren't removed if non-ASCII chars are present.
+",['tests/admin_views/tests.py'],English words are not being removed in admin's URLify.js if non-ASCII characters are present during Selenium tests.
+52936efacec4df05df2d9872c09c3332335bf21b,1574754490,"Fixed #31031 -- Fixed data loss in admin changelist view when formset's prefix contains regex special chars.
+
+Regression in b18650a2634890aa758abae2f33875daa13a9ba3.
+","['django/contrib/admin/options.py', 'tests/admin_changelist/tests.py']",Admin changelist view experiences data loss when formset's prefix contains regex special characters. This is a regression issue.
+9368f51e1273c56ca40e396ef5a1aa0aa7c91871,1434740086,"Fixed #20197 -- Made XML serializer fail loudly when outputting unserializable chars
+
+Thanks Tim Graham for the review.
+","['django/core/serializers/xml_serializer.py', 'django/utils/xmlutils.py', 'tests/serializers/tests.py']",XML serializer quietly outputs unserializable characters instead of providing an error or failure message.
+110b3b83567da22f19ec04210db134d0fe83d662,1675162327,"Fixed #34304 -- Made MySQL's SchemaEditor.remove_constraint() don't create foreign key index when unique constraint is ignored.
+
+Regression in b731e8841558ee4caaba766c83f34ea9c7004f8b.","['django/db/backends/mysql/schema.py', 'tests/schema/tests.py']","MySQL's SchemaEditor.remove_constraint() is creating a foreign key index even when a unique constraint is ignored, causing regression."
+196a99da5d9c4c33a78259a58d38fb114a4d2ee8,1629875521,"Refs #29898 -- Made ProjectState encapsulate alterations in relations registry.
+
+Thanks Simon Charette and Chris Jerdonek for reviews.
+
+Co-authored-by: Mariusz Felisiak <felisiak.mariusz@gmail.com>
+","['django/db/migrations/state.py', 'tests/migrations/test_state.py']","Alterations in relations registry are not properly encapsulated within the ProjectState, leading to potential inconsistencies."
+7f663aeccf17a75d5fe3fee02d1ac577fdeb57f2,1449189855,"Fixed #25820 -- Allowed whitespace in admin's calendar.js month/weekday names.
+
+This is useful for certain language translations.
+","['django/contrib/admin/static/admin/js/calendar.js', 'tests/admin_widgets/tests.py']","Admin's calendar.js doesn't handle whitespace in month and weekday names, causing issues for certain language translations."
+29c1151a5577cccfdb18109ccb42330cde124d89,1404156875,"Fixed #22756 -- Added view name to technical 404 template if Http404 is raised.
+
+Thanks Keryn Knight for the suggestion.
+","['django/views/debug.py', 'tests/view_tests/tests/test_debug.py', 'tests/view_tests/urls.py', 'tests/view_tests/views.py']",Technical 404 template does not display the view name when Http404 error is raised.
+195e0cb1709e96144ccbb9863ff8526f4c733f63,1585649357,"Refs #31040 -- Used 402 HTTP status in middleware_exceptions tests.
+
+HTTP status code 418 - ""I'm a Teaport"" was added to http.HTTPStatus in
+Python 3.9.0a5 [1] that caused failures in middleware_exceptions tests.
+
+This changes HTTP status used in middleware_exceptions tests to 402,
+which exists in all supported versions of Python.
+
+[1] https://docs.python.org/3.9/whatsnew/3.9.html#http","['tests/middleware_exceptions/middleware.py', 'tests/middleware_exceptions/tests.py']",Middleware exceptions tests are failing due to the introduction of HTTP status code 418 in Python 3.9.0a5.
+f3b69f9757ec03057441ebbd52b7cdbfed31fb32,1522673573,"Fixed #29273 -- Prevented initial selection of empty choice in multiple choice widgets.
+
+Regression in b52c73008a9d67e9ddbb841872dc15cdd3d6ee01.
+","['django/forms/widgets.py', 'tests/forms_tests/widget_tests/test_checkboxselectmultiple.py', 'tests/forms_tests/widget_tests/test_selectmultiple.py']","Initial selection in multiple choice widgets defaults to empty choice, which is a unanticipated behavior."
+ed77bea58274e11e5a9e4c8b9650f50deb8a2b26,1503405908,"Refs #28502 -- Complemented stringformat tuple handling/test.
+
+An additional test and a code change were suggested in a late review.","['django/template/defaultfilters.py', 'tests/template_tests/filter_tests/test_stringformat.py']",Stringformat tuple handling lacks comprehensive testing and its current functionality may be problematic.
+2926559cce34e48efb4b073721926d737e372dd3,1433538102,"Fixed #24937 -- fix serialization of Date(Time)RangeField.
+
+Use the DjangoJSONEncoder so that datetime and date are encoded
+appropriately.
+","['django/contrib/postgres/fields/ranges.py', 'tests/postgres_tests/test_ranges.py']",Issue with Date(Time)RangeField serialization using Django--date and datetime data are not encoded correctly.
+cc9e4297019bcec9fe0fee2199aa30fb1f6e90b7,1480524581,"Fixed #27557 -- Casted GEOSGeometry only when necessary
+
+Thanks Pete Flugstad for the report, and Tim Graham for the review.
+","['django/contrib/gis/geos/geometry.py', 'tests/gis_tests/geos_tests/test_geos.py']",Unnecessary casting of GEOSGeometry is occurring which may affect performance.
+83440a1258ab2e0c29ce2c5d3586456ece20b633,1499866229,"Refs #28389 -- Added release note and test for pickling of LazyObject when wrapped object doesn't have __reduce__().
+
+Forwardport of 30f334cc58e939c7d9bd8455c80bd066fbde9f2b from stable/1.11.x
+",['tests/utils_tests/test_lazyobject.py'],Pickling of LazyObject fails when the wrapped object lacks a __reduce__() method.
+1cb65b8a77bd1b15f094b5857468c107784aad90,1458024358,"Fixed #26157 #25321 -- Added sql/params to extra context of schema logger
+
+Thanks Akshesh Doshi for the initial patch and Tim Graham for the review
+","['django/db/backends/base/schema.py', 'django/test/utils.py', 'tests/logging_tests/tests.py']","Schema logger's extra context lacks sql/params, hindering efficient debugging and tracing of schema-related issues."
+f734e2d4b2fc4391a4d097b80357724815c1d414,1477499130,"Fixed #27334 -- Allowed FileField to move rather than copy a file.
+
+When a FileField is set to an instance of File that is not also an
+instance of FieldFile, pre_save() passes that object as the contents to
+Storage.save(). This allows the file to be moved rather than copied
+to the upload destination.
+","['django/db/models/fields/files.py', 'tests/model_fields/test_filefield.py']",FileField's pre_save() always copying files instead of moving them when the instance of File is not also an instance of FieldFile.
+116d39842dab2569013856e9f3701a7cb6554f09,1392609511,"Added the possibility to pass a stdin object to a management command.
+
+This makes testing certain features easier.
+
+Thanks to AeroNotix for the original patch.
+","['django/core/management/base.py', 'tests/user_commands/tests.py']","Management command lacks the functionality to accept a stdin object, resulting in difficulty when testing certain features."
+f92e68c30a0d38d25486e3f3cfabe5dfb5961ef7,1694631438,"Fixed #34822 -- Added support for serializing functions decorated with functools.lru_cache in migrations.
+
+`@functools.cache` and `@functools.lru_cache` return an object of type
+`functools._lru_cache_wrapper` which prevented the migrations serializer from
+working. Simply using the existing `FunctionTypeSerializer` for this additional
+type works as expected.
+","['django/db/migrations/serializer.py', 'tests/migrations/test_writer.py']",Functions decorated with `@functools.cache` or `@functools.lru_cache` are failing to serialize in migrations due to the return of type `functools._lru_cache_wrapper`.
+6d18ab01d96dbc7da2fd8807b9d8422d9e9e0b7d,1393155209,"Removed incorrect statement from docstring
+
+The docstring of FilterExpression said that it shouldn't be
+instantiated from anywhere but the get_filters_from_token
+helper function.
+
+However, that helper function was deleted in commit
+3ede006fc98f7e96ae9fb997872f78635576d5f8 and FilterExpression
+is instantiated from inside the compile_filter help function.
+",['django/template/base.py'],"The docstring for FilterExpression incorrectly states that it should only be instantiated from a function that no longer exists, causing confusion in usage."
+110001d0bbbabe2a5b57b14a59bd0e4b71bf2712,1608639987,"Refs #32285 -- Made AppConfigStub do not call super().__init__().
+
+Calling super().__init__() is unnecessary and enforces the use of
+various workarounds.
+",['django/db/migrations/state.py'],AppConfigStub's call to super().__init__() creates the need for various workarounds and potentially imposes unnecessary restrictions.
+4045fd56cb0f83d0f78de9aca073c7104e4cf8fd,1487696776,"Fixed #27856 -- Improved accuracy of date subtraction on PostgreSQL.
+
+Accuracy was incorrect when dates differ by a month or more.
+","['django/db/backends/postgresql/operations.py', 'tests/expressions/tests.py']",Date subtraction on PostgreSQL showing inaccurate results especially when the dates have a difference of a month or more.
+2c912c348808ee66a4fd164bda68b494243c6c54,1630388093,"Fixed #33061 -- Fixed handling nonexistent keys with negative deltas in incr()/decr() in memcached backends.
+
+Thanks Chris Jerdonek for the review.
+","['django/core/cache/backends/memcached.py', 'tests/cache/tests.py']","Nonexistent keys with negative deltas in incr()/decr() functions in memcached backends are not properly handled, leading to potential errors."
+cfee67ae100343f9e20f412a0b2c56e001d84eca,1409080254,"Added exception name in debug error message
+
+This can help when some exception has no error message.
+",['django/template/defaultfilters.py'],Exceptions without error messages do not get their names displayed on debug error messages.
+fba4f831bc75369c975a95c9b7774e9e89f8a2f9,1488056184,"Fixed #27176 -- Raised an exception for reentrant calls to apps.populate().
+
+Thanks to Aymeric Augustin, Harry Percival, and Tim Graham.",['django/apps/registry.py'],Reentrant calls to apps.populate() causing unexpected behavior because no exception is raised to prevent them.
+533a5835784b95335c8373b6d0b9495b3834e96e,1611208223,"Refs #29721 -- Simplified migration used to test atomic recording.
+
+This makes sure atomic recording of migration application is used when
+the schema editor doesn't defer any statement.
+",['tests/migrations/test_executor.py'],Testing atomic recording of migration application fails as schema editor doesn't consistently defer statements.
+bb8f66934d93faf80cd1a2dda65aaedce21a6fc5,1598261879,"Fixed #31877 -- Reverted ""Fixed #19878 -- Deprecated TemplateView passing URL kwargs into context.""
+
+This reverts commit 4ed534758cb6a11df9f49baddecca5a6cdda9311.
+","['django/views/generic/base.py', 'tests/generic_views/test_base.py', 'tests/generic_views/urls.py']","Commit 4ed534758cb6a11df9f49baddecca5a6cdda9311 caused issues, the deprecation of TemplateView passing URL kwargs into context as fixed in #19878 is causing unforeseen problems."
+3f41d6d62929dfe53eda8109b3b836f26645bdce,1693821517,"Fixed CVE-2023-41164 -- Fixed potential DoS in django.utils.encoding.uri_to_iri().
+
+Thanks MProgrammer (https://hackerone.com/mprogrammer) for the report.
+
+Co-authored-by: nessita <124304+nessita@users.noreply.github.com>
+","['django/utils/encoding.py', 'tests/utils_tests/test_encoding.py']",Potential Denial of Service (DoS) vulnerability exists in the django.utils.encoding.uri_to_iri() function.
+6d4efa8e6a4cc7be4ba957dec71f6f63cd58700d,1547494786,"Refs #28643 -- Changed Variance() to use NumericOutputFieldMixin.
+
+Keeps precision instead of forcing DecimalField to FloatField.
+","['django/db/models/aggregates.py', 'tests/aggregation_regress/tests.py']","The Variance() function is erroneously forcing DecimalField to FloatField, leading to lost precision."
+a6074e8908e36286de7e31f165be801df8ee1eab,1459914488,"Fixed #26458 -- Based Avg's default output_field resolution on its source field type.
+
+Thanks Tim for the review and Josh for the input.","['django/db/models/aggregates.py', 'tests/aggregation/tests.py']","Avg's default output_field resolution doesn't depend on its source field type, potentially leading to incorrect results."
+35291df7f786f8c9b8177e4baa286e6f12597407,1433496555,"Fixed #19542: Made mirroring databases for tests work with Oracle
+
+No tests are provided because there is no sane way to test database
+settings within the Django test suite.
+
+Thanks Aymeric Augustin for review.
+","['django/db/backends/base/creation.py', 'django/db/backends/oracle/creation.py', 'django/test/runner.py']",The test suite is unable to mirror databases when using Oracle.
+1d070d027c218285b66c0bde8079034b33a87f11,1490762827,"Fixed #25414 -- Fixed QuerySet.annotate() with pk in values() on MySQL.
+
+Thanks Tim Graham and Simon Charette for the reviews.","['django/db/models/sql/compiler.py', 'tests/annotations/tests.py']",Use of QuerySet.annotate() along with values() containing a primary key (pk) leads to malfunction on MySQL databases.
+ee4043f7355f077583ca4c1749db7d5211f0855e,1505334723,"Refs #28593 -- Moved django.conf.urls.include() to django.urls().
+
+The old location remains for backwards compatibility. Documentation
+will be updated separately along with the rest of the URL routing changes.
+","['django/conf/urls/__init__.py', 'django/urls/__init__.py', 'django/urls/conf.py', 'tests/urlpatterns_reverse/tests.py']",The function django.conf.urls.include() is located in an obsolete location which is not congruent with recent URL routing changes.
+3c593ba79e5bdee46419e2aa6b14e7ce8bc01758,1434068787,"Refs #24125 -- Added admin_docs tests for multiple template engines.
+
+This adds a test for 511a53b3142551a1bc3093ed1b6655f57634f510
+",['tests/admin_docs/tests.py'],Lack of tests for admin_docs with multiple template engines may lead to uncaught issues or bugs.
+4b8a1d2c0d1a8c5107f3aef01597db78d2a2a5ce,1410292687,"Fixed #22267 -- Fixed unquote/quote in smart_urlquote
+
+Thanks Md. Enzam Hossain for the report and initial patch, and
+Tim Graham for the review.
+","['django/utils/html.py', 'tests/utils_tests/test_html.py']","Unquote/quote functionality in smart_urlquote is malfunctioning, leading to improper URL handling."
+2e364a0aacb49a5160896b1ca5a2619baa3f4d9b,1400259458,"Fixed #15716 - Authentication backends can short-circuit authorization.
+
+Authorization backends can now raise PermissionDenied in ""has_perm""
+and ""has_module_perms"" to short-circuit authorization process.
+","['django/contrib/auth/models.py', 'django/contrib/auth/tests/test_auth_backends.py']","Authentication backends lack the ability to immediately halt authorization process, resulting in possible unnecessary security checks."
+27dd7e727153cbf12632a2161217340123687c44,1420530178,"Fixed #23815 -- Prevented UnicodeDecodeError in CSRF middleware
+
+Thanks codeitloadit for the report, living180 for investigations
+and Tim Graham for the review.
+","['django/middleware/csrf.py', 'tests/csrf_tests/tests.py']",The CSRF middleware is causing a UnicodeDecodeError.
+cca151d196d520f799d3517a9719d03c0c8c9d8a,1452693396,"Refs #26071 -- Added test for __in lookup in a Case expression.
+
+Forwardport of 5b3c66d8b64add684489f5010e43de73e7acdd04 from stable/1.8.x
+",['tests/expressions_case/tests.py'],Lack of tests for __in lookup in a Case expression.
+a0b4ecce579c7d603a280a21f96428d6700d7f61,1505135582,"Fixed #28392 -- Fixed GIS's WKT regex to match large scientific notation numbers.
+
+Thanks Greg Larmore for report and initial patch.","['django/contrib/gis/geometry/regex.py', 'tests/gis_tests/geos_tests/test_geos.py']",GIS's WKT regex doesn't properly match large scientific notation numbers.
+27aa85246a218b0999c7c9d227eed2afb08ed510,1400154936,"Fixed #20897 -- Added make_cursor() for consistent cursor creation
+
+In django.db.backends.BaseDatabaseWrapper, pulled the creation of
+cursors in the non-debug case into a separate method, in order to
+make behavior more consistent when overriding the cursor creation
+in derived classes.
+",['django/db/backends/__init__.py'],"In django.db.backends.BaseDatabaseWrapper, inconsistent cursor creation when overriding in derived classes due to current method structure."
+84d7c93feb5ebad83fa88b02779db7e85928f0a8,1419782549,"Raised an error when allowed_include_roots is a string.
+
+This avoids leaving projects silently vulnerable when this option is set
+to a string instead of a one-item tuple containing that string, a very
+common misconfiguration.
+",['django/template/engine.py'],Misconfiguration of 'allowed_include_roots' set as a string instead of a one-item tuple leaves projects vulnerable without giving an error.
+bceadd2788dc2dad53eba0caae172bd8522fd483,1556781200,"Fixed #30396 -- Added system checks for uniqueness of indexes and constraints names.
+
+Co-Authored-By: Mariusz Felisiak <felisiak.mariusz@gmail.com>
+","['django/core/checks/model_checks.py', 'tests/check_framework/test_model_checks.py']","Lack of system checks in place for ensuring uniqueness of index and constraint names, leading to potential data integrity issues."
+7cb3a488436e8e7d0249280e95ba2ee945c96c87,1443018379,"Fixed #25410 -- Fixed empty ClearableFileInput crash on Python 2.
+
+Reverted ""Fixes #24727 -- Prevented ClearableFileInput from masking
+exceptions on Python 2"" and added a regression test.
+
+This reverts commit 5c412dd8a724b263489c1bd7a2fea381460665d7.
+","['django/forms/widgets.py', 'tests/forms_tests/widget_tests/test_clearablefileinput.py', 'tests/model_forms/tests.py']","ClearableFileInput crashes on Python 2 when empty, potentially due to previous fix for Python 2 exception masking."
+04b15022e8d1f49af69d8a1e6cd678f31f1280ff,1668762811,"Fixed #26261 -- Fixed queryset crash when excluding reverse GenericRelation.
+
+Thanks Amir Hadi for the report.
+","['django/contrib/contenttypes/fields.py', 'tests/generic_relations_regress/tests.py']",Queryset crashes when attempting to exclude instances of reverse GenericRelation.
+da7910d4834726eca596af0a830762fa5fb2dfd9,1478007057,"Fixed CVE-2016-9013 -- Generated a random database user password when running tests on Oracle.
+
+This is a security fix.
+",['django/db/backends/oracle/creation.py'],Running tests on Oracle without generating a random database user password exposes a potential security vulnerability (CVE-2016-9013).
+feb683c4c2c5ecfb61e4cb490c3e357450c0c0e8,1521018007,"Fixed #29155 -- Fixed crash when database functions are used with pattern lookups.
+
+Thanks Tim Graham and Sergey Fedoseev for reviews.","['django/db/models/lookups.py', 'tests/lookup/models.py', 'tests/lookup/tests.py']",Crash occurs when database functions are utilized in conjunction with pattern lookups.
+ce3351b9508896afdf87d11bd64fd6b5ad928228,1528305370,"Fixed #29301 -- Added custom help formatter to BaseCommand class
+
+This partially reverts c3055242c81812278ebdc93dd109f30d2cbd1610.
+Thanks Adam Johnson and Carlton Gibson for the reviews.
+","['django/core/management/base.py', 'tests/user_commands/management/commands/common_args.py', 'tests/user_commands/tests.py']","The BaseCommand class is lacking a custom help formatter, causing display issues when users request help information."
+3f1412ff7bbfd7b1a15b7ed8c574ee8ba5aa6309,1405962319,"Fixed #23064 -- Added lib detection support for GDAL 1.10/1.11
+
+Note that GDAL 1.11 is not yet officially supported, until someone
+has tested it and can confirm it has no issues with Django.
+",['django/contrib/gis/gdal/libgdal.py'],"Django is unable to properly detect and support GDAL versions 1.10 and 1.11, and these versions haven't yet been tested with Django for compatibility issues."
+150d88cc2c0866ef65f077387e3e560e9c9c3f80,1403608178,"Restored is_anonymous() check in ModelBackend permission checking removed in refs #17903.
+
+Thanks Florian Apolloner for raising the issue.
+","['django/contrib/auth/backends.py', 'django/contrib/auth/tests/test_auth_backends.py']",The removal of is_anonymous() check in ModelBackend permission checking has led to unauthorized access issues.
+e07609a0d1cac573890380ee32b85d7743632650,1624336122,"Refs #32858, Refs #32392 -- Restored using :: shortcut syntax in Cast() on PostgreSQL.
+
+This partly reverts commit fdfbc66331292def201c9344e3cd29fbcbcd076a
+unnecessary since b69b0c3fe871167a0ca01bb439508e335143801f.
+","['django/db/models/functions/comparison.py', 'tests/db_functions/comparison/test_cast.py', 'tests/postgres_tests/test_indexes.py']","The Cast() function in PostgreSQL is not able to use the :: shortcut syntax, which may decrease readability and convenience in code."
+56c461a0d7c1cbb9d5709bda817579c7ee18d474,1452186279,"Fixed #26038 -- Changed FileSystemStorage defaults on setting change.
+
+Thanks to Dave Voutila for the report and Tim for the review.
+","['django/core/files/storage.py', 'django/test/signals.py', 'tests/file_storage/tests.py']","Changes in FileSystemStorage settings don't properly reflect in default settings, leading to inadequate storage configurations."
+bd145e7209a0e628cced10384bd6f62d65c0f211,1461550545,"Fixed #26536 -- Preserved leading dashes of the cached template loader keys.
+
+Thanks Anders Roos for the report.
+","['django/template/loaders/cached.py', 'tests/template_tests/test_loaders.py']","Leading dashes of the keys in the cached template loader are being removed, leading to mismatched or missing keys in the cache."
+c94bff2b26f8844fe15d68a79511ff3a6853dc61,1395504050,"Fixed #22241 -- Selectively added line breaks in admin read-only fields
+
+When content is supposed to contain HTML, we do not try to add
+line breaks in read-only contents.
+Thanks Alexander Todorov for the report.
+","['django/contrib/admin/helpers.py', 'tests/admin_views/admin.py', 'tests/admin_views/tests.py']",Admin read-only fields are adding line breaks even when the content contains HTML.
+aeb8c381789ad93866223f8bd07d09ae5e2edd9e,1521163995,"Fixed #29206 -- Fixed PasswordResetConfirmView crash when the URL contains a non-UUID where one is expected.
+
+","['django/contrib/auth/views.py', 'tests/auth_tests/test_views.py']",PasswordResetConfirmView crashes when encountering a non-UUID in the URL where a UUID is expected.
+e124d2da94cc1233729d8f0200809589f6c5afc8,1486657233,"Fixed #26551 -- Fixed negated Q() queries that span relations.
+
+Prevented queries from reusing trimmed joins.
+","['django/db/models/sql/query.py', 'tests/queries/models.py', 'tests/queries/tests.py']","Negated Q() queries spanning multiple relations are reusing trimmed joins, leading to inaccurate results."
+b2ed0d78f2dff9986ef15b9098c1b6d9ce720a99,1645105937,"Refs #28358 -- Fixed infinite recursion in LazyObject.__getattribute__().
+
+Regression in 97d7990abde3fe4b525ae83958fd0b52d6a1d13f.
+
+Co-authored-by: Mariusz Felisiak <felisiak.mariusz@gmail.com>
+Co-authored-by: Theo Alexiou <theofilosalexiou@gmail.com>
+","['django/utils/functional.py', 'tests/utils_tests/test_lazyobject.py']",LazyObject's __getattribute__() function is entering an infinite recursion.
+44f9241c48e28823b140bc4ec7515f5a88b88c32,1489596866,"Refs #27563 -- Fixed ModelChoiceField.__deepcopy__() so forms don't share a queryset cache.
+
+Thanks Luke Benstead for the report Simon Charettes for the fix.","['django/forms/models.py', 'tests/model_forms/tests.py']","ModelChoiceField.__deepcopy__() results in shared queryset cache among forms, causing potential data inconsistency."
+32c02f2a0eaf66e4744f9904eb2a743b87300257,1472759541,"Fixed #5908 -- Added {% resetcycle %} template tag.
+
+Thanks to Simon Litchfield for the report, Uninen for the initial
+patch, akaihola, jamesp, b.schube, and Florian Appoloner for
+subsequent patches, tests, and documentation.
+","['django/template/defaulttags.py', 'tests/template_tests/syntax_tests/test_resetcycle.py']","The template lacks a {% resetcycle %} tag, causing cycle issues that need a reset mechanism."
+feb658199373c5f61d02bc78516c8386c4821d6a,1593147573,"Fixed the centering of the ""Log in"" button on admin login page.
+
+Previously, the button's container had a padding of 9.4em which was
+approximately center but not precisely. Now, the container uses
+'align:text-center' to let the browser center the button.",['tests/admin_views/tests.py'],"The ""Log in"" button on the admin login page is not being centered accurately due to use of approximate padding values."
+e233f357bd463df519ca5cd01106f1f59fb5733d,1482182286,"Refs #25484 -- Removed incorrect unquoting in {% static %}.
+
+Regression in 374e6230ca9f9bb84cc9dd760dfb6395fbb5ff0f.
+
+Thanks Florian Apolloner for the report and analysis.
+","['django/templatetags/static.py', 'tests/staticfiles_tests/storage.py', 'tests/staticfiles_tests/test_templatetags.py']","""{% static %}"" template tag incorrectly unquotes given values with regression in a previous version."
+8a6df55f2dd5131282084a4edfd48f63fbf8c69a,1594288503,"Fixed #31773 -- Fixed preserving output_field in ExpressionWrapper for combined expressions.
+
+Thanks Thodoris Sotiropoulos for the report and Simon Charette for the
+implementation idea.
+
+Regression in df32fd42b84cc6dbba173201f244491b0d154a63.","['django/db/models/expressions.py', 'tests/annotations/tests.py']","Combined expressions in ExpressionWrapper fail to preserve output_field, causing regressions."
+3921b1c6d24c9d5a60e5f5f83c9a394104089c21,1630916293,"Refs #32363 -- Made shell ignore a missing sys.___interactivehook__.
+
+Thanks Tim Graham for the report.
+
+Follow up to 1bbb98d9a4b7d83e422b14ae2429cb368eff5a13.
+",['django/core/management/commands/shell.py'],"'Python shell execution fails when sys.___interactivehook__ is missing.'
+"
+62d85a283500e9abb0e1c9ec53c59be468f056a0,1593206339,"Fixed #31742 -- Fixed makemigrations crash on ForeignKey to an app with mixed case label.
+
+Regression in 9e1b6b8a66af4c2197e5b1b41eb9dbb36e4f6502.
+
+Thanks Ignacio Santolin for the report.","['django/db/models/fields/related.py', 'tests/migrations/test_state.py']",The 'makemigrations' command crashes when a ForeignKey relation is pointing to an application with a mixed case label.
+83022d279c585be2c4173b36a92d4399e738150e,1626939727,"Refs #32508 -- Raised TypeError/ValueError instead of using ""assert"" in encode() methods of some password hashers.
+
+","['django/contrib/auth/hashers.py', 'tests/auth_tests/test_hashers.py']","Password hashers' encode() methods are using ""assert"" instead of raising TypeError/ValueError."
+cecbb71312a5cc515ac1ddf821bdeb072c3bfaea,1403342495,"Prevented evaluation of a possible lazy message
+
+As far as possible, message evaluation should not happen in field
+__init__ (often run at import time).
+",['django/forms/fields.py'],"Field __init__ is triggering unwanted message evaluations, which potentially occur during import time."
+b26fedacef16cc42a4fdd891af06ca925d4bb418,1462609069,"Fixed #26544 -- Delayed translations of SetPasswordForm help_texts
+
+Thanks Michael Bitzi for the reporti and Tim Graham for the review.
+","['django/contrib/auth/password_validation.py', 'tests/auth_tests/test_forms.py']","'SetPasswordForm help_texts translations are being processed too early, resulting in inaccurate translations.'"
+a0c03c62a8ac586e5be5b21393c925afa581efaf,1521507943,"Fixed #29229 -- Fixed column mismatch crash when combining two annotated values_list() querysets with union(), difference(), or intersection().
+
+Regression in 7316720603821ebb64dfe8fa592ba6edcef5f3e.","['django/db/models/sql/compiler.py', 'tests/queries/test_qs_combinators.py']","Combining two annotated values_list() querysets with union(), difference(), or intersection() causes a column mismatch crash."

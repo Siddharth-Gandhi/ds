@@ -1,0 +1,999 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
+07a31599c3f5b23158f83988ebc05381a1e86b00,1664217249,"KAFKA-10199: Fix switching to updating standbys if standby is removed (#12687)
+
+When the state updater only contains standby tasks and then a
+standby task is removed, an IllegalStateException is thrown
+because the changelog reader does not allow to switch to standby
+updating mode more than once in a row.
+
+This commit fixes this bug by checking that the removed task is
+an active one before trying to switch to standby updating mode.
+If the task to remove is a standby task then either we are already
+in standby updating mode and we should not switch to it again or
+we are not in standby updating mode which implies that there are
+still active tasks that would prevent us to switch to standby
+updating mode.
+
+Reviewer: Guozhang Wang <wangguoz@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/DefaultStateUpdater.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/DefaultStateUpdaterTest.java']","IllegalStateException is thrown when transitioning to standby updating mode more than once consecutively, specifically after removing only standby tasks from the state updater."
+fb77da941ac2a34513cf2cd5d11137ba9b275575,1631102228,"KAFKA-12766 - Disabling WAL-related Options in RocksDB (#11250)
+
+Description
+Streams disables the write-ahead log (WAL) provided by RocksDB since it replicates the data in changelog topics. Hence, it does not make much sense to set WAL-related configs for RocksDB.
+
+Proposed solution
+Ignore any WAL-related configuration and state in the log that we are ignoring them.
+
+Co-authored-by: Tomer Wizman <tomer.wizman@personetics.com>
+Co-authored-by: Bruno Cadonna <cadonna@apache.org>
+
+Reviewers: Boyang Chen <boyang@apache.org>, Bruno Cadonna <cadonna@apache.org>","['streams/src/main/java/org/apache/kafka/streams/state/internals/RocksDBGenericOptionsToDbOptionsColumnFamilyOptionsAdapter.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/RocksDBGenericOptionsToDbOptionsColumnFamilyOptionsAdapterTest.java']","Unnecessary setting of write-ahead log (WAL) related configurations in RocksDB despite Streams replicating data in changelog topics, leading to redundancy."
+1d496a26c998cefc77223a7575980208620dfe2d,1575593843,"KAFKA-9179; Fix flaky test due to race condition when fetching reassignment state (#7786)
+
+This patch fixes a race condition on reassignment completion. The previous code fetched metadata first and then fetched the reassignment state. It is possible in between those times for the reassignment to complete, which leads to spurious URPs being reported. The fix here is to change the order of these checks and to explicitly check for reassignment completion. 
+
+Note this patch fixes the flaky test `TopicCommandWithAdminClientTest.testDescribeUnderReplicatedPartitionsWhenReassignmentIsInProgress`.
+
+Reviewers: Guozhang Wang <wangguoz@gmail.com>","['core/src/main/scala/kafka/admin/TopicCommand.scala', 'core/src/test/scala/unit/kafka/admin/TopicCommandWithAdminClientTest.scala']",Test to describe under-replicated partitions during reassignment is flaky due to race condition occurring between fetching metadata and fetching reassignment state.
+acf39fe94ad6a666e7ddd88dbcc6ddf5173fe56c,1612558664,"MINOR: Allow KafkaApis to be configured for Raft controller quorums (#10045)
+
+`KafkaApis` is configured differently when it is used in a broker with a Raft-based controller quorum vs. a ZooKeeper quorum.  For example, when using Raft, `ForwardingManager` is required rather than optional, and there is no `AdminManager`, `KafkaController`, or `KafkaZkClient`.  This PR introduces `MetadataSupport` to abstract the two possibilities: `ZkSupport` and `RaftSupport`.  This provides a fluent way to decide what to do based on the type of support that `KafkaApis` has been configured with.  Certain types of requests are not supported when using raft (`AlterIsrRequest`, `UpdateMetadataRequest`, etc.), and `MetadataSupport` gives us an intuitive way to identify the constraints and requirements associated with the different configurations and react accordingly.
+
+Existing tests are sufficient to detect bugs and regressions.
+
+Reviewers: José Armando García Sancio <jsancio@gmail.com>, Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/server/KafkaApis.scala', 'core/src/main/scala/kafka/server/KafkaServer.scala', 'core/src/main/scala/kafka/server/MetadataSupport.scala', 'core/src/test/scala/unit/kafka/server/KafkaApisTest.scala', 'jmh-benchmarks/src/main/java/org/apache/kafka/jmh/metadata/MetadataRequestBenchmark.java']","KafkaApis configuration varies depending on whether a Raft-based controller quorum or a ZooKeeper quorum is used, leading to discrepancies in requirement parameters and unsupported request types in a Raft setup."
+7e573001484427dc73d821cc232a4c3bb3b5f5bb,1632873016,"KAFKA-12486: Enforce Rebalance when a TaskCorruptedException is throw… (#11076)
+
+This PR aims to utilize HighAvailabilityTaskAssignor to avoid downtime on corrupted tasks. The idea is that, when we hit TaskCorruptedException on an active task, a rebalance is triggered after we've wiped out the corrupted state stores. This will allow the assignor to temporarily redirect this task to another client who can resume work on the task while the original owner works on restoring the state from scratch.
+
+Reviewers: Anna Sophie Blee-Goldman <ableegoldman@apache.org>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TaskManager.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamThreadTest.java']","When a TaskCorruptedException is thrown on an active task, it does not trigger a rebalance after the corrupted state stores are wiped out, resulting in potential downtime."
+b35ca4349dabb199411cb6bc4c80ef89f19d9328,1613770567,"KAFKA-9274: Throw TaskCorruptedException instead of TimeoutException when TX commit times out (#10072)
+
+Part of KIP-572: follow up work to PR #9800. It's not save to retry a TX commit after a timeout, because it's unclear if the commit was successful or not, and thus on retry we might get an IllegalStateException. Instead, we will throw a TaskCorruptedException to retry the TX if the commit failed.
+
+Reviewers: A. Sophie Blee-Goldman <sophie@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/errors/TaskCorruptedException.java', 'streams/src/main/java/org/apache/kafka/streams/errors/TaskTimeoutExceptions.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/ProcessorStateManager.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/RecordCollectorImpl.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StoreChangelogReader.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TaskManager.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/ProcessorStateManagerTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamThreadTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/TaskManagerTest.java']","Uncertainty in transaction commit status post-timeout may cause an IllegalStateException upon retry, making it unsafe to retry a TX commit after timeout."
+a03bda61e068d72823af47e5f25ffd12c3319541,1631567722,"KAFKA-13249: Always update changelog offsets before writing the checkpoint file (#11283)
+
+When using EOS checkpointed offsets are not updated to the latest offsets from the changelog because the maybeWriteCheckpoint method is only ever called when commitNeeded=false. This change will force the update if enforceCheckpoint=true .
+
+I have also added a test which verifies that both the state store and the checkpoint file are completely up to date with the changelog after the app has shutdown.
+
+Reviewers: Anna Sophie Blee-Goldman <ableegoldman@apache.org>, Guozhang Wang <wangguoz@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/test/java/org/apache/kafka/streams/integration/EosIntegrationTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamTaskTest.java']","In EOS, checkpointed offsets are not up-to-date with the latest changelog offsets causing potential differences between the state store and checkpoint file after the app shutdown."
+43bcc5682da82a602a4c0a000dc7433d0507b450,1636033445,"KAFKA-13396: Allow create topic without partition/replicaFactor (#11429)
+
+[KIP-464](https://cwiki.apache.org/confluence/display/KAFKA/KIP-464%3A+Defaults+for+AdminClient%23createTopic) (PR: https://github.com/apache/kafka/pull/6728)
+made it possible to create topics without passing partition count and/or replica factor when using
+the admin client. We incorrectly disallowed this via https://github.com/apache/kafka/pull/10457 while
+trying to ensure validation was consistent between ZK and the admin client (in this case the
+inconsistency was intentional).
+
+Fix this regression and add tests for the command lines in quick start (i.e. create topic and describe
+topic) to make sure it won't be broken in the future.
+
+Reviewers: Lee Dongjin <dongjin@apache.org>, Ismael Juma <ismael@juma.me.uk>","['core/src/main/scala/kafka/admin/TopicCommand.scala', 'core/src/test/scala/unit/kafka/admin/TopicCommandTest.scala']","Inconsistency between validation in ZK and the admin client after applying KIP-464, resulting in inability to create topics without passing partition count and/or replica factor."
+67e99a42361b8f0febc3e691488c668ebfe257e9,1646160917,"MINOR: Ensure LocalLog.flush is thread safe to recoveryPoint changes (#11814)
+
+Issue:
+Imagine a scenario where two threads T1 and T2 are inside UnifiedLog.flush() concurrently:
+
+KafkaScheduler thread T1 -> The periodic work calls LogManager.flushDirtyLogs() which in turn calls UnifiedLog.flush(). For example, this can happen due to log.flush.scheduler.interval.ms here.
+KafkaScheduler thread T2 -> A UnifiedLog.flush() call is triggered asynchronously during segment roll here.
+Supposing if thread T1 advances the recovery point beyond the flush offset of thread T2, then this could trip the check within LogSegments.values() here for thread T2, when it is called from LocalLog.flush() here. The exception causes the KafkaScheduler thread to die, which is not desirable.
+
+Fix:
+We fix this by ensuring that LocalLog.flush() is immune to the case where the recoveryPoint advances beyond the flush offset.
+
+Reviewers: Jun Rao <junrao@gmail.com>",['core/src/main/scala/kafka/log/LocalLog.scala'],"Concurrent execution of UnifiedLog.flush() by two threads can lead to advancement of recovery point beyond flush offset, failing the LogSegments.values() check and causing KafkaScheduler thread to die undesirably."
+66d81a0e50680916f541703049dd4e911542b5ed,1565269282,"MINOR: Update dependencies for Kafka 2.4 (#7126)
+
+Scala 2.12.9 brings another 5% ~ 10% improvement in compiler performance,
+improved compatibility with JDK 11/12/13, and experimental infrastructure for
+build pipelining.
+
+zstd update includes performance improvements, among which the
+primary improvement is that decompression is ~7% faster.
+
+Level | v1.4.0 | v1.4.1 | Delta
+-- | -- | -- | --
+1 | 1390 MB/s | 1453 MB/s | +4.5%
+3 | 1208 MB/s | 1301 MB/s | +7.6%
+5 | 1129 MB/s | 1233 MB/s | +9.2%
+7 | 1224 MB/s | 1347 MB/s | +10.0%
+16 | 1278 MB/s | 1430 MB/s | +11.8%
+
+Jetty 9.4.19 includes a number of bug fixes:
+https://github.com/eclipse/jetty.project/releases/tag/jetty-9.4.19.v20190610
+
+Mockito 3.0.0 switched the Java requirement from 7 to 8.
+
+Several updates to owaspDepCheckPlugin (4.0.2 -> 5.2.1).
+
+The rest are patch updates.
+
+Reviewers: Rajini Sivaram <rajinisivaram@googlemail.com>","['bin/kafka-run-class.sh', 'bin/windows/kafka-run-class.bat']","There are performance issues and compatibility concerns with JDK 11/12/13, attributed to outdated dependencies, including Scala, Zstd, Jetty, Mockito, and owaspDepCheckPlugin."
+81b71c06f300daf353cef04653d59385db561b38,1662672089,"KAFKA-14204: QuorumController must correctly handle overly large batches (#12595)
+
+Originally, the QuorumController did not try to limit the number of records in a batch that it sent
+to the Raft layer.  This caused two problems. Firstly, we were not correctly handling the exception
+that was thrown by the Raft layer when a batch of records was too large to apply atomically. This
+happened because the Raft layer threw an exception which was a subclass of ApiException. Secondly,
+by letting the Raft layer split non-atomic batches, we were not able to create snapshots at each of
+the splits. This led to O(N) behavior during controller failovers.
+
+This PR fixes both of these issues by limiting the number of records in a batch. Atomic batches
+that are too large will fail with a RuntimeException which will cause the active controller to
+become inactive and revert to the last committed state. Non-atomic batches will be split into
+multiple batches with a fixed number of records in each.
+
+Reviewers: Luke Chen <showuon@gmail.com>, José Armando García Sancio <jsancio@gmail.com>","['metadata/src/main/java/org/apache/kafka/controller/QuorumController.java', 'metadata/src/test/java/org/apache/kafka/controller/QuorumControllerTest.java']","QuorumController is not limiting the number of records in a batch sent to the Raft layer, leading to exceptions when batches are too large to apply atomically and inability to create snapshots at each of the splits, resulting in O(N) behaviour during controller failovers."
+1574b9f16df83c6a392502a9134d4b04647511cf,1690568934,"MINOR: Code cleanups in group-coordinator module (#14117)
+
+This patch does a few code cleanups in the group-coordinator module.
+
+It renames Coordinator to CoordinatorShard;
+It renames ReplicatedGroupCoordinator to GroupCoordinatorShard. I was never really happy with this name. The new name makes more sense to me;
+It removes TopicPartition from the GroupMetadataManager. It was only used in log messages. The log context already includes it so we don't have to log it again.
+It renames assignors to consumerGroupAssignors.
+
+Reviewers: Jeff Kim <jeff.kim@confluent.io>, Justine Olshan <jolshan@confluent.io>","['group-coordinator/src/main/java/org/apache/kafka/coordinator/group/GroupCoordinatorService.java', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/GroupCoordinatorShard.java', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/GroupMetadataManager.java', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/runtime/CoordinatorRuntime.java', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/runtime/CoordinatorShard.java', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/runtime/CoordinatorShardBuilder.java', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/runtime/CoordinatorShardBuilderSupplier.java', 'group-coordinator/src/test/java/org/apache/kafka/coordinator/group/GroupCoordinatorServiceTest.java', 'group-coordinator/src/test/java/org/apache/kafka/coordinator/group/GroupCoordinatorShardTest.java', 'group-coordinator/src/test/java/org/apache/kafka/coordinator/group/GroupMetadataManagerTest.java', 'group-coordinator/src/test/java/org/apache/kafka/coordinator/group/OffsetMetadataManagerTest.java', 'group-coordinator/src/test/java/org/apache/kafka/coordinator/group/runtime/CoordinatorRuntimeTest.java']","Naming conventions in the group-coordinator module are unclear and potentially misleading, and redundant TopicPartition information is being logged in GroupMetadataManager."
+c38825ab976e5187d14c10503a5b403fc41c8d5c,1595332931,"KAFKA-9432:(follow-up) Set `configKeys` to null in `describeConfigs()` to make it backward compatible with older Kafka versions.
+
+- After #8312, older brokers are returning empty configs,  with latest `adminClient.describeConfigs`.  Old brokers  are receiving empty configNames in `AdminManageer.describeConfigs()` method. Older brokers does not handle empty configKeys. Due to this old brokers are filtering all the configs.
+- Update ClientCompatibilityTest to verify describe configs
+- Add test case to test describe configs with empty configuration Keys
+
+Author: Manikumar Reddy <manikumar.reddy@gmail.com>
+
+Reviewers: Rajini Sivaram <rajinisivaram@googlemail.com>
+
+Closes #9046 from omkreddy/KAFKA-9432
+","['clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java', 'core/src/test/scala/unit/kafka/server/AdminManagerTest.scala', 'tests/kafkatest/tests/client/client_compatibility_features_test.py', 'tools/src/main/java/org/apache/kafka/tools/ClientCompatibilityTest.java']","Older Kafka versions are returning empty configs when executed with latest `adminClient.describeConfigs()`, due to inability to handle empty configuration keys."
+b94c7f479b917d4ec602c31a24f11390627c479b,1574489103,"MINOR: Add ignorable field check to `toStruct` and fix usage (#7710)
+
+If a field is not marked as ignorable, we should raise an exception if it has been set to a non-default value. This check already exists in `Message.write`, so this patch adds it to `Message.toStruct`. Additionally, we fix several fields which should have been marked ignorable and we fix some related test assertions.
+
+Reviewers: Ismael Juma <ismael@juma.me.uk>, Manikumar Reddy <manikumar.reddy@gmail.com>, Colin Patrick McCabe <cmccabe@apache.org>","['clients/src/main/java/org/apache/kafka/common/requests/DescribeGroupsResponse.java', 'clients/src/main/java/org/apache/kafka/common/requests/MetadataResponse.java', 'clients/src/test/java/org/apache/kafka/common/message/SimpleExampleMessageTest.java', 'clients/src/test/java/org/apache/kafka/common/requests/JoinGroupRequestTest.java', 'clients/src/test/java/org/apache/kafka/common/requests/RequestResponseTest.java', 'core/src/main/scala/kafka/server/KafkaApis.scala', 'core/src/test/scala/integration/kafka/api/BaseAdminIntegrationTest.scala', 'core/src/test/scala/integration/kafka/api/DescribeAuthorizedOperationsTest.scala', 'core/src/test/scala/unit/kafka/server/MetadataRequestTest.scala', 'generator/src/main/java/org/apache/kafka/message/MessageDataGenerator.java']",`Message.toStruct` does not raise exceptions for non-default values of non-ignorable fields and there are fields that should have been marked as ignorable.
+45ecae6a28fe820eb2698c8a375c83ee15036f5c,1679505966,"KAFKA-14491: [15/N] Add integration tests for versioned stores (#13340)
+
+Adds integration tests for the new versioned stores introduced in KIP-889.
+
+This PR also contains a small bugfix for the restore record converter, required to get the tests above to pass: even though versioned stores are timestamped stores, we do not want to use the record converter for prepending timestamps when restoring a versioned store.
+
+Reviewers: Matthias J. Sax <matthias@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StateManagerUtil.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/WrappedStateStore.java', 'streams/src/test/java/org/apache/kafka/streams/integration/VersionedKeyValueStoreIntegrationTest.java']","Versioned stores, introduced in KIP-889, are not functioning as expected during restore due to an issue with the record converter prepending timestamps."
+f97f36b650ef75841164ba01d42e02955141655a,1626198876,"KAFKA-13051; Require principal builders implement `KafkaPrincipalSerde` and set default (#11011)
+
+This patch adds a check to ensure that principal builder implementations implement `KafkaPrincipalSerde` as specified in KIP-590: https://cwiki.apache.org/confluence/display/KAFKA/KIP-590%3A+Redirect+Zookeeper+Mutation+Protocols+to+The+Controller. This patch also changes the default value of `principal.builder.class` to `DefaultKafkaPrincipalBuilder`, which was already the implicit behavior when no principal builder was specified.
+
+Reviewers: Ismael Juma <ismael@juma.me.uk>, Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/server/KafkaConfig.scala', 'core/src/test/scala/integration/kafka/api/AuthorizerIntegrationTest.scala', 'core/src/test/scala/integration/kafka/api/GroupAuthorizerIntegrationTest.scala', 'core/src/test/scala/integration/kafka/api/GroupEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/PlaintextEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/SaslPlainSslEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/SslEndToEndAuthorizationTest.scala', 'core/src/test/scala/unit/kafka/server/AlterUserScramCredentialsRequestTest.scala', 'core/src/test/scala/unit/kafka/server/ControllerMutationQuotaTest.scala', 'core/src/test/scala/unit/kafka/server/DescribeUserScramCredentialsRequestTest.scala']","Principal builders not implementing `KafkaPrincipalSerde` as per KIP-590 could lead to unexpected behaviors. Also, `principal.builder.class` lacks a default value, affecting behavior when no principal builder is specified."
+40d5c9fac92f019c46b1de15ee428e6f47544551,1557530439,"KAFKA-8352 : Fix Connect System test failure 404 Not Found (#6713)
+
+Corrects the system tests to check for either a 404 or a 409 error and sleeping until the Connect REST API becomes available. This corrects a previous change to how REST extensions are initialized (#6651), which added the ability of Connect throwing a 404 if the resources are not yet started. The integration tests were already looking for 409.
+
+Author: Magesh Nandakumar <magesh.n.kumar@gmail.com>
+Reviewer: Randall Hauch <rhauch@gmail.com>",['tests/kafkatest/services/connect.py'],"Connect system tests fail due to 404 error as Connect REST API isn't available immediately, leading to test failures even when resources haven't yet started."
+6acf69d7a257b83fbf3103772ca8d68093718274,1696247960,"MINOR: Remove the client side assignor from the ConsumerGroupHeartbeat API (#14469)
+
+As a first step, we plan to release a preview of the new consumer group rebalance protocol without the client side assignor. This patch removes all the related fields from the ConsumerGroupHeartbeat API for now. Removing fields is fine here because this API is not released yet and not exposed by default. We will add them back while bumping the version of the request when we release this part in the future.
+
+Reviewers: Justine Olshan <jolshan@confluent.io>","['clients/src/test/java/org/apache/kafka/clients/consumer/internals/MembershipManagerImplTest.java', 'clients/src/test/java/org/apache/kafka/common/protocol/ProtoUtilsTest.java', 'clients/src/test/java/org/apache/kafka/common/requests/RequestResponseTest.java', 'core/src/test/scala/unit/kafka/server/ConsumerGroupHeartbeatRequestTest.scala', 'group-coordinator/src/main/java/org/apache/kafka/coordinator/group/GroupMetadataManager.java', 'group-coordinator/src/test/java/org/apache/kafka/coordinator/group/GroupMetadataManagerTest.java']","The ConsumerGroupHeartbeat API currently includes fields related to the client side assignor, which are not necessary for the preliminary release of the new consumer group rebalance protocol."
+294b62963b563f65f64a60ed673276c0c36af101,1582843615,"throttle consumer timeout increase (#8188)
+
+The test_throttled_reassignment test fails because the consumer that is used to validate reassignment does not start on time to consume all messages. This does not seem like an issue with the throttling of the reassignment, since increasing the timeout allowed the test to pass multiple consecutive runs locally.
+
+This test seemed to rely on the default JmxTool for the console consumer that was removed in this commit: 179d0d7
+The console consumer would check to see if it had partitions assigned to it before beginning to consume. Although the test occasionally failed with the JmxTool, it began to fail much more after the removal.
+
+Error messages of failures followed the below format with varying numbers of missed messages. They are the first messages by the producer.
+
+535 acked message did not make it to the Consumer. They are: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19...plus 515 more. Total Acked: 192792, Total Consumed: 192259. We validated that the first 535 of these missing messages correctly made it into Kafka's data files. This suggests they were lost on their way to the consumer.
+In the scope of the test, this error suggests that the test is falling into the race condition described in produce_consume_validate.py, which has the timeout to prevent the consumer from missing initial messages.
+
+This can serve as a temporary fix until the logic of consumer startup is addressed further.
+
+Reviewers: Jason Gustafson <jason@confluent.io>, Bill Bejeck <bbejeck@gmail.com>",['tests/kafkatest/tests/core/throttling_test.py'],"The test_throttled_reassignment test fails consistently due to the consumer not starting on time to consume all messages, resulting in a mismatch in the number of acknowledged and consumed messages. This problem has exacerbated after the removal of the default JmxTool for the console consumer."
+8cabd57612189d633ca2aed40b63f20e1f668fa4,1607651812,"MINOR: Update jmh to 1.27 for async profiler support (#9129)
+
+Also updated the jmh readme to make it easier for new people to know
+what's possible and best practices.
+
+There were some changes in the generated benchmarking code that
+required adjusting `spotbugs-exclude.xml` and for a `javac` warning
+to be suppressed for the benchmarking module. I took the chance
+to make the spotbugs exclusion mode maintainable via a regex
+pattern.
+
+Tested the commands on Linux and macOS with zsh.
+
+JMH highlights:
+
+* async-profiler integration. Can be used with -prof async,
+pass -prof async:help to look for the accepted options.
+* perf c2c [2] integration. Can be used with -prof perfc2c,
+if available.
+* JFR profiler integration. Can be used with -prof jfr, pass
+-prof jfr:help to look for the accepted options.
+
+Full details:
+* 1.24: https://mail.openjdk.java.net/pipermail/jmh-dev/2020-August/002982.html
+* 1.25: https://mail.openjdk.java.net/pipermail/jmh-dev/2020-August/002987.html
+* 1.26: https://mail.openjdk.java.net/pipermail/jmh-dev/2020-October/003024.html
+* 1.27: https://mail.openjdk.java.net/pipermail/jmh-dev/2020-December/003096.html
+
+Reviewers: Manikumar Reddy <manikumar.reddy@gmail.com>, Chia-Ping Tsai <chia7712@gmail.com>, Bill Bejeck <bbejeck@gmail.com>, Lucas Bradstreet <lucasbradstreet@gmail.com>
+",['jmh-benchmarks/jmh.sh'],'Current version of jmh lacks async profiler support and some issues with the generated benchmarking code are causing spotbugs exclusions and `javac` warnings.'
+558bb1d0692b3ba6cf9c46d7170be6d31656024b,1565562702,"KAFKA-8782: Close metrics in QuotaManagerTests (#7191)
+
+Since `Metrics` was constructed with `enableExpiration=false`, this was
+not a source of flakiness given the current implementation. This could
+change in the future, so good to follow the class contract.
+
+Included a few clean-ups with regards to redundant casts and type parameters
+as well as usage of try with resources for inline usage of `Metrics`.
+
+Reviewers: Manikumar Reddy <manikumar.reddy@gmail.com>","['clients/src/main/java/org/apache/kafka/common/metrics/Metrics.java', 'clients/src/test/java/org/apache/kafka/common/metrics/MetricsTest.java', 'clients/src/test/java/org/apache/kafka/common/metrics/SensorTest.java', 'clients/src/test/java/org/apache/kafka/common/metrics/stats/FrequenciesTest.java', 'core/src/test/scala/unit/kafka/server/ClientQuotaManagerTest.scala', 'core/src/test/scala/unit/kafka/server/ReplicationQuotaManagerTest.scala']",The QuotaManagerTests do not close Metrics which could potentially cause flakiness if the Metrics implementation changes in the future.
+7c5c739b7f020ae40cc435a5f31f4c72bdfa1242,1617234520,"Initial commit (#10454)
+
+This PR is a precursor to the recovery logic refactor work (KAFKA-12553).
+
+I've renamed the file: core/src/test/scala/unit/kafka/log/LogUtils.scala to core/src/test/scala/unit/kafka/log/LogTestUtils.scala. Also I've renamed the underlying lass from LogUtils to LogTestUtils. This is going to help avoid a naming conflict with a new file called LogUtils.scala that I plan to introduce in core/src/main/scala/kafka/log/ as part of the recovery logic refactor. The new file will also contain a bunch of static functions.
+
+Tests:
+Relying on existing tests to catch regressions (if any) since this is a simple change.
+
+Reviewers: Satish Duggana <satishd@apache.org>, Dhruvil Shah <dhruvil@confluent.io>, Jun Rao <junrao@gmail.com>","['core/src/test/scala/unit/kafka/log/LogSegmentTest.scala', 'core/src/test/scala/unit/kafka/log/LogSegmentsTest.scala', 'core/src/test/scala/unit/kafka/log/LogTestUtils.scala']",Potential naming conflict due to the existence of LogUtils file in test directory and planned introduction of a new file with the same name as part of recovery logic refactor in the main directory.
+762d11c13f1f4dc8e5a82f9bbed88582dcb045f4,1626478089,"MINOR: ducktape should start brokers in parallel and support co-located kraft
+
+This patch adds a sanity-check bounce system test for the case where we have 3
+co-located KRaft controllers and fixes the system test code so that this case
+will pass by starting brokers in parallel by default instead of serially. We
+now also send SIGKILL to any running KRaft broker or controller nodes for the
+co-located case when a majority of co-located controllers have been stopped --
+otherwise they do not shutdown, and we spin for the 60 second timeout. Finally,
+this patch adds the ability to specify that certain brokers should not be
+started when starting the cluster, and then we can start those nodes at a later
+time via the add_broker() method call; this is going to be helpful for KRaft
+snapshot system testing.
+
+We were not testing the 3 co-located KRaft controller case previously, and it
+would not pass because the first Kafka node would never be considered started.
+We were starting the Kafka nodes serially, and we decide that a node has
+successfully started when it logs a particular message. This message is not
+logged until the broker has identified the controller (i.e. the leader of the
+KRaft quorum). There cannot be a leader until a majority of the KRaft quorum
+has started, so with 3 co-located controllers the first node could never be
+considered ""started"" by the system test.
+
+Reviewers: Colin P. McCabe <cmccabe@apache.org>","['tests/kafkatest/sanity_checks/test_bounce.py', 'tests/kafkatest/services/kafka/kafka.py']",Co-located KRaft controllers and brokers start serially leading to failures in system test for 3 co-located controllers scenario. Unstoppable running KRaft broker or controller nodes spin for 60 seconds timeout when a majority of co-located controllers are stopped.
+28d5a059438634db6fdecdbb816e2584715884d6,1661903763,"KAFKA-14187: kafka-features.sh: add support for --metadata (#12571)
+
+This PR adds support to kafka-features.sh for the --metadata flag, as specified in KIP-778.  This
+flag makes it possible to upgrade to a new metadata version without consulting a table mapping
+version names to short integers. Change --feature to use a key=value format.
+
+FeatureCommandTest.scala: make most tests here true unit tests (that don't start brokers) in order
+to improve test run time, and allow us to test more cases. For the integration test part, test both
+KRaft and ZK-based clusters. Add support for mocking feature operations in MockAdminClient.java.
+
+upgrade.html: add a section describing how the metadata.version should be upgraded in KRaft
+clusters.
+
+Add kraft_upgrade_test.py to test upgrades between KRaft versions.
+
+Reviewers: David Arthur <mumrah@gmail.com>, dengziming <dengziming1993@gmail.com>, José Armando García Sancio <jsancio@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/admin/FinalizedVersionRange.java', 'clients/src/main/java/org/apache/kafka/clients/admin/SupportedVersionRange.java', 'clients/src/test/java/org/apache/kafka/clients/admin/MockAdminClient.java', 'core/src/main/scala/kafka/admin/FeatureCommand.scala', 'core/src/test/scala/unit/kafka/admin/FeatureCommandTest.scala', 'tests/kafkatest/services/kafka/kafka.py', 'tests/kafkatest/tests/core/kraft_upgrade_test.py', 'tests/kafkatest/version.py']","The kafka-features.sh script lacks support for the --metadata flag as specified in KIP-778, limiting the ability to upgrade to a new metadata version without consulting a mapping table."
+9d17bf98b6eae2d5a91a9a719e5c447b55ded3a5,1580950267,"KAFKA-9447: Add new customized EOS model example (#8031)
+
+With the improvement of 447, we are now offering developers a better experience on writing their customized EOS apps with group subscription, instead of manual assignments. With the demo, user should be able to get started more quickly on writing their own EOS app, and understand the processing logic much better.
+
+Reviewers: Guozhang Wang <wangguoz@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/admin/DescribeTopicsResult.java', 'clients/src/main/java/org/apache/kafka/clients/admin/ListTopicsResult.java', 'examples/bin/exactly-once-demo.sh', 'examples/src/main/java/kafka/examples/Consumer.java', 'examples/src/main/java/kafka/examples/ExactlyOnceMessageProcessor.java', 'examples/src/main/java/kafka/examples/KafkaConsumerProducerDemo.java', 'examples/src/main/java/kafka/examples/KafkaExactlyOnceDemo.java', 'examples/src/main/java/kafka/examples/Producer.java']","There's a lack of guidance and examples for developers to understand how to write customized EOS apps using group subscription, causing difficulties in getting started and comprehending the processing logic."
+dcbd28da53bfc6edb78fd1735993163fc6f4c7c7,1605811938,"KAFKA-10723: Fix LogManager shutdown error handling (#9596)
+
+The asynchronous shutdown in LogManager has the shortcoming that if during shutdown any of the internal futures fail, then we do not always ensure that all futures are completed before LogManager.shutdown returns. This is because, this line in the finally clause shuts down the thread pools asynchronously. As a result, despite the shut down completed message from KafkaServer is seen in the error logs, some futures continue to run from inside LogManager attempting to close some logs. This is misleading during debugging. Also sometimes it introduces an avoidable post-shutdown activity where resources (such as file handles) are released or persistent state is checkpointed in the Broker.
+
+In this PR, we fix the above behavior such that we prevent leakage of threads. If any of the futures throw an error, we skip creating of checkpoint and clean shutdown file only for the affected log directory. We continue to wait for all futures to complete for all the directories.
+
+Reviewers: Ismael Juma <ismael@juma.me.uk>, Jun Rao <junrao@gmail.com>","['core/src/main/scala/kafka/log/LogManager.scala', 'core/src/test/scala/unit/kafka/log/LogManagerTest.scala']","During LogManager's asynchronous shutdown, some futures continue running and attempt to close logs even after shutdown completion message, resulting in thread leakage and misleading error logs."
+87bef1d1b0fe1502be2335524990aad94bfd4bae,1591232010,"KAFKA-9788; Use distinct names for transaction and group load time sensors (#8784)
+
+Sensor objects are stored in the Kafka metrics registry and keyed by name. If a new sensor is created with the same name as an existing one, the existing one is returned rather than a new object being created. The partition load time sensors for the transaction and group coordinators used the same name, so data recorded to either was stored in the same object. This meant that the metrics values for both metrics were identical and consisted of the combined data. This patch changes the names to be distinct so that the data will be stored in separate Sensor objects.
+
+Reviewers: Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/coordinator/group/GroupMetadataManager.scala', 'core/src/main/scala/kafka/coordinator/transaction/TransactionStateManager.scala']","Transaction and group coordinators' identical partition load time sensor names lead to incorrect data recording; both metrics display combined data instead of separate, accurate data."
+40ad4fe0ae9c687ed3c4d35fb5f5830cb1a867b8,1602613145,"KAFKA-10494: Eager handling of sending old values (#9415)
+
+Nodes that are materialized should not forward requests to `enableSendingOldValues` to parent nodes, as they themselves can handle fulfilling this request. However, some instances of `KTableProcessorSupplier` were still forwarding requests to parent nodes, which was causing unnecessary materialization of table sources.
+
+The following instances of `KTableProcessorSupplier` have been updated to not forward `enableSendingOldValues` to parent nodes if they themselves are materialized and can handle sending old values downstream:
+
+ * `KTableFilter`
+ * `KTableMapValues`
+ * `KTableTransformValues`
+
+Other instances of `KTableProcessorSupplier` have not be modified for reasons given below:
+ * `KTableSuppressProcessorSupplier`: though it has a `storeName` field, it didn't seem right for this to handle sending old values itself. Its only job is to suppress output.
+ * `KTableKTableAbstractJoin`: doesn't have a store name, i.e. it is never materialized, so can't handle the call itself.
+ * `KTableKTableJoinMerger`: table-table joins already have materialized sources, which are sending old values. It would be an unnecessary performance hit to have this class do a lookup to retrieve the old value from its store.
+ * `KTableReduce`: is always materialized and already handling the call without forwarding
+ * `KTableAggregate`: is always materialized and already handling the call without forwarding
+
+Reviewer: Matthias J. Sax <matthias@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/kstream/internals/KTableFilter.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/internals/KTableMapValues.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/internals/KTableTransformValues.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KTableFilterTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KTableKTableLeftJoinTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KTableMapValuesTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KTableTransformValuesTest.java']",Unnecessary materialization of table sources in certain `KTableProcessorSupplier` instances as they are forwarding `enableSendingOldValues` requests to parent nodes despite being capable of handling these requests themselves.
+f978d0551be5ffaec282cf8c3643bacbe90ad4b9,1605215355,"MINOR: Increase the amount of time available to the `test_verifiable_producer` (#9201)
+
+Increase the amount of time available to the `test_verifiable_producer` test to login and get the process name for the verifiable producer from 5 seconds to 10 seconds.
+
+We were seeing some test failures due to the assertion failing because the verifiable producer would complete before we could login, list the processes, and parse out the producer version. Previously, we were giving this operation 5 seconds to run, this PR bumps it up to 10 seconds. 
+
+I verified locally that this does not flake, but even at 5 seconds I wasn't seeing any flakes. Ultimately we should find a better strategy than racing to query the producer process (as outlined in the existing comments). 
+
+Reviewers: Jason Gustafson <jason@confluent.io>",['tests/kafkatest/sanity_checks/test_verifiable_producer.py'],"The `test_verifiable_producer` fails intermittently because the allotted 5 seconds isn't sufficient time for the producer to login, list processes, and parse the producer version."
+fc6e91e19920a41a56ff60c65e3b9719f4506977,1657361162,"KAFKA-13474: Allow reconfiguration of SSL certs for broker to controller connection (#12381)
+
+What:
+When a certificate is rotated on a broker via dynamic configuration and the previous certificate expires, the broker to controller connection starts failing with SSL Handshake failed.
+
+Why:
+A similar fix was earlier performed in #6721 but when BrokerToControllerChannelManager was introduced in v2.7, we didn't enable dynamic reconfiguration for it's channel.
+
+Summary of testing strategy (including rationale)
+Add a test which fails prior to the fix done in the PR and succeeds afterwards. The bug wasn't caught earlier because there was no test coverage to validate the scenario.
+
+Reviewers: Luke Chen <showuon@gmail.com>","['core/src/main/scala/kafka/server/BrokerToControllerChannelManager.scala', 'core/src/test/scala/integration/kafka/server/DynamicBrokerReconfigurationTest.scala', 'core/src/test/scala/kafka/server/BrokerToControllerRequestThreadTest.scala', 'core/src/test/scala/unit/kafka/utils/TestUtils.scala']","After rotating a certificate on a broker through dynamic configuration, the broker to controller connection fails due to SSL Handshake failure when the previous certificate expires."
+ce883892270a02a72e91afbdb1fabdd50d7da474,1648176010,"KAFKA-13770: Restore compatibility with KafkaBasedLog using older Kafka brokers (#11946)
+
+The `retryEndOffsets(…)` method in `TopicAdmin` recently added (KAFKA-12879, #11797) to allow the `KafkaBasedLog.start()` method to retry any failures reading the last offsets for a topic. However, this introduce a regression when talking to older brokers (0.10.x or earlier).
+
+The `KafkaBasedLog` already had logic that expected an `UnsupportedVersionException` thrown by the admin client when a Kafka API is not available on an older broker, but the new retry logic in `TopicAdmin` did not account for this and wrapped the exception, thereby breaking the `KafkaBasedLog` logic and preventing startup.
+
+The fix is to propagate this `UnsupportedVersionException` from the `TopicAdmin.retryEndOffsets(…)` method. Added a new unit test that first replicated the problem before the fix, and verified the fix corrects the problem.","['connect/runtime/src/main/java/org/apache/kafka/connect/util/TopicAdmin.java', 'connect/runtime/src/test/java/org/apache/kafka/connect/util/TopicAdminTest.java']","The new retry logic in `TopicAdmin.retryEndOffsets(…)` is not compatible with older Kafka brokers (0.10.x or earlier), breaking `KafkaBasedLog` logic and preventing startup."
+4deb80676e66311dc919f97dad1cac6131267885,1573248073,"KAFKA-9098: When users name repartition topic, use the name for the repartition filter, source and sink node. (#7598)
+
+When users specify a name for a repartition topic, we should use the same name for the repartition filter, source, and sink nodes. With the addition of KIP-307 if users go to the effort of naming every node in the topology having processor nodes with generated names is inconsistent behavior.
+
+Updated tests in the streams test suite.
+
+Reviewers: John Roesler <john@confluent.io>, Christopher Pettitt <cpettitt@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/kstream/internals/KStreamImpl.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/RepartitionTopicNamingTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/SuppressTopologyTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/RepartitionOptimizingTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/RepartitionWithMergeOptimizingTest.java']","When users assign a name to a repartition topic, the same name isn't assigned to the repartition filter, source, and sink nodes, leading to inconsistent processor node names."
+6b6b36cec043eefc830c5209d5a18bbcb47a31db,1577145348,"KAFKA-9232; Coordinator new member timeout does not work for JoinGroup v3 and below (#7753)
+
+The v3 JoinGroup logic does not properly complete the initial heartbeat for new members, which then expires after the static 5 minute timeout if the member does not rejoin. The core issue is in the `shouldKeepAlive` method, which returns false when it should return true because of an inconsistent timeout check.
+
+Reviewers: Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/coordinator/group/MemberMetadata.scala', 'core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala']","Inconsistent timeout check in `shouldKeepAlive` method causes initial heartbeat for new members not to properly complete in v3 JoinGroup logic, leading to expiration after static 5 minute timeout unless the member rejoins."
+c6d2778a8d1383e76695ec82710208153e83b2c2,1624981776,"KAFKA-12996; Return OFFSET_OUT_OF_RANGE for fetchOffset < startOffset even for diverging epochs (#10930)
+
+If fetchOffset < startOffset, we currently throw OffsetOutOfRangeException when attempting to read from the log in the regular case. But for diverging epochs, we return Errors.NONE with the new leader start offset, hwm etc.. ReplicaFetcherThread throws OffsetOutOfRangeException when processing responses with Errors.NONE if the leader's offsets in the response are out of range and this moves the partition to failed state. The PR adds a check for this case when processing fetch requests and throws OffsetOutOfRangeException regardless of epoch.
+
+Reviewers: Luke Chen <showuon@gmail.com>, Nikhil Bhatia <rite2nikhil@gmail.com>, Guozhang Wang <wangguoz@gmail.com>","['core/src/main/scala/kafka/cluster/Partition.scala', 'core/src/test/scala/unit/kafka/cluster/PartitionTest.scala']","For cases of diverging epochs, fetchOffset < startOffset does not throw an OffsetOutOfRangeException, instead it returns Errors.NONE leading to partitions moving to a failed state."
+1a3e23a5798373fb40f31af2eb7c4348270ac437,1633459058,"MINOR: TopicIdPartition improvements (#11374)
+
+1. It should not require a TopicPartition during construction and normal
+usage.
+2. Simplify `equals` since `topicId` and `topicPartition` are never
+null.
+3. Inline `Objects.hash` to avoid array allocation.
+4. Make `toString` more concise using a similar approach as
+`TopicPartition` since this `TopicIdPartition` will replace
+`TopicPartition` in many places in the future.
+5. Add unit tests for `TopicIdPartition`, it seems like we had none.
+6. Minor clean-up in calling/called classes.
+
+Reviewers: David Jacot <djacot@confluent.io>, Satish Duggana <satishd@apache.org>","['clients/src/main/java/org/apache/kafka/common/TopicIdPartition.java', 'clients/src/main/java/org/apache/kafka/common/TopicPartition.java', 'clients/src/test/java/org/apache/kafka/common/TopicIdPartitionTest.java', 'storage/src/main/java/org/apache/kafka/server/log/remote/metadata/storage/RemoteLogMetadataTopicPartitioner.java', 'storage/src/main/java/org/apache/kafka/server/log/remote/metadata/storage/serialization/RemoteLogSegmentMetadataTransform.java', 'storage/src/main/java/org/apache/kafka/server/log/remote/metadata/storage/serialization/RemoteLogSegmentMetadataUpdateTransform.java', 'storage/src/main/java/org/apache/kafka/server/log/remote/metadata/storage/serialization/RemotePartitionDeleteMetadataTransform.java']","`TopicIdPartition` requires `TopicPartition` during construction and normal usage, lacks unit tests, has inefficient `equals` and `toString` methods, and needs overall cleanup."
+ecfccb480bd57f5195ea67d23702710014ec0e1a,1625764403,"KAFKA-12660; Do not update offset commit sensor after append failure (#10560)
+
+Do not update the commit-sensor if the commit failed and add test logic. The patch also adds 2 unit tests, the first for `OFFSET_METADATA_TOO_LARGE` error, the second is to cover circumstance when one offset is committed and the other is failed with `OFFSET_METADATA_TOO_LARGE`. Both of these cases were uncovered previously.
+
+Reviewers: Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/coordinator/group/GroupMetadataManager.scala', 'core/src/test/scala/unit/kafka/coordinator/group/GroupMetadataManagerTest.scala', 'core/src/test/scala/unit/kafka/utils/TestUtils.scala']","Offset commit sensor updates erroneously after commit failures, including in cases where OFFSET_METADATA_TOO_LARGE errors occur."
+7f90eda04720274a0e4f7ec32a7340245f493e9e,1614301360,"KAFKA-8562; SaslChannelBuilder - Avoid (reverse) DNS lookup while building SslTransportLayer (#10059)
+
+This patch moves the `peerHost` helper defined in `SslChannelBuilder` into `SslFactor`. `SaslChannelBuilder` is then updated to use a new `createSslEngine` overload which relies on `peerHost` when building its `SslEngine`. The purpose is to avoid the reverse DNS in `getHostName`.
+
+Reviewers: Ismael Juma <ismael@juma.me.uk>, Manikumar Reddy <manikumar.reddy@gmail.com>, Jason Gustafson <jason@confluent.io>","['clients/src/main/java/org/apache/kafka/common/network/SaslChannelBuilder.java', 'clients/src/main/java/org/apache/kafka/common/network/SslChannelBuilder.java', 'clients/src/main/java/org/apache/kafka/common/security/ssl/SslFactory.java', 'clients/src/test/java/org/apache/kafka/common/network/SslSelectorTest.java', 'clients/src/test/java/org/apache/kafka/common/network/SslTransportLayerTest.java', 'clients/src/test/java/org/apache/kafka/common/security/authenticator/SaslAuthenticatorFailureDelayTest.java', 'clients/src/test/java/org/apache/kafka/common/security/authenticator/SaslAuthenticatorTest.java']","SaslChannelBuilder's current process uses reverse DNS in getHostName when building the SslEngine, causing potential delays or dependence on DNS availability."
+3c4472d701a7e9d9b8714a0b9d87ae190d1679fb,1680271267,"KAFKA-14867: Trigger rebalance when replica racks change if client.rack is configured (KIP-881) (#13474)
+
+When `client.rack` is configured for consumers, we perform rack-aware consumer partition assignment to improve locality. After/during reassignments, replica racks may change, so to ensure optimal consumer assignment, trigger rebalance from the leader when set of racks of any partition changes.
+
+Reviewers: David Jacot <djacot@confluent.io>","['clients/src/main/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinator.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinatorTest.java', 'core/src/test/scala/integration/kafka/server/FetchFromFollowerIntegrationTest.scala']","Rack-aware consumer partition assignment becomes suboptimal when replica racks change after/during reassignments, due to no rebalance being triggered if `client.rack` is configured for consumers."
+cfdd567955588e134770a9145ba57800ca88313c,1655522222,"KAFKA-13880: Remove DefaultPartitioner from StreamPartitioner (#12304)
+
+There are some considerata embedded in this seemingly straight-forward PR that I'd like to explain here. The StreamPartitioner is used to send records to three types of topics:
+
+1) repartition topics, where key should never be null.
+2) changelog topics, where key should never be null.
+3) sink topics, where only non-windowed key could be null and windowed key should still never be null.
+Also, the StreamPartitioner is used as part of the IQ to determine which host contains a certain key, as determined by the case 2) above.
+
+This PR's main goal is to remove the deprecated producer's default partitioner, while with those things in mind such that:
+
+We want to make sure for not-null keys, the default murmur2 hash behavior of the streams' partitioner stays consistent with producer's new built-in partitioner.
+For null-keys (which is only possible for non-window default stream partition, and is never used for IQ), we would fix the issue that we may never rotate to a new partitioner by setting the partition as null hence relying on the newly introduced built-in partitioner.
+
+Reviewers: Artem Livshits <84364232+artemlivshits@users.noreply.github.com>, Matthias J. Sax <matthias@confluent.io>","['clients/src/main/java/org/apache/kafka/clients/producer/KafkaProducer.java', 'clients/src/main/java/org/apache/kafka/clients/producer/internals/BuiltInPartitioner.java', 'clients/src/main/java/org/apache/kafka/clients/producer/internals/DefaultPartitioner.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/internals/WindowedStreamPartitioner.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/DefaultStreamPartitioner.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamsMetadataState.java']","The DefaultPartitioner in StreamPartitioner is deprecated and may not handle null-keyed (non-window default stream partition) records correctly, potentially leading to the lack of rotation to a new partitioner. Furthermore, it should maintain consistency for non-null keys with the producer's new built-in partitioner."
+fbf6a76fc40fc5fecd679ef6484a0b92a4ab3971,1561695159,"KAFKA-8356: add static membership info to round robin assignor (#6815)
+
+The purpose here is to leverage static membership information during round robin consumer assignment, because persistent member id could help make the assignment remain the same during rebalance.
+The comparison logic is changed to:
+
+1. If member A and member B both have group.instance.id, then compare their group.instance.id
+2. If member A has group.instance.id, while member B doesn't, then A < B
+3. If both member A and B don't have group.instance.id, compare their member.id
+
+In round robin assignor, we use ephemeral member.id to sort the members in order for assignment. This semantic is not stable and could trigger unnecessary shuffle of tasks. By leveraging group.instance.id the static member assignment shall be persist when satisfying following conditions:
+
+1. number of members remain the same across generation
+2. static members' identities persist across generation
+
+Reviewers: A. Sophie Blee-Goldman <sophie@confluent.io>, Guozhang Wang <wangguoz@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/consumer/RoundRobinAssignor.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/StickyAssignor.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/internals/AbstractPartitionAssignor.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/RangeAssignorTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/RoundRobinAssignorTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/StickyAssignorTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/internals/AbstractPartitionAssignorTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamsPartitionAssignorTest.java']",Unstable ephemeral member.id use in round robin consumer assignment triggers unnecessary task shuffles during task assignment. Lack of persistent identity for static members across generations causes changes in member assignment even if the number of members remains the same.
+3348fc49d8824155e737b866f633e14684da5fe9,1593050258,"KAFKA-10198: guard against recycling dirty state (#8924)
+
+We just needed to add the check in StreamTask#closeClean to closeAndRecycleState as well. I also renamed closeAndRecycleState to closeCleanAndRecycleState to drive this point home: it needs to be clean.
+
+This should be cherry-picked back to the 2.6 branch
+
+Reviewers: Matthias J. Sax <matthias@confluent.io>, John Roesler <john@confluent.io>, Guozhang Wang <wangguoz@gmail.com>, ","['streams/src/main/java/org/apache/kafka/streams/processor/internals/ActiveTaskCreator.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StandbyTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StandbyTaskCreator.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/Task.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StandbyTaskTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamTaskTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/TaskManagerTest.java']",'Dirty state recycling leads to potential errors in StreamTask#closeClean functionality due to lack of appropriate checks.'
+b1830e4aa2d83d2f213faf5f7432a119742df80c,1681465434,"KAFKA-14834: [9/N] Disable versioned-stores for unsupported operations (#13565)
+
+Using versioned-stores for global-KTables is not allowed, because a
+global-table is bootstrapped on startup, and a stream-globalTable join
+does not support temporal semantics.
+
+Furthermore, `suppress()` does not support temporal semantics and thus
+cannot be applied to an versioned-KTable.
+
+This PR disallows both use-cases explicitely.
+
+Part of KIP-914.
+
+Reviewers: Bill Bejeck <bbejeck@gmail.com>, Victoria Xia <victoria.xia@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/StreamsBuilder.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/KTable.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/internals/InternalStreamsBuilder.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/internals/KTableImpl.java', 'streams/src/main/java/org/apache/kafka/streams/kstream/internals/graph/TableSuppressNode.java', 'streams/src/test/java/org/apache/kafka/streams/StreamsBuilderTest.java', 'streams/src/test/java/org/apache/kafka/streams/integration/VersionedKeyValueStoreIntegrationTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/InternalStreamsBuilderTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KStreamGlobalKTableJoinTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KStreamGlobalKTableLeftJoinTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/SuppressTopologyTest.java']",Using versioned-stores for global-KTables and applying `suppress()` to a versioned-KTable leads to unsupported operations due to lack of temporal semantics support.
+6d649f503a964ed9612e79ef2d9e55e26240fbc3,1553004769,"KAFKA-8062: Do not remore StateListener when shutting down stream thread (#6468)
+
+In a previous commit #6091, we've fixed a couple of edge cases and hence do not need to remove state listener anymore (before that we removed the state listener intentionally to avoid some race conditions, which has been gone for now).
+
+Reviewers: Matthias J. Sax <mjsax@apache.org>,   Bill Bejeck <bbejeck@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/KafkaStreams.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/test/java/org/apache/kafka/streams/KafkaStreamsTest.java']",Removing state listeners when shutting down a stream thread leads to some race conditions.
+9eface2e731ac53037bfa29b191171dae8c44d41,1579300051,"KAFKA-9449; Adds support for closing the producer's BufferPool. (#7967)
+
+The producer's BufferPool may block allocations if its memory limit has hit capacity. If the producer is closed, it's possible for the allocation waiters to wait for max.block.ms if progress cannot be made, even when force-closed (immediate), which can cause indefinite blocking if max.block.ms is particularly high. 
+
+This patch fixes the problem by adding a `close()` method to `BufferPool`, which wakes up any waiters that have pending allocations and throws an exception.
+
+Reviewers: Jason Gustafson <jason@confluent.io>","['clients/src/main/java/org/apache/kafka/clients/producer/internals/BufferPool.java', 'clients/src/main/java/org/apache/kafka/clients/producer/internals/RecordAccumulator.java', 'clients/src/test/java/org/apache/kafka/clients/producer/internals/BufferPoolTest.java']","The producer's BufferPool blocks allocations when memory limit is hit. Closing the producer can result in indefinite blocking for allocation waiters, even on force-close, if max.block.ms is high."
+1b36e11967e7a459d6401ba5ea740a659fc1994b,1585069823,"MINOR: Restore and global consumers should never have group.instance.id (#8322)
+
+And hence restore / global consumers should never expect FencedInstanceIdException.
+
+When such exception is thrown, it means there's another instance with the same instance.id taken over, and hence we should treat it as fatal and let this instance to close out instead of handling as task-migrated.
+
+Reviewers: Boyang Chen <boyang@confluent.io>, Matthias J. Sax <matthias@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/StreamsConfig.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StoreChangelogReader.java', 'streams/src/test/java/org/apache/kafka/streams/StreamsConfigTest.java']",Restore and global consumers are not expected to handle FencedInstanceIdException. Throwing such exception could suggest an instance takeover and might close out the current instance erroneously.
+b166ac43cb646d9589623abfe283874d59ce923b,1663421450,"KAFKA-14238;  KRaft metadata log should not delete segment past the latest snapshot (#12655)
+
+Disable segment deletion based on size and time by setting the KRaft metadata log's `RetentionMsProp` and `RetentionBytesProp` to `-1`. This will cause `UnifiedLog.deleteRetentionMsBreachedSegments` and `UnifiedLog.deleteRetentionSizeBreachedSegments` to short circuit instead of deleting segments.
+
+Without this changes the included test would fail. This happens because `deleteRetentionMsBreachedSegments` is able to delete past the `logStartOffset`. Deleting past the `logStartOffset` would violate the invariant that if the `logStartOffset` is greater than 0 then there is a snapshot with an end offset greater than or equal to the log start offset.
+
+Reviewers: Luke Chen <showuon@gmail.com>, Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/raft/KafkaMetadataLog.scala', 'core/src/test/scala/kafka/raft/KafkaMetadataLogTest.scala']","KRaft metadata log's current segment deletion based on size and time causes deletion past the `logStartOffset`, violating an invariant regarding the existence of a snapshot with an end offset."
+9b409de1e2719f72e3c17663ce131e40dc459361,1669948469,"KAFKA-14358; Disallow creation of cluster metadata topic (#12885)
+
+With KRaft the cluster metadata topic (__cluster_metadata) has a different implementation compared to regular topic. The user should not be allowed to create this topic. This can cause issues if the metadata log dir is the same as one of the log dirs.
+
+This change returns an authorization error if the user tries to create the cluster metadata topic.
+
+Reviewers: David Arthur <mumrah@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java', 'clients/src/main/java/org/apache/kafka/common/internals/Topic.java', 'clients/src/test/java/org/apache/kafka/clients/admin/KafkaAdminClientTest.java', 'core/src/main/scala/kafka/server/ControllerApis.scala', 'core/src/main/scala/kafka/server/KafkaApis.scala', 'core/src/main/scala/kafka/server/KafkaRaftServer.scala', 'core/src/test/scala/unit/kafka/server/AbstractCreateTopicsRequestTest.scala', 'core/src/test/scala/unit/kafka/server/ControllerApisTest.scala', 'core/src/test/scala/unit/kafka/server/CreateTopicsRequestTest.scala']","User can unintentionally create a cluster metadata topic (__cluster_metadata), leading to potential conflicts because of its different implementation in KRaft."
+9c7d8577134559437c67cc2d24154023993a901f,1646872242,"KAFKA-12648: fix #getMinThreadVersion and include IOException + topologyName in StreamsException when topology dir cleanup fails (#11867)
+
+Quick fix to make sure we log the actual source of the failure both in the actual log message as well as the StreamsException that we bubble up to the user's exception handler, and also to report the offending topology by filling in the StreamsException's taskId field.
+
+Also prevents a NoSuchElementException from being thrown when trying to compute the minimum topology version across all threads when the last thread is being unregistered during shutdown.
+
+Reviewers: Guozhang Wang <guozhang@confluent.io>, Walker Carlson <wcarlson@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StateDirectory.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TopologyMetadata.java']","StreamsException does not provide sufficient information when topology directory cleanup fails, and NoSuchElementException is thrown during shutdown when computing minimum topology version across all threads."
+d9b139220ee253da673af44d58dc87bd184188f1,1670626956,"KAFKA-14318: KIP-878, Introduce partition autoscaling configs (#12962)
+
+First PR for KIP-878: Internal Topic Autoscaling for Kafka Streams
+
+Introduces two new configs related to autoscaling in Streams: a feature flag and retry timeout. This PR just adds the configs and gets them passed through to the Streams assignor where they'll ultimately be needed/used
+
+Reviewers: Bill Bejeck <bill@confluent.io>, Walker Carlson <wcarlson@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/StreamsConfig.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/assignment/AssignorConfiguration.java', 'streams/src/test/java/org/apache/kafka/streams/StreamsConfigTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/AssignmentTestUtils.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/AssignorConfigurationTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/ClientTagAwareStandbyTaskAssignorTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/FallbackPriorTaskAssignorTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/HighAvailabilityTaskAssignorTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/StandbyTaskAssignorFactoryTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/StickyTaskAssignorTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/assignment/TaskAssignorConvergenceTest.java']","Kafka Streams lacks a feature flag and retry timeout configuration for partition autoscaling, preventing optimal handling of internal topic autoscaling."
+aebb0e33943bd8d410de1aa8160a01d9581c8681,1607447612,"KAFKA-10264; Fix Flaky Test TransactionsTest.testBumpTransactionalEpoch (#9291)
+
+The test case sends two records before killing broker. The failure is caused when both records are NOT sent in a single batch. The failure of first record can abort second batch and then produces `KafkaException` rather than `TimeoutException`. The patch removes the second record send.
+
+Reviewers: Jason Gustafson <jason@confluent.io>",['core/src/test/scala/integration/kafka/api/TransactionsTest.scala'],TransactionsTest.testBumpTransactionalEpoch is flaky because it can produce a KafkaException rather than TimeoutException when records are not sent in a single batch.
+de4183485b0be534738010b19944edf3388cf49b,1602176729,"KAFKA-10028: Minor fixes to describeFeatures and updateFeatures apis (#9393)
+
+In this PR, I have addressed the review comments from @chia7712 in #9001 which were provided after #9001 was merged. The changes are made mainly to KafkaAdminClient:
+
+Improve error message in updateFeatures api when feature name is empty.
+Propagate top-level error message in updateFeatures api.
+Add an empty-parameter variety for describeFeatures api.
+Minor documentation updates to @param and @return to make these resemble other apis.
+
+Reviewers: Chia-Ping Tsai chia7712@gmail.com, Jun Rao junrao@gmail.com","['clients/src/main/java/org/apache/kafka/clients/admin/Admin.java', 'clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java', 'clients/src/test/java/org/apache/kafka/clients/admin/KafkaAdminClientTest.java']",KafkaAdminClient's updateFeatures API gives poor error messages when feature name is empty and doesn't propagate top-level error messages. A variety for describeFeatures API with empty parameters is also missing.
+0bc8da7aec8dfb7c61321b22e717a94565f4855d,1657473399,"KAFKA-14055; Txn markers should not be removed by matching records in the offset map (#12390)
+
+When cleaning a topic with transactional data, if the keys used in the user data happen to conflict with the keys in the transaction markers, it is possible for the markers to get removed before the corresponding data from the transaction is removed. This results in a hanging transaction or the loss of the transaction's atomicity since it would effectively get bundled into the next transaction in the log. Currently control records are excluded when building the offset map, but not when doing the cleaning. This patch fixes the problem by checking for control batches in the `shouldRetainRecord` callback.
+
+Reviewers: Jun Rao <junrao@gmail.com>","['core/src/main/scala/kafka/log/LogCleaner.scala', 'core/src/test/scala/unit/kafka/log/LogCleanerTest.scala']","Transactional markers in a topic, conflicting with keys in user data during a clean-up, leading to potential premature removal of markers and compromising the atomicity of transactions."
+b60f4464acaa540de75ef2fc83a911d4ff6a8786,1647994769,"Revert ""KAFKA-7077: Use default producer settings in Connect Worker (#11475)"" (#11932)
+
+This reverts commit 76cf7a5793702b55e2cfd98a375f8f1708ff32c3.
+
+Connect already allows users to enable idempotent producers for connectors and the Connect workers. Although Kafka producers enabled idempotency by default in 3.0, due to compatibility requirements and the fact that [KIP-318](https://cwiki.apache.org/confluence/display/KAFKA/KIP-318%3A+Make+Kafka+Connect+Source+idempotent) hasn't been explicitly approved, the changes here are reverted. A separate commit will explicitly disable idempotency in producers instantiated by Connect by default until KIP-318 is approved and scheduled for release. ","['connect/runtime/src/main/java/org/apache/kafka/connect/runtime/Worker.java', 'connect/runtime/src/test/java/org/apache/kafka/connect/runtime/WorkerTest.java']","Default idempotency in Kafka Connect's producers introduced due to KAFKA-7077 may cause compatibility issues, given that KIP-318 is yet to be approved and scheduled for release."
+7201976378aeb206563c949dd0e0c62d411e57d6,1630081701,"KAFKA-13079: Forgotten Topics in Fetch Requests may incorrectly use topic IDs (#11104)
+
+The FetchSessionHandler had a small bug in the session build method where we did not consider building a session where no partitions were added and the session previously did not use topic IDs. (ie, it was relying on at least one partition being added to signify whether topic IDs were present)
+
+Due to this, we could send forgotten partitions with the zero UUID. This would always result in an exception and closed session.
+
+This patch fixes the logic to check that any forgotten partitions have topic IDs. There is also a test added for the empty session situation when topic IDs are used and when topic names are used.
+
+Reviewers: David Jacot <djacot@confluent.io>, Jun Rao <junrao@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/FetchSessionHandler.java', 'clients/src/test/java/org/apache/kafka/clients/FetchSessionHandlerTest.java']","FetchRequests may fail when no partitions were added to a session previously not using topic IDs, causing potential exceptions and closed sessions due to sending of forgotten partitions with the zero UUID."
+0a5097323bce270440697201d359bc67bf646f28,1586968244,"KAFKA-9864: Avoid expensive QuotaViolationException usage (#8477)
+
+QuotaViolationException generates an exception message via String.format in the constructor
+even though the message is often not used, e.g. https://github.com/apache/kafka/blob/trunk/core/src/main/scala/kafka/server/ClientQuotaManager.scala#L258. We now override `toString` instead.
+
+It also generates an unnecessary stack trace, which is now avoided using the same pattern as in ApiException.
+
+I have also avoided use of QuotaViolationException for control flow in
+ReplicationQuotaManager which is another hotspot that we have seen in practice.
+
+Reviewers: Gwen Shapira <gwen@confluent.io>, Stanislav Kozlovski <stanislav_kozlovski@outlook.com>, Ismael Juma <ismael@juma.me.uk>","['clients/src/main/java/org/apache/kafka/common/metrics/QuotaViolationException.java', 'core/src/main/scala/kafka/server/ReplicationQuotaManager.scala']","QuotaViolationException construction frequently causes unnecessary overhead through generating often-unused exception messages and stack traces. Additionally, its usage causes unwanted control flow disruptions in ReplicationQuotaManager."
+d2c06c9c3c35803b9f5f0b6060b242789657f008,1617903750,"KAFKA-12619; Raft leader should expose hw only after committing LeaderChange (#10481)
+
+KIP-595 describes an extra condition on commitment here: https://cwiki.apache.org/confluence/display/KAFKA/KIP-595%3A+A+Raft+Protocol+for+the+Metadata+Quorum#KIP595:ARaftProtocolfortheMetadataQuorum-Fetch. In order to ensure that a newly elected leader's committed entries cannot get lost, it must commit one record from its own epoch. This guarantees that its latest entry is larger (in terms of epoch/offset) than any previously written record which ensures that any future leader must also include it. This is the purpose of the `LeaderChange` record which is written to the log as soon as the leader gets elected.
+
+Although we had this check implemented, it was off by one. We only ensured that replication reached the epoch start offset, which does not reflect the appended `LeaderChange` record. This patch fixes the check and clarifies the point of the check. The rest of the patch is just fixing up test cases.
+
+Reviewers: dengziming <swzmdeng@163.com>, Guozhang Wang <wangguoz@gmail.com>","['raft/src/main/java/org/apache/kafka/raft/LeaderState.java', 'raft/src/test/java/org/apache/kafka/raft/KafkaRaftClientTest.java', 'raft/src/test/java/org/apache/kafka/raft/LeaderStateTest.java', 'raft/src/test/java/org/apache/kafka/raft/RaftClientTestContext.java']","The Raft leader is exposing its high watermark before committing the `LeaderChange` record, which jeopardizes future leader's replicated entries due to incorrect offset calculations."
+28393be6d7416f51eb51f7fe2b075570b45ef09f,1646851168,"KAFKA-12879: Revert changes from KAFKA-12339 and instead add retry capability to KafkaBasedLog (#11797)
+
+Fixes the compatibility issue regarding KAFKA-12879 by reverting the changes to the admin client from KAFKA-12339 (#10152) that retry admin client operations, and instead perform the retries within Connect's `KafkaBasedLog` during startup via a new `TopicAdmin.retryEndOffsets(..)` method. This method delegates to the existing `TopicAdmin.endOffsets(...)` method, but will retry on `RetriableException` until the retry timeout elapses.
+
+This change should be backward compatible to the KAFKA-12339 so that when Connect's `KafkaBasedLog` starts up it will retry attempts to read the end offsets for the log's topic. The `KafkaBasedLog` existing thread already has its own retry logic, and this is not changed.
+
+Added more unit tests, and thoroughly tested the new `RetryUtil` used to encapsulate the parameterized retry logic around any supplied function.","['clients/src/main/java/org/apache/kafka/clients/admin/internals/MetadataOperationContext.java', 'clients/src/test/java/org/apache/kafka/clients/admin/KafkaAdminClientTest.java', 'connect/runtime/src/main/java/org/apache/kafka/connect/util/KafkaBasedLog.java', 'connect/runtime/src/main/java/org/apache/kafka/connect/util/RetryUtil.java', 'connect/runtime/src/main/java/org/apache/kafka/connect/util/TopicAdmin.java', 'connect/runtime/src/test/java/org/apache/kafka/connect/util/KafkaBasedLogTest.java', 'connect/runtime/src/test/java/org/apache/kafka/connect/util/RetryUtilTest.java', 'connect/runtime/src/test/java/org/apache/kafka/connect/util/TopicAdminTest.java']","The changes from KAFKA-12339 have resulted in compatibility issue KAFKA-12879, making KafkaBasedLog unable to handle RetriableExceptions during startup, causing failures in reading the end offsets for the log's topic."
+5c0fd36ee53052fa8a92dac1266fee3aaf16d7a1,1587669902,"KAFKA-9823: Remember the sent generation for the coordinator request (#8445)
+
+For join / sync / commit / heartbeat request, we would remember the sent generation in the created handler object, and then upon getting the error code, we could check whether the sent generation still matches the current generation. If not, it means that the member has already reset its generation or has participated in a new rebalance already. This means:
+
+1. For join / sync-group request, we do not need to call reset-generation any more for illegal-generation / unknown-member. But we would still set the error since at a given time only one join/sync round-trip would be in flight, and hence we should not be participating in a new rebalance. Also for fenced instance error we still treat it as fatal since we should not be participating in a new rebalance, so this is still not expected.
+
+2. For commit request, we do not set the corresponding error for illegal-generation / unknown-member / fenced-instance but raise rebalance-in-progress. For commit-sync it would be still thrown to user, while for commit-async it would be logged and swallowed.
+
+3. For heartbeat request, we do not treat illegal-generation / unknown-member / fenced-instance errors and just consider it as succeeded since this should be a stale heartbeat which can be ignored.
+
+Reviewers: Konstantine Karantasis <konstantine@confluent.io>, Boyang Chen <boyang@confluent.io>, Jason Gustafson <jason@confluent.io>","['clients/src/main/java/org/apache/kafka/clients/consumer/internals/AbstractCoordinator.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinator.java', 'clients/src/main/java/org/apache/kafka/common/requests/LeaveGroupResponse.java', 'clients/src/main/java/org/apache/kafka/common/requests/SyncGroupResponse.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/internals/AbstractCoordinatorTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/internals/ConsumerCoordinatorTest.java', 'core/src/main/scala/kafka/coordinator/group/GroupMetadata.scala', 'core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala']","On sending join/sync/commit/heartbeat requests, if the sent generation does not match the current generation, members may erroneously reset their generations or participate in a new rebalance."
+079e5d647ce39cf2ab5b5f37c5ce28b59fb6db13,1695745043,"KAFKA-15326: [8/N] Move consumer interaction out of processing methods (#14226)
+
+The process method inside the tasks needs to be called from within
+the processing threads. However, it currently interacts with the
+consumer in two ways:
+
+* It resumes processing when the PartitionGroup buffers are empty
+* It fetches the lag from the consumer
+
+We introduce updateLags() and 
+resumePollingForPartitionsWithAvailableSpace() methods that call into
+the task from the polling thread, in order to set up the consumer
+correctly for the next poll, and extract metadata from the consumer
+after the poll.
+
+Reviewer: Bruno Cadonna <bruno@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/PartitionGroup.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/ReadOnlyTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StandbyTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/Task.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TaskManager.java', 'streams/src/test/java/org/apache/kafka/streams/integration/PauseResumeIntegrationTest.java', 'streams/src/test/java/org/apache/kafka/streams/integration/utils/IntegrationTestUtils.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/PartitionGroupTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamTaskTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamThreadTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/TaskManagerTest.java', 'streams/test-utils/src/main/java/org/apache/kafka/streams/TopologyTestDriver.java']","The 'process' method in tasks interacts with the consumer directly, potentially causing synchronization issues between processing threads and the consumer in the event of empty PartitionGroup buffers or fetching the lag."
+33df5c633f68cb3726f053fe51109bbed897cbb4,1621898098,"MINOR: clarify message ordering with max in-flight requests and idempotent producer (#10690)
+
+The docs for the max.in.flight.requests.per.connection and enable.idempotence configs currently imply that setting the max in-flight request greater than 1 will break the message ordering guarantee, but that is only true if enable.idempotence is false. When using an idempotent producer, the max in-flight request can be up to 5 without re-ordering messages.
+
+Reviewers: Matthias J. Sax <mjsax@confluent.io>, Ismael Juma <mlists@juma.me.uk>, Luke Chen <showuon@gmail.com>",['clients/src/main/java/org/apache/kafka/clients/producer/ProducerConfig.java'],"The documentation for 'max.in.flight.requests.per.connection' and 'enable.idempotence' configurations could mislead users to believe that a max in-flight request greater than 1 breaks message ordering, disregarding the idempotent producer settings."
+0aea498b9a2e70bdd92859159c0a868e9b8900d9,1654194083,"MINOR: Pin ducktape version to < 0.9 (#12242)
+
+With newer ducktape versions than < 0.9 system tests
+may run into authentication issues with the AK system test
+infrastructure.
+
+The version will be bumped up once we have infrastructure
+in place for newer paramiko versions brought in by ducktape
+0.9.
+
+Reviewers: Lucas Bradstreet <lucas@confluent.io>, Matthias J. Sax <mjsax@apache.org>, Kvicii <Karonazaba@gmail.com>",['tests/setup.py'],Newer Ducktape versions (>0.9) lead to authentication issues with the AK system test infrastructure.
+7dc17908de540b461b67b71652cef652adc488b0,1666130960,"KAFKA-14300; Generate snapshot after repeated controller resign (#12747)
+
+Setting the `committedBytesSinceLastSnapshot` to 0 when resigning can cause the controller to not generate a snapshot after `snapshotMaxNewRecordBytes` committed bytes have been replayed.
+
+This change fixes that by simply not resetting the counter during resignation. This is correct because the counter tracks the number of committed bytes replayed but not included in the latest snapshot. In other words, reverting the last committed state does not invalidate this value.
+
+Reviewers: Colin Patrick McCabe <cmccabe@apache.org>","['metadata/src/main/java/org/apache/kafka/controller/QuorumController.java', 'metadata/src/main/java/org/apache/kafka/timeline/SnapshotRegistry.java', 'metadata/src/test/java/org/apache/kafka/controller/QuorumControllerTest.java', 'metadata/src/test/java/org/apache/kafka/metalog/LocalLogManager.java']","The controller doesn't generate a snapshot after `snapshotMaxNewRecordBytes` committed bytes have been replayed post controller's resign, due to resetting of `committedBytesSinceLastSnapshot` counter."
+6625214c52961fc40b7992a031d60c6805db4cec,1675273323,"KAFKA-14658: Do not open broker ports until we are ready to accept traffic (#13169)
+
+When we are listening on fixed ports, we should defer opening ports until we're ready to accept
+traffic. If we open the broker port too early, it can confuse monitoring and deployment systems.
+This is a particular concern when in KRaft mode, since in that mode, we create the SocketServer
+object earlier in the startup process than when in ZK mode.
+
+The approach taken in this PR is to defer opening the acceptor port until Acceptor.start is called.
+Note that when we are listening on a random port, we continue to open the port ""early,"" in the
+SocketServer constructor. The reason for doing this is that there is no other way to find the
+random port number the kernel has selected. Since random port assignment is not used in production
+deployments, this should be reasonable.
+
+FutureUtils.java: add chainFuture and tests.
+
+SocketServerTest.scala: add timeouts to cases where we call get() on futures.
+
+Reviewers: David Arthur <mumrah@gmail.com>, Alexandre Dupriez <hangleton@users.noreply.github.com>","['core/src/main/scala/kafka/network/SocketServer.scala', 'core/src/main/scala/kafka/server/BrokerServer.scala', 'core/src/main/scala/kafka/server/ControllerServer.scala', 'core/src/test/scala/unit/kafka/network/SocketServerTest.scala', 'core/src/test/scala/unit/kafka/server/ServerStartupTest.scala', 'server-common/src/main/java/org/apache/kafka/server/util/FutureUtils.java', 'server-common/src/test/java/org/apache/kafka/server/util/FutureUtilsTest.java']","Broker ports open prematurely before being ready to accept traffic, confusing monitoring and deployment systems, particularly noticeable in KRaft mode."
+8b1eca1c58aef822082dd9954bc41179ecf3eb06,1627082561,"KAFKA-13126: guard against overflow when computing `joinGroupTimeoutMs` (#11111)
+
+Setting the max.poll.interval.ms to MAX_VALUE causes overflow when computing the joinGroupTimeoutMs and results in the JoinGroup timeout being set to the request.timeout.ms instead, which is much lower.
+
+This can easily make consumers drop out of the group, since they must rejoin now within 30s (by default) yet have no obligation to almost ever call poll() given the high max.poll.interval.ms, especially when each record takes a long time to process or the `max.poll.records` is also very large. We just need to check for overflow and fix it to Integer.MAX_VALUE when it occurs.
+
+Reviewers: Luke Chen <showuon@gmail.com>, John Roesler <vvcephei@apache.org>","['clients/src/main/java/org/apache/kafka/clients/NetworkClientUtils.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/internals/AbstractCoordinator.java', 'clients/src/main/java/org/apache/kafka/common/security/kerberos/KerberosLogin.java', 'connect/runtime/src/main/java/org/apache/kafka/connect/tools/MockSinkTask.java', 'connect/runtime/src/main/java/org/apache/kafka/connect/tools/MockSourceTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/GlobalStreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StateDirectory.java']","Setting the max.poll.interval.ms to MAX_VALUE leads to overflow when computing joinGroupTimeoutMs, causing unexpected consumer dropouts due to lower JoinGroup timeout."
+31a5f92b9f657d3b0f65ad2abfc2a085958621c9,1567543637,"Changed for updatedTasks, avoids stopping and starting of unnecessary tasks (#7097)
+
+Corrected the `KafkaConfigBackingStore` logic to notify of only the changed tasks, rather than all tasks. This was not noticed before because Connect always stopped and restarted all tasks during a rebalanced, but since 2.3 the incremental rebalance logic exposed this bug.
+
+Author: Luying Liu <lyliu@lyliu-mac.freewheelmedia.net>
+Reviewers: Konstantine Karantasis <konstantine@confluent.io>, Randall Hauch <rhauch@gmail.com>",['connect/runtime/src/main/java/org/apache/kafka/connect/storage/KafkaConfigBackingStore.java'],"The KafkaConfigBackingStore logic notifies all tasks instead of only the changed tasks, leading to unnecessary stopping and restarting of tasks during rebalancing."
+d2521855b8eb8a0dbb6f94cd9bb5093276fb7db2,1599594216,"KAFKA-10432; LeaderEpochCache is incorrectly recovered for leader epoch 0 (#9219)
+
+The leader epoch cache is incorrectly recovered for epoch 0 as the
+assignment is skipped when epoch == 0. This check was likely intended to
+prevent negative epochs from being applied or there was an assumption
+that epochs started at 1.
+
+A test has been added to LogSegmentTest to show the LogSegment
+recovery path works for the epoch cache. This was a test gap as none of the 
+recover calls supply a leader epoch cache to recover.
+
+Reviewers: Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/log/LogSegment.scala', 'core/src/test/scala/unit/kafka/log/LogSegmentTest.scala']","The leader epoch cache recovery is not properly functioning when the epoch equals 0, possibly due to a misunderstanding that epochs start at 1. This is causing issues in the log segment recovery path."
+ba1e16f0c02aeeaba54600c1a828f6cd13acf1a4,1610742523,"MINOR: Upstream ApisUtils from kip-500 (#9715)
+
+In the [KIP-500 development branch](https://github.com/confluentinc/kafka/tree/kip-500),
+we have a separate ControllerApis that shares a lot of functionality with KafkaApis. We
+introduced a utility class ApisUtils to pull out the common code. Some things were moved
+to RequestChannel as well.
+
+We'd like to upstream this work now so we don't continue to diverge (since KafkaApis is
+a frequently modified class). There should be no logical changes in this PR, only shuffling
+code around.
+
+Reviewers: Jason Gustafson <jason@confluent.io>, Chia-Ping Tsai <chia7712@gmail.com>, Jose Sancio <jsancio@users.noreply.github.com>, Ismael Juma <ismael@juma.me.uk>
+","['core/src/main/scala/kafka/server/AuthHelper.scala', 'core/src/main/scala/kafka/server/KafkaApis.scala', 'core/src/main/scala/kafka/server/RequestHandlerHelper.scala', 'core/src/test/scala/unit/kafka/server/KafkaApisTest.scala']","KafkaApis is frequently modified, causing divergence with the ControllerApis class in KIP-500 development branch, due to common functionality that is not universally accessible."
+a3305c4b8b29c9fb4eede11aea4dd6fd60e445dc,1612543860,"MINOR: Remove ZK dependency for coordinator topics' partition counts (#10008)
+
+The group coordinator and the transaction state manager query ZooKeeper 
+to retrieve the partition count for the topics they manager. Since ZooKeeper
+won't be available when the broker is using a Raft-based metadata quorum,
+this PR changes the startup function to provide an accessor function instead.
+This will allow the ZK-based broker to continue using ZK, while the kip-500
+broker will query the metadata provided by the metadata log.
+
+Reviewers: Colin P. McCabe <cmccabe@apache.org>, David Arthur <david.arthur@confluent.io>
+
+Co-authored-by: Ismael Juma <ismael@juma.me.uk>","['core/src/main/scala/kafka/coordinator/group/GroupCoordinator.scala', 'core/src/main/scala/kafka/coordinator/group/GroupMetadataManager.scala', 'core/src/main/scala/kafka/coordinator/transaction/TransactionCoordinator.scala', 'core/src/main/scala/kafka/coordinator/transaction/TransactionStateManager.scala', 'core/src/main/scala/kafka/server/KafkaServer.scala', 'core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorConcurrencyTest.scala', 'core/src/test/scala/unit/kafka/coordinator/group/GroupCoordinatorTest.scala', 'core/src/test/scala/unit/kafka/coordinator/group/GroupMetadataManagerTest.scala', 'core/src/test/scala/unit/kafka/coordinator/transaction/TransactionCoordinatorConcurrencyTest.scala', 'core/src/test/scala/unit/kafka/coordinator/transaction/TransactionCoordinatorTest.scala', 'core/src/test/scala/unit/kafka/coordinator/transaction/TransactionStateManagerTest.scala']",Group coordinator and transaction state manager can't retrieve the partition count for their topics when broker uses a Raft-based metadata quorum due to dependency on unavailable ZooKeeper.
+5359b2e3bc1cf13a301f32490a6630802afc4974,1582575153,"MINOR: Improve AuthorizerIntegrationTest (#7926)
+
+This patch improves the authorizer integration tests in the following ways:
+
+1. We use a separate principal for inter-broker communications. This ensures that ACLs set in the test cases do not interfere with inter-broker communication. We had two test cases (`testCreateTopicAuthorizationWithClusterCreate` and `testAuthorizationWithTopicExisting`) which depend on topic creation and were timing out because of inter-broker metadata propagation failures. The timeouts were treated as successfully satisfying the expectation of authorization. So the tests passed, but not because of the intended reason.
+2. Previously `GroupAuthorizerIntegrationTest` was inheriting _all_ of the tests from `AuthorizerIntegrationTest`. This seemed like overkill since the ACL evaluation logic is essentially the same. 
+
+Totally this should take about 5-10 minutes off the total build time and make the authorizer integration tests a little more resilient to problems with inter-broker communication.
+
+Reviewers: Rajini Sivaram <rajinisivaram@googlemail.com>, Ismael Juma <ismael@juma.me.uk>","['core/src/test/scala/integration/kafka/api/AuthorizerIntegrationTest.scala', 'core/src/test/scala/integration/kafka/api/DelegationTokenEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/EndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/GroupAuthorizerIntegrationTest.scala', 'core/src/test/scala/integration/kafka/api/GroupEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/PlaintextEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/PlaintextProducerSendTest.scala', 'core/src/test/scala/integration/kafka/api/SaslGssapiSslEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/SaslOAuthBearerSslEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/SaslPlainSslEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/SaslScramSslEndToEndAuthorizationTest.scala', 'core/src/test/scala/integration/kafka/api/SslEndToEndAuthorizationTest.scala', 'core/src/test/scala/unit/kafka/integration/KafkaServerTestHarness.scala', 'core/src/test/scala/unit/kafka/utils/TestUtils.scala']","Inter-broker communications in authorizer integration tests are being interfered with by ACLs, causing false-positive test results and subsequent timeouts. Also, `GroupAuthorizerIntegrationTest` is unnecessarily inheriting all tests from `AuthorizerIntegrationTest`, leading to redundancy."
+23cade850678eeae1bc1227a2a2a4bc09b02f2fc,1599233671,"KAFKA-10314: KafkaStorageException on reassignment when offline log directories exist (#9122)
+
+Make sure that we set the isNew field in LeaderAndIsrRequest correctly for brokers
+that gets added to the replica set on reassignment.
+
+This is tested by creating a variant of ControllerIntergationTest.testPartitionReassignment()
+that makes one of the log directories on the target broker offline before initiating the
+reassignment. Without the change to the way isNew is set, this fails after a timeout. With
+the change, it succeeds.
+
+To facilitate calling causeLogDirFailure() both from ControllerIntegrationTest and
+LogDirFailureTest, the method was moved to TestUtils along with the other helper
+methods that deals with interacting with KafkaServer instances for test cases.
+
+Reviewers: Mickael Maison <mickael.maison@gmail.com>","['core/src/main/scala/kafka/controller/KafkaController.scala', 'core/src/test/scala/unit/kafka/controller/ControllerIntegrationTest.scala', 'core/src/test/scala/unit/kafka/server/LogDirFailureTest.scala', 'core/src/test/scala/unit/kafka/utils/TestUtils.scala']","LeaderAndIsrRequest's 'isNew' field not set correctly for brokers added to replica set upon reassignment, causing KafkaStorageException when offline log directories are present."
+56ef910358e2bde42aba4aaafd7f5c899055ad92,1626824480,"KAFKA-13104: Controller should notify raft client when it resigns #11082
+
+When the active controller encounters an event exception it attempts to renounce leadership.
+Unfortunately, this doesn't tell the RaftClient that it should attempt to give up leadership. This
+will result in inconsistent state with the RaftClient as leader but with the controller as
+inactive.  This PR changes the implementation so that the active controller asks the RaftClient
+to resign.
+
+Reviewers: Jose Sancio <jsancio@gmail.com>, Colin P. McCabe <cmccabe@apache.org>","['metadata/src/main/java/org/apache/kafka/controller/QuorumController.java', 'raft/src/main/java/org/apache/kafka/raft/RaftClient.java']","When an active controller encounters an event exception and renounces leadership, the RaftClient is not notified, leading to an inconsistent state where RaftClient remains the leader while the controller is inactive."
+82dff1db5486647b27e5297e4c839bd2a905c1d9,1586212229,"KAFKA-9753: A few more metrics to add (#8371)
+
+Instance-level:
+* number of alive stream threads
+
+Thread-level:
+* avg / max number of records polled from the consumer per runOnce, INFO
+* avg / max number of records processed by the task manager (i.e. across all tasks) per runOnce, INFO
+
+Task-level:
+* number of current buffered records at the moment (i.e. it is just a dynamic gauge), DEBUG.
+
+Reviewers: Bruno Cadonna <bruno@confluent.io>, John Roesler <john@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/KafkaStreams.java', 'streams/src/main/java/org/apache/kafka/streams/internals/metrics/ClientMetrics.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/Task.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TaskManager.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/metrics/StreamsMetricsImpl.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/metrics/TaskMetrics.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/metrics/ThreadMetrics.java', 'streams/src/test/java/org/apache/kafka/streams/KafkaStreamsTest.java', 'streams/src/test/java/org/apache/kafka/streams/integration/MetricsIntegrationTest.java', 'streams/src/test/java/org/apache/kafka/streams/internals/metrics/ClientMetricsTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/metrics/TaskMetricsTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamTaskTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamThreadTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/metrics/ThreadMetricsTest.java']","The software lacks sufficient metrics at the instance, thread, and task levels which includes the number of live stream threads, the average/maximum number of records polled from the consumer, average/maximum number of records processed by the task manager and the number of current buffered records."
+2df7ea5a4a43920ae1ac8a259f6f69846011eda7,1582481792,"KAFKA-9530; Fix flaky test `testDescribeGroupWithShortInitializationTimeout` (#8154)
+
+With a short timeout, a call in KafkaAdminClient may timeout and the client might disconnect. Currently this can be exposed to the user as either a TimeoutException or a DisconnectException. To be consistent, rather than exposing the underlying retriable error, we handle both cases with a TimeoutException.
+
+Reviewers: Boyang Chen <boyang@confluent.io>, Ismael Juma <ismael@juma.me.uk>",['clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java'],"KafkaAdminClient inconsistency error: In case of a short timeout, it may unpredictably throw TimeoutException or DisconnectException instead of handling both situations consistently with TimeoutException."
+a126e3a622f2b7142f3543b9dbee54b6412ba9d8,1655310015,"KAFKA-13888; Addition of Information in DescribeQuorumResponse about Voter Lag (#12206)
+
+This commit adds an Admin API handler for DescribeQuorum Request and also
+adds in two new fields LastFetchTimestamp and LastCaughtUpTimestamp to
+the DescribeQuorumResponse as described by KIP-836.
+
+This commit does not implement the newly added fields. Those will be
+added in a subsequent commit.
+
+Reviewers: dengziming <dengziming1993@gmail.com>, David Jacot <djacot@confluent.io>, Jason Gustafson <jason@confluent.io>","['clients/src/main/java/org/apache/kafka/clients/admin/Admin.java', 'clients/src/main/java/org/apache/kafka/clients/admin/DescribeMetadataQuorumOptions.java', 'clients/src/main/java/org/apache/kafka/clients/admin/DescribeMetadataQuorumResult.java', 'clients/src/main/java/org/apache/kafka/clients/admin/KafkaAdminClient.java', 'clients/src/main/java/org/apache/kafka/clients/admin/QuorumInfo.java', 'clients/src/main/java/org/apache/kafka/common/internals/Topic.java', 'clients/src/test/java/org/apache/kafka/clients/admin/KafkaAdminClientTest.java', 'clients/src/test/java/org/apache/kafka/clients/admin/MockAdminClient.java', 'core/src/main/scala/kafka/server/KafkaRaftServer.scala', 'core/src/test/scala/unit/kafka/server/DescribeQuorumRequestTest.scala']","DescribeQuorumResponse lacking key fields, 'LastFetchTimestamp' and 'LastCaughtUpTimestamp', providing insufficient information about quorum state.
+"
+7f640f13b4d486477035c3edb28466734f053beb,1585889317,"KAFKA-9776: Downgrade TxnCommit API v3 when broker doesn't support (#8375)
+
+Revert the decision for the sendOffsetsToTransaction(groupMetadata) API to fail with old version of brokers for the sake of making the application easier to adapt between versions. This PR silently downgrade the TxnOffsetCommit API when the build version is small than 3.
+
+Reviewers: Matthias J. Sax <matthias@confluent.io>, Guozhang Wang <wangguoz@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/producer/KafkaProducer.java', 'clients/src/main/java/org/apache/kafka/clients/producer/ProducerConfig.java', 'clients/src/main/java/org/apache/kafka/clients/producer/internals/TransactionManager.java', 'clients/src/main/java/org/apache/kafka/common/requests/TxnOffsetCommitRequest.java', 'clients/src/test/java/org/apache/kafka/clients/producer/KafkaProducerTest.java', 'clients/src/test/java/org/apache/kafka/clients/producer/internals/RecordAccumulatorTest.java', 'clients/src/test/java/org/apache/kafka/clients/producer/internals/SenderTest.java', 'clients/src/test/java/org/apache/kafka/clients/producer/internals/TransactionManagerTest.java', 'clients/src/test/java/org/apache/kafka/common/requests/RequestResponseTest.java', 'clients/src/test/java/org/apache/kafka/common/requests/TxnOffsetCommitRequestTest.java', 'core/src/test/scala/unit/kafka/server/KafkaApisTest.scala', 'core/src/test/scala/unit/kafka/server/RequestQuotaTest.scala', 'streams/src/main/java/org/apache/kafka/streams/StreamsConfig.java', 'streams/src/test/java/org/apache/kafka/streams/StreamsConfigTest.java', 'tests/kafkatest/tests/streams/streams_broker_compatibility_test.py']","The sendOffsetsToTransaction(groupMetadata) API fails with older versions of brokers, complicating the application adaptation between versions."
+c462a657ecbc4761e247c28159fa4055546f1be2,1651151603,"KAFKA-13794: Fix comparator of inflightBatchesBySequence in TransactionsManager (round 3) (#12096)
+
+Conceptually, the ordering is defined by the producer id, producer epoch
+and the sequence number. This set should generally only have entries
+for the same producer id and epoch, but there is one case where
+we can have conflicting `remove` calls and hence we add this as
+a temporary safe fix.
+
+We'll follow-up with a fix that ensures the original intended invariant.
+
+Reviewers: Jason Gustafson <jason@confluent.io>, David Jacot <djacot@confluent.io>, Luke Chen <showuon@gmail.com>",['clients/src/main/java/org/apache/kafka/clients/producer/internals/TransactionManager.java'],"In TransactionsManager, the inflightBatchesBySequence's comparator ordering conflicts due to same producer id and epoch, leading to conflicts during 'remove' calls."
+47a9871ef65a13f9d58d5ea216de340f7e123da5,1555372408,"KAFKA-7471: Multiple Consumer Group Management Feature (#5726)
+
+* Describe/Delete/Reset offsets on multiple consumer groups at a time (including each group by repeating `--group` parameter)
+* Describe/Delete/Reset offsets on ALL consumer groups at a time (add new `--all-groups` option similar to `--all-topics`)
+* Reset plan CSV file generation reworked: structure updated to support multiple consumer groups and make sure that CSV file generation is done properly since there are no restrictions on consumer group names and symbols like commas and quotes are allowed.
+* Extending data output table format by adding `GROUP` column for all `--describe` queries","['core/src/main/scala/kafka/admin/ConsumerGroupCommand.scala', 'core/src/test/scala/integration/kafka/api/AuthorizerIntegrationTest.scala', 'core/src/test/scala/unit/kafka/admin/DeleteConsumerGroupsTest.scala', 'core/src/test/scala/unit/kafka/admin/DescribeConsumerGroupTest.scala', 'core/src/test/scala/unit/kafka/admin/ResetConsumerGroupOffsetTest.scala']",Multiple consumer group management is limited - cannot describe/delete/reset offsets for multiple or all consumer groups at a time. Reset plan CSV file generation structure does not support multiple consumer groups and symbols like commas and quotes.
+e3ccf2079463d0be6141d3a86c0499ceba8a3afa,1584113009,"KAFKA-9685: Solve Set concatenation perf issue in AclAuthorizer
+
+To dismiss the usage of operation ++ against Set which is slow when Set has many entries. This pr introduces a new class 'AclSets' which takes multiple Sets as parameters and do 'find' against them one by one. For more details about perf and benchmark, refer to [KAFKA-9685](https://issues.apache.org/jira/browse/KAFKA-9685)
+
+Author: jiao <jiao.zhang@linecorp.com>
+
+Reviewers: Manikumar Reddy <manikumar.reddy@gmail.com>
+
+Closes #8261 from jiao-zhangS/jira-9685
+","['core/src/main/scala/kafka/security/authorizer/AclAuthorizer.scala', 'jmh-benchmarks/src/main/java/org/apache/kafka/jmh/acl/AclAuthorizerBenchmark.java']",Set concatenation in AclAuthorizer using operation ++ exhibits performance degradation when dealing with large sets.
+aa399a335f75122d258c5cef1ffc3604b42f4052,1695906277,"KAFKA-15499: Fix the flaky DeleteSegmentsDueToLogStartOffsetBreach test (#14439)
+
+DeleteSegmentsDueToLogStartOffsetBreach configures the segment such that it can hold at-most 2 record-batches. And, it asserts that the local-log-start-offset based on the assumption that each segment will contain exactly two messages.
+
+During leader switch, the segment can get rotated and may not always contain two records. Previously, we were checking whether the expected local-log-start-offset is equal to the base-offset-of-the-first-local-log-segment. With this patch, we will scan the first local-log-segment for the expected offset.
+
+Reviewers: Divij Vaidya <diviv@amazon.com>","['storage/src/test/java/org/apache/kafka/server/log/remote/storage/LocalTieredStorageTest.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/utils/BrokerLocalStorage.java']","The DeleteSegmentsDueToLogStartOffsetBreach test is flaky due to segment rotation during leader switch, causing the segment to possibly not contain two records as initially assumed."
+aaa976a3409f61e1e65ed49742567c08a502d9e1,1678402360,"MINOR: Some metadata publishing fixes and refactors (#13337)
+
+This PR refactors MetadataPublisher's interface a bit. There is now an onControllerChange
+callback. This is something that some publishers might want. A good example is ZkMigrationClient.
+Instead of two different publish functions (one for snapshots, one for log deltas), we now have a single onMetadataUpdate function. Most publishers didn't want to do anything different in those two cases.
+The ones that do want to do something different for snapshots can always check the manifest type.
+The close function now has a default empty implementation, since most publishers didn't need to do
+anything there.
+
+Move the SCRAM logic out of BrokerMetadataPublisher and run it on the controller as well.
+
+On the broker, simply use dynamicClientQuotaPublisher to handle dynamic client quotas changes.
+That is what the controller already does, and the code is exactly the same in both cases.
+
+Fix the logging in FutureUtils.waitWithLogging a bit. Previously, when invoked from BrokerServer
+or ControllerServer, it did not include the standard ""[Controller 123] "" style prefix indicating server
+name and ID. This was confusing, especially when debugging junit tests.
+
+Reviewers: Ron Dagostino <rdagostino@confluent.io>, David Arthur <mumrah@gmail.com>","['core/src/main/scala/kafka/server/BrokerServer.scala', 'core/src/main/scala/kafka/server/ControllerServer.scala', 'core/src/main/scala/kafka/server/KafkaRaftServer.scala', 'core/src/main/scala/kafka/server/metadata/BrokerMetadataPublisher.scala', 'core/src/main/scala/kafka/server/metadata/DynamicClientQuotaPublisher.scala', 'core/src/main/scala/kafka/server/metadata/DynamicConfigPublisher.scala', 'core/src/main/scala/kafka/server/metadata/ScramPublisher.scala', 'core/src/test/scala/unit/kafka/server/metadata/BrokerMetadataPublisherTest.scala', 'metadata/src/main/java/org/apache/kafka/image/loader/LoaderManifest.java', 'metadata/src/main/java/org/apache/kafka/image/loader/LoaderManifestType.java', 'metadata/src/main/java/org/apache/kafka/image/loader/LogDeltaManifest.java', 'metadata/src/main/java/org/apache/kafka/image/loader/MetadataLoader.java', 'metadata/src/main/java/org/apache/kafka/image/loader/SnapshotManifest.java', 'metadata/src/main/java/org/apache/kafka/image/publisher/MetadataPublisher.java', 'metadata/src/main/java/org/apache/kafka/image/publisher/SnapshotGenerator.java', 'metadata/src/main/java/org/apache/kafka/metadata/migration/KRaftMigrationDriver.java', 'metadata/src/test/java/org/apache/kafka/image/loader/MetadataLoaderTest.java', 'metadata/src/test/java/org/apache/kafka/metadata/migration/KRaftMigrationDriverTest.java', 'server-common/src/main/java/org/apache/kafka/server/util/FutureUtils.java', 'server-common/src/test/java/org/apache/kafka/server/util/FutureUtilsTest.java']","MetadataPublisher's interface changes causing issues with certain publishers, like ZkMigrationClient, and inconsistencies with client quota changes handling in BrokerMetadataPublisher and the controller. In addition, logging in FutureUtils.waitWithLogging lacks standard server name and ID prefix, leading to confusion in debugging."
+a024e679c7207aee2242d72aef53dc441c60ca27,1578529520,"MINOR: Update dependencies for Kafka 2.5 (#7909)
+
+Noteworthy:
+* zstd decompression speed improvement of ~10%:
+https://github.com/facebook/zstd/releases/tag/v1.4.4
+* EasyMock, PowerMock and Mockito: improved support for Java 13.
+* Replace usage of method deprecated by Mockito.
+* Gradle plugins updated to versions that require Gradle 5.x, this is
+fine since we no longer depend on the installed Gradle version.
+* Fixed build not to depend on methods deprecated in Gradle 5.x
+(fixes KAFKA-8786).
+* Reflections 0.9.12 no longer depends on Guava (fixes KAFKA-3061).
+* Updated `OptimizedKTableIntegrationTest` to pass with new version
+of Hamcrest.
+* Several Jetty improvements and bug fixes:
+   - https://github.com/eclipse/jetty.project/releases/tag/jetty-9.4.21.v20190926
+   - https://github.com/eclipse/jetty.project/releases/tag/jetty-9.4.22.v20191022
+   - https://github.com/eclipse/jetty.project/releases/tag/jetty-9.4.23.v20191118
+   - https://github.com/eclipse/jetty.project/releases/tag/jetty-9.4.24.v20191120
+   - https://github.com/eclipse/jetty.project/releases/tag/jetty-9.4.25.v20191220
+
+Note that I did not upgrade lz4 due to https://github.com/lz4/lz4-java/issues/156.
+
+Reviewers: Manikumar Reddy <manikumar.reddy@gmail.com>
+
+Co-authored-by: Ismael Juma <ismael@juma.me.uk>
+Co-authored-by: Aljoscha <aljoscha.poertner@posteo.de>","['clients/src/test/java/org/apache/kafka/common/security/oauthbearer/OAuthBearerLoginModuleTest.java', 'streams/src/test/java/org/apache/kafka/streams/integration/OptimizedKTableIntegrationTest.java']","Outdated Kafka dependencies causing poor decompression speed, lack of support for Java 13, dependency on deprecated methods, and specific issues with Jetty and Reflections. Also, lz4 version has not been updated due to present shortcomings."
+d3130f2e911473fcf1265dec14016c824499d9a7,1657616299,"KAFKA-14062: OAuth client token refresh fails with SASL extensions (#12398)
+
+- Different objects should be considered unique even with same content to support logout
+- Added comments for SaslExtension re: removal of equals and hashCode
+- Also swapped out the use of mocks in exchange for *real* SaslExtensions so that we exercise the use of default equals() and hashCode() methods.
+- Updates to implement equals and hashCode and add tests in SaslExtensionsTest to confirm
+
+Co-authored-by: Purshotam Chauhan <pchauhan@confluent.io>
+
+Reviewers: Manikumar Reddy <manikumar.reddy@gmail.com>","['clients/src/main/java/org/apache/kafka/common/security/auth/SaslExtensions.java', 'clients/src/main/java/org/apache/kafka/common/security/auth/SaslExtensionsCallback.java', 'clients/src/main/java/org/apache/kafka/common/security/oauthbearer/internals/OAuthBearerClientInitialResponse.java', 'clients/src/test/java/org/apache/kafka/common/security/SaslExtensionsTest.java', 'clients/src/test/java/org/apache/kafka/common/security/oauthbearer/OAuthBearerLoginModuleTest.java']","OAuth client token refresh fails with SASL extensions due to objects with the same content not being considered unique, causing logout issues."
+0586f544ef5a3e2ffa263babc811568ce672dfa1,1648225802,"KAFKA-10405: Set purge interval explicitly in PurgeRepartitionTopicIntegrationTest (#11948)
+
+In KIP-811, we added a new config repartition.purge.interval.ms to set repartition purge interval. In this flaky test, we expected the purge interval is the same as commit interval, which is not correct anymore (default is 30 sec). Set the purge interval explicitly to fix this issue.
+
+Reviewers: Bruno Cadonna <cadonna@apache.org>, Guozhang Wang <wangguoz@gmail.com>",['streams/src/test/java/org/apache/kafka/streams/integration/PurgeRepartitionTopicIntegrationTest.java'],"The PurgeRepartitionTopicIntegrationTest is flaky due to an unexpected purge interval, assumed to be the same as the commit interval, which is not correct with the new configuration added in KIP-811."
+cd1e46c8bb46f1e5303c51f476c74e33b522fce8,1586265978,"MINOR: Pass one action per unique resource name in KafkaApis.filterAuthorized (#8432)
+
+90bbeedf52f introduced a regression resulting in passing an action per resource
+name to the `Authorizer` instead of passing one per unique resource name. Refactor
+the signatures of both `filterAuthorized` and `authorize` to make them easier to test
+and add a test for each.
+
+Reviewers: Ismael Juma <ismael@juma.me.uk>","['core/src/main/scala/kafka/server/KafkaApis.scala', 'core/src/test/scala/unit/kafka/server/KafkaApisTest.scala']","A regression causes an action per resource name to be passed to the Authorizer, instead of one per unique resource name, which impacts the function of `filterAuthorized` and `authorize` in KafkaApis."
+c249ea8e5d9dad5e74b804a6f062b059517d6a8d,1584743173,"KAFKA-9727: cleanup the state store for standby task dirty close and check null for changelogs (#8307)
+
+This PR fixes three things:
+
+* the state should be closed when standby task is restoring as well
+* the EOS standby task should also wipe out state under dirty close
+* the changelog reader should check for null as well
+
+Reviewers: Guozhang Wang <wangguoz@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StandbyTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StoreChangelogReader.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TaskManager.java', 'streams/src/test/java/org/apache/kafka/streams/integration/StandbyTaskEOSIntegrationTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StandbyTaskTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StoreChangelogReaderTest.java']","Dirty close of EOS standby task does not wipe out state and null values aren't checked in changelog reader, leading to potential application crashes and stale data during restoration."
+ff48edbed46f23600ab434deee57e3ef2da8ed28,1604620513,"KAFKA-10624: For FeatureZNodeStatus, use sealed trait instead of Enumeration (#9561)
+
+This is a follow-up to initial KIP-584 development. In this PR, I've switched the FeatureZNodeStatus enum to be a sealed trait. In Scala, we prefer sealed traits over Enumeration since the former gives you exhaustiveness checking. With Scala enumeration, you don't get a warning if you add a new value that is not handled in a given pattern match.
+
+Reviewers: Jun Rao <junrao@gmail.com>","['core/src/main/scala/kafka/zk/ZkData.scala', 'core/src/test/scala/kafka/zk/FeatureZNodeTest.scala']","The Scala Enumeration for FeatureZNodeStatus in KIP-584 lacks exhaustiveness checking, possibly leading to unhandled new values."
+0a1c26934757afae4dce49ff3ee038311ca6dd4a,1550039800,"KAFKA-7652: Part III; Put to underlying before Flush (#6191)
+
+1. In the caching layer's flush listener call, we should always write to the underlying store, before flushing (see #4331 's point 4) for detailed explanation). When fixing 4331, it only touches on KV stores, but it turns out that we should fix for window and session store as well.
+
+2. Also apply the optimization that was in session-store already: when the new value bytes and old value bytes are all null (this is possible e.g. if there is a put(K, V) followed by a remove(K) or put(K, null) and these two operations only hit the cache), upon flushing this mean the underlying store does not have this value at all and also no intermediate value has been sent to downstream as well. We can skip both putting a null to the underlying store as well as calling the flush listener sending `null -> null` in this case.
+
+Modifies corresponding unit tests.
+
+Reviewers: John Roesler <john@confluent.io>, Matthias J. Sax <matthias@confluent.io>, Bill Bejeck <bill@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/state/internals/CachingKeyValueStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/CachingSessionStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/CachingWindowStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/SessionKeySchema.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/WindowKeySchema.java', 'streams/src/test/java/org/apache/kafka/streams/integration/QueryableStateIntegrationTest.java', 'streams/src/test/java/org/apache/kafka/streams/kstream/internals/KTableFilterTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/AbstractKeyValueStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/CachingKeyValueStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/CachingSessionStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/CachingWindowStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/RocksDBSessionStoreTest.java', 'streams/src/test/java/org/apache/kafka/test/StreamsTestUtils.java']","Caching layer's flush listener is not writing to the underlying store before flushing for window and session store. For put and remove operations that only hit the cache, unnecessary nulls are being pushed to the underlying store on flush."
+bda5c34b030207f542c7987a5e0f9bcb23406c18,1647373853,"MINOR: refactor how ConfigurationControl checks for resource existence (#11835)
+
+ConfigurationControl methods should take a boolean indicating whether the resource is newly
+created, rather than taking an existence checker object. The boolean is easier to understand. Also
+add a unit test of existing checking failing (and succeeding).
+
+Reviewers: Kirk True <kirk@mustardgrain.com>, José Armando García Sancio <jsancio@users.noreply.github.com>","['metadata/src/main/java/org/apache/kafka/controller/ConfigurationControlManager.java', 'metadata/src/main/java/org/apache/kafka/controller/QuorumController.java', 'metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java', 'metadata/src/test/java/org/apache/kafka/controller/ConfigurationControlManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/ReplicationControlManagerTest.java']","The existing mechanism of checking for resource existence in ConfigurationControl methods uses an existence checker object, making it complex to understand."
+44b3177a087ff809a9d95a27b63b10e00aa4da7d,1671562514,"KAFKA-14457; Controller metrics should only expose committed data (#12994)
+
+The controller metrics in the controllers has three problems. 1) the active controller exposes uncommitted data in the metrics. 2) the active controller doesn't update the metrics when the uncommitted data gets aborted. 3) the controller doesn't update the metrics when the entire state gets reset.
+
+We fix these issues by only updating the metrics when processing committed metadata records and reset the metrics when the metadata state is reset.
+
+This change adds a new type `ControllerMetricsManager` which processes committed metadata records and updates the metrics accordingly. This change also removes metrics updating responsibilities from the rest of the controller managers. 
+
+Reviewers: Ron Dagostino <rdagostino@confluent.io>","['metadata/src/main/java/org/apache/kafka/controller/BrokersToIsrs.java', 'metadata/src/main/java/org/apache/kafka/controller/ClusterControlManager.java', 'metadata/src/main/java/org/apache/kafka/controller/ControllerMetrics.java', 'metadata/src/main/java/org/apache/kafka/controller/ControllerMetricsManager.java', 'metadata/src/main/java/org/apache/kafka/controller/PartitionChangeBuilder.java', 'metadata/src/main/java/org/apache/kafka/controller/QuorumController.java', 'metadata/src/main/java/org/apache/kafka/controller/QuorumControllerMetrics.java', 'metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java', 'metadata/src/test/java/org/apache/kafka/controller/ClusterControlManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/ControllerMetricsManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/MockControllerMetrics.java', 'metadata/src/test/java/org/apache/kafka/controller/ProducerIdControlManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/QuorumControllerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/ReplicationControlManagerTest.java', 'server-common/src/main/java/org/apache/kafka/timeline/SnapshotRegistry.java']",Active controller is exposing uncommitted data in metrics and failing to update them when the data is aborted or when the entire state is reset.
+e2847e8603fe19a87ff03584fb38954e4bd3a59e,1558158345,"KAFKA-8365; Consumer and protocol support for follower fetching (#6731)
+
+This patch includes API changes for follower fetching per [KIP-392](https://cwiki.apache.org/confluence/display/KAFKA/KIP-392%3A+Allow+consumers+to+fetch+from+closest+replica) as well as the consumer implementation. After this patch, consumers will continue to fetch only from the leader, since the broker implementation to select an alternate read replica is not included here.
+
+Adds new `client.rack` consumer configuration property is added which allows the consumer to indicate its rack. This is just an arbitrary string to indicate some relative location, it doesn't have to actually represent a physical rack. We are keeping the naming consistent with the broker property (`broker.rack`).
+
+FetchRequest now includes `rack_id` which can optionally be specified by the consumer. FetchResponse includes an optional `preferred_read_replica` field for each partition in the response. OffsetForLeaderEpochRequest also adds new `replica_id` field which is similar to the same field in FetchRequest.
+
+When the consumer sees a `preferred_read_replica` in a fetch response, it will use the Node with that ID for the next fetch.
+
+Reviewers: Jason Gustafson <jason@confluent.io>","['clients/src/main/java/org/apache/kafka/clients/CommonClientConfigs.java', 'clients/src/main/java/org/apache/kafka/clients/Metadata.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/ConsumerConfig.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/KafkaConsumer.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/internals/Fetcher.java', 'clients/src/main/java/org/apache/kafka/clients/consumer/internals/SubscriptionState.java', 'clients/src/main/java/org/apache/kafka/common/Cluster.java', 'clients/src/main/java/org/apache/kafka/common/requests/FetchRequest.java', 'clients/src/main/java/org/apache/kafka/common/requests/FetchResponse.java', 'clients/src/main/java/org/apache/kafka/common/requests/OffsetsForLeaderEpochRequest.java', 'clients/src/main/java/org/apache/kafka/common/requests/OffsetsForLeaderEpochResponse.java', 'clients/src/test/java/org/apache/kafka/clients/MetadataTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/KafkaConsumerTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/internals/FetcherTest.java', 'clients/src/test/java/org/apache/kafka/clients/consumer/internals/SubscriptionStateTest.java', 'clients/src/test/java/org/apache/kafka/common/requests/RequestResponseTest.java', 'core/src/main/scala/kafka/api/ApiVersion.scala', 'core/src/main/scala/kafka/server/ReplicaFetcherThread.scala', 'core/src/test/scala/unit/kafka/server/ReplicaFetcherThreadTest.scala']","Currently, Kafka consumers always fetches from the leader, failing to utilize closer replicas for fetching, which affects network data consumption and latency. An additional issue is the lack of ability for the consumer to indicate its rack for relative location tracking."
+1317f3f77a9e1e432e7a81de2dcb88365feeac43,1648682641,"MINOR: log warning when topology override for cache size is non-zero (#11959)
+
+Since the topology-level cache size config only controls whether we disable the caching layer entirely for that topology, setting it to anything other than 0 has no effect. The actual cache memory is still just split evenly between the threads, and shared by all topologies.
+
+It's possible we'll want to change this in the future, but for now we should make sure to log a warning so that users who do try to set this override to some nonzero value are made aware that it doesn't work like this.
+
+Also includes some minor refactoring plus a fix for an off-by-one error in #11796
+
+Reviewers: Luke Chen <showuon@gmail.com>, Walker Carlson <wcarlson@confluent.io>, Sagar Rao <sagarmeansocean@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/KafkaStreams.java', 'streams/src/main/java/org/apache/kafka/streams/StreamsConfig.java', 'streams/src/main/java/org/apache/kafka/streams/TopologyConfig.java', 'streams/src/main/java/org/apache/kafka/streams/internals/StreamsConfigUtils.java', 'streams/src/test/java/org/apache/kafka/streams/KafkaStreamsTest.java', 'streams/src/test/java/org/apache/kafka/streams/StreamsConfigTest.java', 'streams/src/test/java/org/apache/kafka/streams/integration/AdjustStreamThreadCountTest.java', 'streams/test-utils/src/main/java/org/apache/kafka/streams/TopologyTestDriver.java']","Setting topology-level cache size config to non-zero values fails to influence cache memory, leading to incorrect expectations of topology memory control."
+caaa4c55fee68c5893d54ffe84287f3b5205fff1,1693870996,"KAFKA-15410: Expand partitions, segment deletion by retention and enable remote log on topic integration tests (1/4) (#14307)
+
+Added the below integration tests with tiered storage
+ - PartitionsExpandTest
+ - DeleteSegmentsByRetentionSizeTest
+ - DeleteSegmentsByRetentionTimeTest and
+ - EnableRemoteLogOnTopicTest
+ - Enabled the test for both ZK and Kraft modes.
+
+These are enabled for both ZK and Kraft modes.
+
+Reviewers: Satish Duggana <satishd@apache.org>, Luke Chen <showuon@gmail.com>, Christo Lolov <lolovc@amazon.com>, Divij Vaidya <diviv@amazon.com>","['core/src/main/java/kafka/log/remote/RemoteLogManager.java', 'core/src/main/scala/kafka/server/BrokerServer.scala', 'core/src/main/scala/kafka/server/KafkaServer.scala', 'storage/src/test/java/org/apache/kafka/tiered/storage/TieredStorageTestContext.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/TieredStorageTestHarness.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/actions/ExpectEmptyRemoteStorageAction.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/integration/BaseDeleteSegmentsTest.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/integration/DeleteSegmentsByRetentionSizeTest.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/integration/DeleteSegmentsByRetentionTimeTest.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/integration/EnableRemoteLogOnTopicTest.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/integration/PartitionsExpandTest.java', 'storage/src/test/java/org/apache/kafka/tiered/storage/utils/BrokerLocalStorage.java']","There's a lack of integration tests for tiered storage such as partitions expansion, segment deletion by retention size/time and enabling remote log on topics in both ZK and Kraft modes."
+9f5a69a4c2d6ac812ab6134e64839602a0840b87,1554923447,"[MINOR] Guard against crashing on invalid key range queries (#6521)
+
+Due to KAFKA-8159, Streams will throw an unchecked exception when a caching layer or in-memory underlying store is queried over a range of keys from negative to positive. We should add a check for this and log it then return an empty iterator (as the RocksDB stores happen to do) rather than crash
+
+Reviewers: Bruno Cadonna <bruno@confluent.io> Bill Bejeck <bbejeck@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/state/internals/AbstractRocksDBSegmentedBytesStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/CachingKeyValueStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/CachingSessionStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/CachingWindowStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/InMemoryKeyValueStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/InMemoryWindowStore.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/MemoryNavigableLRUCache.java', 'streams/src/main/java/org/apache/kafka/streams/state/internals/RocksDBStore.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/AbstractKeyValueStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/CachingSessionStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/CachingWindowStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/InMemoryWindowStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/RocksDBSessionStoreTest.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/RocksDBWindowStoreTest.java']",Streams application crashes on querying over a range of keys from negative to positive in caching layer or in-memory underlying store due to an unchecked exception.
+ee8e7578789e02e369ce933341501a383b62d5dd,1674516275,"temporarily disable the 'false' parameter (#13147)
+
+Need to get a clean build for 3.4 and this test has been extremely flaky. I'm looking into the failure as well, and want to pinpoint whether it's the true build that's broken or it's the parameterization itself causing this -- thus, let's start by temporarily disabling the false parameter first.
+
+See KAFKA-14533 for more details
+
+Reviewers: Lucas Brutschy <lbrutschy@confluent.io>",['streams/src/test/java/org/apache/kafka/streams/integration/SmokeTestDriverIntegrationTest.java'],"Flaky test for version 3.4 might be caused by the 'false' parameter, causing build failures and uncertainty about source of the problem: the build process or the test parameterization."
+131d4753cfed65ed6dee0a8c754765c97c3d513f,1612438963,"KAFKA-12193: Re-resolve IPs after a client disconnects (#9902)
+
+This patch changes the NetworkClient behavior to resolve the target node's hostname after disconnecting from an established connection, rather than waiting until the previously-resolved addresses are exhausted. This is to handle the scenario when the node's IP addresses have changed during the lifetime of the connection, and means that the client does not have to try to connect to invalid IP addresses until it has tried each address.
+
+Reviewers: Mickael Maison <mickael.maison@gmail.com>, Satish Duggana <satishd@apache.org>, David Jacot <djacot@confluent.io>
+","['clients/src/main/java/org/apache/kafka/clients/ClientUtils.java', 'clients/src/main/java/org/apache/kafka/clients/ClusterConnectionStates.java', 'clients/src/main/java/org/apache/kafka/clients/DefaultHostResolver.java', 'clients/src/main/java/org/apache/kafka/clients/HostResolver.java', 'clients/src/main/java/org/apache/kafka/clients/NetworkClient.java', 'clients/src/test/java/org/apache/kafka/clients/AddressChangeHostResolver.java', 'clients/src/test/java/org/apache/kafka/clients/ClientUtilsTest.java', 'clients/src/test/java/org/apache/kafka/clients/ClusterConnectionStatesTest.java', 'clients/src/test/java/org/apache/kafka/clients/NetworkClientTest.java', 'clients/src/test/java/org/apache/kafka/test/MockSelector.java']",NetworkClient does not re-resolve target node's IP address after disconnecting from an established connection. This leads to attempts to connect to invalid IP addresses when the node's IP address changes during the connection's lifetime.
+62dcfa196e7819f7fb77aa181d96767988cbe908,1585939864,"KAFKA-9750; Fix race condition with log dir reassign completion (#8412)
+
+There is a race on receiving a LeaderAndIsr request for a replica with an active log dir reassignment. If the reassignment completes just before the LeaderAndIsr handler updates epoch information, it can lead to an illegal state error since no future log dir exists. This patch fixes the problem by ensuring that the future log dir exists when the fetcher is started. Removal cannot happen concurrently because it requires access the same partition state lock.
+
+Reviewers: Chia-Ping Tsai <chia7712@gmail.com>, David Arthur <mumrah@gmail.com>
+
+Co-authored-by: Chia-Ping Tsai <chia7712@gmail.com>","['core/src/main/scala/kafka/server/AbstractFetcherManager.scala', 'core/src/main/scala/kafka/server/AbstractFetcherThread.scala', 'core/src/main/scala/kafka/server/ReplicaAlterLogDirsManager.scala', 'core/src/main/scala/kafka/server/ReplicaAlterLogDirsThread.scala', 'core/src/main/scala/kafka/server/ReplicaManager.scala', 'core/src/test/scala/unit/kafka/server/AbstractFetcherManagerTest.scala', 'core/src/test/scala/unit/kafka/server/ReplicaAlterLogDirsThreadTest.scala', 'core/src/test/scala/unit/kafka/server/ReplicaManagerTest.scala']","Log directory reassignment can lead to an illegal state error due to a race condition with LeaderAndIsr request handling. If reassignment completes prior to updating epoch information, it results in the absence of the required future log directory."
+530224e4fe853df734e7bf7c15661fe6b1ab34fe,1623597277,"KAFKA-12940: Enable JDK 16 builds in Jenkins (#10702)
+
+JDK 15 no longer receives updates, so we want to switch from JDK 15 to JDK 16.
+However, we have a number of tests that don't yet pass with JDK 16.
+
+Instead of replacing JDK 15 with JDK 16, we have both for now and we either
+disable (via annotations) or exclude (via gradle) the tests that don't pass with
+JDK 16 yet. The annotations approach is better, but it doesn't work for tests
+that rely on the PowerMock JUnit 4 runner.
+
+Also add `--illegal-access=permit` when building with JDK 16 to make MiniKdc
+work for now. This has been removed in JDK 17, so we'll have to figure out
+another solution when we migrate to that.
+
+Relevant JIRAs for the disabled tests: KAFKA-12790, KAFKA-12941, KAFKA-12942.
+
+Moved some assertions from `testTlsDefaults` to `testUnsupportedTlsVersion`
+since the former claims to test the success case while the former tests the failure case.
+
+Reviewers: Chia-Ping Tsai <chia7712@gmail.com>",['clients/src/test/java/org/apache/kafka/common/network/SslTransportLayerTest.java'],"Several tests are failing when switching from JDK 15 to JDK 16. Tests relying on the PowerMock JUnit 4 runner cannot be suitably annotated to disable them, resulting in build failures."
+9ee5f920d5e4b837c3240dff948e120aaef7cd23,1551726495,"KAFKA-7312: Change broker port used in testMinimumRequestTimeouts and testForceClose
+
+Port 22 is used by ssh, which causes the AdminClient to throw an OOM:
+
+> java.lang.OutOfMemoryError: Java heap space
+> 	at java.nio.HeapByteBuffer.<init>(HeapByteBuffer.java:57)
+> 	at java.nio.ByteBuffer.allocate(ByteBuffer.java:335)
+> 	at org.apache.kafka.common.memory.MemoryPool$1.tryAllocate(MemoryPool.java:30)
+> 	at org.apache.kafka.common.network.NetworkReceive.readFrom(NetworkReceive.java:112)
+> 	at org.apache.kafka.common.network.KafkaChannel.receive(KafkaChannel.java:424)
+> 	at org.apache.kafka.common.network.KafkaChannel.read(KafkaChannel.java:385)
+> 	at org.apache.kafka.common.network.Selector.attemptRead(Selector.java:640)
+> 	at org.apache.kafka.common.network.Selector.pollSelectionKeys(Selector.java:561)
+> 	at org.apache.kafka.common.network.Selector.poll(Selector.java:472)
+> 	at org.apache.kafka.clients.NetworkClient.poll(NetworkClient.java:535)
+> 	at org.apache.kafka.clients.admin.KafkaAdminClient$AdminClientRunnable.run(KafkaAdminClient.java:1140)
+> 	at java.lang.Thread.run(Thread.java:748)
+>
+>
+
+Author: Manikumar Reddy <manikumar.reddy@gmail.com>
+Author: Ismael Juma <ismael@juma.me.uk>
+
+Reviewers: Ismael Juma <ismael@juma.me.uk>
+
+Closes #6360 from omkreddy/KAFKA-7312
+","['core/src/test/scala/integration/kafka/api/AdminClientIntegrationTest.scala', 'core/src/test/scala/unit/kafka/utils/TestUtils.scala']",Using port 22 (reserved for ssh) for the AdminClient in testMinimumRequestTimeouts and testForceClose tests results in a Java OutOfMemoryError.
+dbbe0fcf9299b9625dadcf21aa183987539b5877,1578597083,"KAFKA-9287; Fix unneeded delay before failing pending transaction commit (#7799)
+
+It is possible for the user to call `commitTransaction` before a pending `AddPartitionsToTxn` call has returned. If the `AddPartitionsToTxn` call returns an abortable error, we need to cancel any pending batches in the accumulator and we need to fail the pending commit. The problem in this case is that `Sender.runOnce`, after failing the batches, enters `NetworkClient.poll` before it has a chance to cancel the commit. Since there are no pending requests at this time, this will block unnecessarily and prevent completion of the doomed commit. This patch fixes the problem by returning from `runOnce` if any batches have been aborted, which allows the commit to also fail without the delay.
+
+Note that this was the cause of the delay executing `AuthorizerIntegrationTest.testTransactionalProducerTopicAuthorizationExceptionInCommit` compared to other tests in this class. After fixing the bug, the delay is gone and the test time is similar to other test cases in the class.
+
+Reviewers:  Guozhang Wang <wangguoz@gmail.com>","['clients/src/main/java/org/apache/kafka/clients/producer/internals/Sender.java', 'clients/src/test/java/org/apache/kafka/clients/producer/internals/TransactionManagerTest.java']","When `commitTransaction` is called before a pending `AddPartitionsToTxn` call returns and results in an abortable error, there's an unnecessary delay before failing the pending transaction commit. The delay comes from `Sender.runOnce` entering `NetworkClient.poll` without pending requests.
+"
+5234ddff5025501be2b4fca3ecba4e4eb584bbc5,1692026248,"KAFKA-15326: [5/N] Processing thread punctuation (#14001)
+
+Implements punctuation inside processing threads. The scheduler
+algorithm checks if a task that is not assigned currently can
+be punctuated, and returns it when a worker thread asks for the
+next task to be processed. Then, the processing thread runs all
+punctuations in the punctionation queue.
+
+Piggy-backed: take TaskExecutionMetadata into account when
+processing records.
+
+Reviewer: Bruno Cadonna <cadonna@apache.org>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/PunctuationQueue.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamTask.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/tasks/DefaultTaskExecutor.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/tasks/DefaultTaskManager.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/tasks/TaskExecutorCreator.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/PunctuationQueueTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/StreamTaskTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/tasks/DefaultTaskExecutorTest.java', 'streams/src/test/java/org/apache/kafka/streams/processor/internals/tasks/DefaultTaskManagerTest.java']",Processing threads are currently missing punctuation functionality causing issues with task scheduling and execution metadata handling when processing records.
