@@ -1,20 +1,15 @@
 import argparse
 import os
 
-# import pickle
 from typing import List
 
-import evaluate
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.init as init
 
 # import from_pandas method
 from datasets import Dataset as HFDataset
 from sklearn.model_selection import train_test_split
-from torch import nn
 from torch.utils.data import DataLoader, Dataset, TensorDataset
 from tqdm import tqdm
 from transformers import (
