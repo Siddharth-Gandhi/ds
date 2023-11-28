@@ -1,10 +1,10 @@
 import glob
-import json
-import math
+
+# import json
+# import math
 import os
 import pickle
 import random
-from turtle import pos
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,9 @@ import tiktoken
 import torch
 import tqdm
 from torch.utils.data import Dataset
+
+# from turtle import pos
+
 
 os.environ['TIKTOKEN_CACHE_DIR'] = ""
 ENCODING = 'p50k_base'
@@ -193,57 +196,71 @@ def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_
     print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
     return data
 
-# OLD CODE
-# def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_negatives, cache_file, overwrite=False):
-#     # Check if cache file exists
-#     if os.path.exists(cache_file) and not overwrite:
-#         print(f"Loading data from cache file: {cache_file}")
-#         with open(cache_file, 'rb') as file:
-#             return pickle.load(file)
+
+def sanity_check_triplets(data):
+    """
+    Perform a sanity check on the triplets data.
+
+    Args:
+        data: The input data containing triplets.
+
+    Returns:
+        The sanitized data after removing problematic rows.
+
+    Examples:
+        >>> data = pd.DataFrame({'query': ['apple', 'banana', 'apple'], 'passage': ['red fruit', 'yellow fruit', 'red fruit'], 'label': [0, 1, 0]})
+        >>> sanity_check_triplets(data)
+        Assertion failed at index 0: query      apple
+        passage    red fruit
+        label             0
+        Name: 0, dtype: object
+        Dropped row at index 0
+        Total number of problems in sanity check of training data: 1
+        # Output: DataFrame without the problematic row
+    """
+    problems = 0
+    for i, row in tqdm.tqdm(data.iterrows(), total=len(data)):
+        try:
+            if row['label'] == 0:
+                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 0
+            else:
+                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 1
+        except AssertionError:
+            print(f"Assertion failed at index {i}: {row}")
+            # break  # Optional: break after the first failure, remove if you want to see all failures
+            # remove the row with label 0
+
+            if row['label'] == 0:
+                problems += 1
+                data.drop(i, inplace=True)
+                print(f"Dropped row at index {i}")
+
+    print(f"Total number of problems in sanity check of training data: {problems}")
+    return data
 
 
-#     data = []
-#     print(f'Preparing data from dataframe of size: {len(df)} with search_depth: {search_depth}')
-#     total_positives = 0
-#     total_negatives = 0
-#     for _, row in df.iterrows():
-#         commit_message = row['commit_message']
-#         actual_files_modified = row['actual_files_modified']
+def get_recent_df(combined_df, params):
+    # Prepare the data for training
+    print('Preparing training data...')
+    # Step 1: Filter out only the columns we need
+    filtered_df = combined_df[['commit_date', 'commit_message', 'commit_id', 'file_path', 'diff']]
 
-#         search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump')
+    # Step 2: Group by commit_id
+    grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
+    grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
 
-#         # flatten the contributing results for each aggregated result
-#         search_results = [result for agg_result in search_results for result in agg_result.contributing_results]
+    # Step 3: Determine midpoint and filter dataframe
+    midpoint_date = np.median(grouped_df['commit_date'])
+    recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
+    print(f'Number of commits after midpoint date: {len(recent_df)}')
 
-#         # efficiently get the top num_positives and num_negatives samples
-#         positive_samples = []
-#         negative_samples = []
+    # Step 4: Filter out commits with less than average length commit messages
+    average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
+    # filter out commits with less than average length
+    recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len] # type: ignore
+    print(f'Number of commits after filtering by commit message length: {len(recent_df)}')
 
-#         for result in search_results:
-#             if result.file_path in actual_files_modified and len(positive_samples) < num_positives:
-#                 positive_samples.append(result.commit_message)
-#                 total_positives += 1
-#             elif result.file_path not in actual_files_modified and len(negative_samples) < num_negatives:
-#                 negative_samples.append(result.commit_message)
-#                 total_negatives += 1
-
-#             if len(positive_samples) == num_positives and len(negative_samples) == num_negatives:
-#                 break
-
-
-#         for sample_msg in positive_samples:
-#             data.append((commit_message, sample_msg, 1))
-
-#         for sample_msg in negative_samples:
-#             data.append((commit_message, sample_msg, 0))
-#     # Write data to cache file
-#     with open(cache_file, 'wb') as file:
-#         pickle.dump(data, file)
-#         print(f"Saved data to cache file: {cache_file}")
-
-#     # print distribution of labels
-#     print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
-#     # print percentage of positives and negatives
-#     denom = total_positives + total_negatives
-#     print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
-#     return data
+    # Step 5: randomly sample 1500 rows from recent_df
+    recent_df = recent_df.sample(params['train_commits'])
+    print(f'Number of commits after sampling: {len(recent_df)}')
+    return recent_df

@@ -120,6 +120,9 @@ class ModelEvaluator:
 
         if not overwrite_eval and output_file_path and os.path.exists(output_file_path):
             print(f'Output file {output_file_path} already exists, set overwrite_eval flag to False, skipping...')
+            # print the contents of the file
+            with open(output_file_path, "r") as file:
+                print(file.read())
             return
         if gold_df is None:
             sampled_commits = self.sample_commits(n)
@@ -138,7 +141,11 @@ class ModelEvaluator:
                 if len(rerankers) > 0:
                     file.write("Rerankers:\n")
                     for reranker in rerankers:
-                        file.write(f"{reranker.__class__.__name__} @ {reranker.rerank_depth}\n")
+                        reranker_model_name = reranker.model.config.name_or_path
+                        # replace / with _
+                        reranker_model_name = reranker_model_name.replace('/', '_')
+                        file.write(f"{reranker.__class__.__name__} ({reranker_model_name}) @ {reranker.rerank_depth}\n")
+
 
                 file.write(f"Sample Size: {n}\n")
                 file.write("Evaluation Metrics:\n")

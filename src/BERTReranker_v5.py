@@ -17,19 +17,22 @@ from transformers import (
     TrainingArguments,
 )
 
+from BERTReranker_v4 import BERTReranker
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
 from utils import (
     AggregatedSearchResult,
     get_combined_df,
+    get_recent_df,
     prepare_triplet_data_from_df,
+    sanity_check_triplets,
     set_seed,
 )
 
 # set seed
 set_seed(42)
 
-class BERTReranker:
+class BERTCodeReranker:
     def __init__(self, parameters):
         self.parameters = parameters
         self.model_name = parameters['model_name']
@@ -71,12 +74,21 @@ class BERTReranker:
         self.model.eval()
 
         # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
+        # TODO change this to be for diffs instead of commit_messages
         query_passage_pairs = []
         for agg_result in aggregated_results:
-            query_passage_pairs.extend(
-                (query, result.commit_message)
-                for result in agg_result.contributing_results[: self.psg_cnt]
-            )
+            # get the top psg_cnt contributing_results
+            contributing_results = agg_result.contributing_results[: self.psg_cnt]
+            # for each contributing_result, get the file_path and commit_id
+            # TODO maybe limit this with a diff_cnt
+            for contributing_result in contributing_results:
+                file_path = contributing_result.file_path
+                commit_id = contributing_result.commit_id
+                # get the diff from the df
+                diff = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['diff']
+                assert diff.shape[0] == 1, f"diff should only have one row, but has {diff.shape[0]} rows"
+                diff = str(diff.iloc[0])
+                query_passage_pairs.append((query, diff))
 
         if not query_passage_pairs:
             print('WARNING: No query passage pairs to rerank, returning original results from previous stage')
@@ -164,37 +176,17 @@ class BERTReranker:
         assert(len(reranked_results) == len(aggregated_results))
         return reranked_results
 
-def sanity_check(data):
-    problems = 0
-    for i, row in tqdm(data.iterrows(), total=len(data)):
-        try:
-            if row['label'] == 0:
-                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 0
-            else:
-                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 1
-        except AssertionError:
-            print(f"Assertion failed at index {i}: {row}")
-            # break  # Optional: break after the first failure, remove if you want to see all failures
-            # remove the row with label 0
 
-            if row['label'] == 0:
-                problems += 1
-                data.drop(i, inplace=True)
-                print(f"Dropped row at index {i}")
-
-    print(f"Total number of problems in sanity check of training data: {problems}")
-    return data
-
-def do_training(triplet_data, bert_reranker, hf_output_dir, args):
+def do_training(triplet_data, code_reranker, hf_output_dir, args):
     def tokenize_hf(example):
-        return bert_reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=bert_reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
+        return code_reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=code_reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
     print('Training the model...')
     print('Label distribution:')
     print(triplet_data['label'].value_counts())
 
-    if args.sanity_check:
+    if args.sanity_check_triplets:
         print('Running sanity check on training data...')
-        triplet_data = sanity_check(triplet_data)
+        triplet_data = sanity_check_triplets(triplet_data)
 
     # Step 7: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
@@ -247,7 +239,7 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
 
     # Step 11: set up trainer
     trainer = Trainer(
-        model = bert_reranker.model,
+        model = code_reranker.model,
         args = train_args,
         train_dataset = tokenized_train_dataset, # type: ignore
         eval_dataset = tokenized_val_dataset, # type: ignore
@@ -277,36 +269,13 @@ def main(args):
     # TODO remove K and n everywhere
     K = args.k
     n = args.n
-    combined_df = get_combined_df(repo_path)
+    # combined_df = get_combined_df(repo_path)
     # TODO add this to params
     BM25_AGGR_STRAT = 'sump'
-
-
-    # create eval directory to store results
-    eval_path = os.path.join(repo_path, 'eval')
-    if not os.path.exists(eval_path):
-        os.makedirs(eval_path)
 
     bm25_searcher = BM25Searcher(index_path)
     evaluator = SearchEvaluator(metrics)
     model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
-
-    # Reranking with BERT
-    # params = {
-    #     'model_name': 'microsoft/codebert-base',
-    #     'psg_cnt': 5,
-    #     'aggregation_strategy': 'sump',
-    #     'batch_size': 16,
-    #     'use_gpu': True,
-    #     'rerank_depth': 250,
-    #     'num_epochs': 3,
-    #     'lr': 5e-5,
-    #     'num_positives': 10,
-    #     'num_negatives': 10,
-    #     'train_depth': 1000,
-    #     'num_workers': 8,
-    #     'train_commits': 1500,
-    # }
 
     params = {
         'model_name': args.model_path,
@@ -325,56 +294,25 @@ def main(args):
         'bm25_aggr_strategy': BM25_AGGR_STRAT,
     }
 
-
-    if not args.no_bm25:
-        print('Running BM25...')
-        bm25_output_path = os.path.join(eval_path, 'bm25_baseline_metrics.txt')
-        # print(f'BM25 output path: {bm25_output_path}')
-        bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], )
-        print("BM25 Baseline Evaluation")
-        print(bm25_baseline_eval)
-
     bert_reranker = BERTReranker(params)
-    rerankers = [bert_reranker]
+    code_reranker = BERTCodeReranker(params)
+    code_reranker.rerank_depth = 100 # TODO Magic number
+    rerankers = [bert_reranker, code_reranker]
     save_model_name = params['model_name'].replace('/', '_')
-    hf_output_dir = os.path.join(repo_path, f'{save_model_name}_model_output')
+    hf_output_dir = os.path.join(repo_path, f'code_{save_model_name}_model_output')
     best_model_path = os.path.join(hf_output_dir, 'best_model')
+
+
+    # create eval directory to store results
+    eval_path = os.path.join(repo_path, 'eval', save_model_name)
+    if not os.path.exists(eval_path):
+        os.makedirs(eval_path)
 
     # training methods
 
 
-    if args.eval_before_training:
-        # get results without training first
-        print('Evaluating model before training...')
-        bert_without_trainint_output_path = os.path.join(eval_path, 'bert_without_training.txt')
-        bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
-        print("BERT Evaluation without training")
-        print(bert_without_training_eval)
-
     if args.do_train:
-        # Prepare the data for training
-        print('Preparing training data...')
-        # Step 1: Filter out only the columns we need
-        filtered_df = combined_df[['commit_date', 'commit_message', 'commit_id', 'file_path', 'diff']]
-
-        # Step 2: Group by commit_id
-        grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
-        grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
-
-        # Step 3: Determine midpoint and filter dataframe
-        midpoint_date = np.median(grouped_df['commit_date'])
-        recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
-        print(f'Number of commits after midpoint date: {len(recent_df)}')
-
-        # Step 4: Filter out commits with less than average length commit messages
-        average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
-        # filter out commits with less than average length
-        recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len] # type: ignore
-        print(f'Number of commits after filtering by commit message length: {len(recent_df)}')
-
-        # Step 5: randomly sample 1500 rows from recent_df
-        recent_df = recent_df.sample(params['train_commits'])
-        print(f'Number of commits after sampling: {len(recent_df)}')
+        recent_df = get_recent_df(combined_df, params)
 
         # Step 6: Prepare triplet data
         if not os.path.exists(os.path.join(repo_path, 'cache')):
@@ -383,7 +321,7 @@ def main(args):
         # TODO: filter eval commits from here
         triplet_data = prepare_triplet_data_from_df(recent_df, bm25_searcher, search_depth=params['train_depth'], num_positives=params['num_positives'], num_negatives=params['num_negatives'], cache_file=triplet_cache, overwrite=args.overwrite_cache)
 
-        do_training(triplet_data, bert_reranker, hf_output_dir, args)
+        do_training(triplet_data, code_reranker, hf_output_dir, args)
 
 
     # load the best model from args.best_model_path for do_eval and eval_gold
@@ -392,19 +330,12 @@ def main(args):
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
         print(f'Loading model from {cur_best_model_path}...')
-        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
-        bert_reranker.model.to(bert_reranker.device)
-        rerankers = [bert_reranker]
+        code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
+        code_reranker.model.to(code_reranker.device)
+        rerankers = [bert_reranker, code_reranker]
 
 
     if args.do_eval:
-        # # get results after training
-        # if not os.path.exists(best_model_path):
-        #     raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
-        # print(f'Evaluating model from {best_model_path}...')
-        # bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
-        # bert_reranker.model.to(bert_reranker.device)
-        # rerankers = [bert_reranker]
 
         bert_with_training_output_path = os.path.join(eval_path, 'multi_bert_with_training.txt')
         bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
@@ -417,14 +348,14 @@ def main(args):
         if not os.path.exists(gold_dir):
             raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
         # check if gold data exists
-        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
+        gold_data_path = os.path.join(gold_dir, f'{repo_name}_{args.openai_model}_gold.parquet')
         if not os.path.exists(gold_data_path):
             raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
         print(f'Model: {args.openai_model}')
         gold_df = pd.read_parquet(gold_data_path)
         # assert all transformed_message_gpt3 are not NaN
         # rename the column transformed_message_gpt3 to transformed_message_{oai_model}
-        # gold_df = gold_df.rename(columns={'transformed_message_gpt3': f'transformed_message_{args.openai_model}'})
+        gold_df = gold_df.rename(columns={'transformed_message_gpt3': f'transformed_message_{args.openai_model}'})
         assert gold_df[f'transformed_message_{args.openai_model}'].notnull().all()
         # rename commit_message to original_message
         gold_df = gold_df.rename(columns={'commit_message': 'original_message'})
@@ -434,50 +365,21 @@ def main(args):
         print(gold_df.info())
 
         # run BM25 on gold data first
-        print('Running BM25 on gold data...')
-        bm25_gold_output_path = os.path.join(eval_path, f'bm25_v2_{args.openai_model}_gold_metrics.txt')
-        bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
-        print("BM25 Gold Evaluation")
-        print(bm25_gold_eval)
+        # print('Running BM25 on gold data...')
+        # bm25_gold_output_path = os.path.join(eval_path, f'bm25_{args.openai_model}_gold_metrics.txt')
+        # bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
+        # print("BM25 Gold Evaluation")
+        # print(bm25_gold_eval)
 
-        # # get results after training
-        # if not os.path.exists(best_model_path):
-        #     raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
-        # print(f'Evaluating model from {best_model_path}...')
-        # bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
-        # bert_reranker.model.to(bert_reranker.device)
-        # rerankers = [bert_reranker]
 
         # get gold eval with reranking
         print('Running BERT on gold data...')
-        bert_gold_output_path = os.path.join(eval_path, f'bert_v2_{args.openai_model}_gold.txt')
+        bert_gold_output_path = os.path.join(eval_path, f'multi_bert_{args.openai_model}_gold.txt')
         bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
 
-    if args.do_combined_train:
-        print("Performing combined training on multiple repositories...")
-        print(f'Found {len(args.repo_paths)} repositories: {args.repo_paths}')
-        combined_triplet_data = pd.DataFrame()
-        for repo_path in args.repo_paths:
-            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
-            if os.path.exists(triplet_cache):
-                repo_triplet_data = pd.read_pickle(triplet_cache)
-                combined_triplet_data = pd.concat([combined_triplet_data, repo_triplet_data], ignore_index=True)
-            else:
-                print(f"Warning: Triplet cache not found for {repo_path}, skipping this repository.")
-
-        if combined_triplet_data.empty:
-            raise ValueError("No triplet data found in the specified repositories.")
-
-        print(f'Shape of combined triplet data: {combined_triplet_data.shape}')
-
-        combined_hf_output_dir = os.path.join('data', 'combined')
-        if not os.path.exists(combined_hf_output_dir):
-            os.makedirs(combined_hf_output_dir)
-
-        do_training(combined_triplet_data, bert_reranker, combined_hf_output_dir, args)
 
 
 
@@ -488,7 +390,7 @@ if __name__ == '__main__':
     parser.add_argument('--repo_path', type=str, help='Path to the repository directory.', required=True)
     parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
     parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
-    parser.add_argument('--no_bm25', action='store_true', help='Do not run BM25.')
+    # parser.add_argument('--no_bm25', action='store_true', help='Do not run BM25.')
     parser.add_argument('-m', '--model_path', type=str, help='Path to the pretrained model.')
     parser.add_argument('-o', '--overwrite_cache', action='store_true', help='Overwrite existing cache files.')
     parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size for training (default: 32)')
@@ -509,12 +411,12 @@ if __name__ == '__main__':
     parser.add_argument('--eval_gold', action='store_true', help='Evaluate the model on gold data.')
     parser.add_argument('--openai_model', choices=['gpt3', 'gpt4'], help='OpenAI model to use for transforming commit messages.')
     parser.add_argument('--overwrite_eval', action='store_true', help='Replace evaluation files if they already exist.')
-    parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
+    parser.add_argument('--sanity_check_triplets', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
-    parser.add_argument('--eval_before_training', action='store_true', help='Evaluate the model before training.')
-    parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
-    parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
+    # parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
+    # parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
     args = parser.parse_args()
     print(args)
+    combined_df = get_combined_df(args.repo_path)
     main(args)
