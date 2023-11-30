@@ -60,7 +60,7 @@ class BM25Searcher:
 
         return filtered_hits[:ranking_depth]  # Return up to ranking_depth results
 
-    def aggregate_file_scores(self, search_results, aggregation_method='sump'):
+    def aggregate_file_scores(self, search_results, aggregation_method='sump', sort_by='score'):
         file_to_results = defaultdict(list)
         for result in search_results:
             file_to_results[result.file_path].append(result)
@@ -81,10 +81,13 @@ class BM25Searcher:
 
             aggregated_results.append(AggregatedSearchResult(file_path, aggregated_score, results))
 
-        aggregated_results.sort(key=lambda result: result.score, reverse=True)
+        if sort_by == 'date':
+            aggregated_results.sort(key=lambda result: result.commit_date, reverse=True)
+        else:
+            aggregated_results.sort(key=lambda result: result.score, reverse=True)
         return aggregated_results
 
-    def aggregate_commit_scores(self, search_results, aggregation_method='sump'):
+    def aggregate_commit_scores(self, search_results, aggregation_method='sump', sort_by='score'):
         commit_to_results = defaultdict(list)
         for result in search_results:
             commit_to_results[result.commit_id].append(result)
@@ -105,16 +108,19 @@ class BM25Searcher:
 
             aggregated_results.append(AggregatedCommitResult(commit_id, aggregated_score, results))
 
-        aggregated_results.sort(key=lambda result: result.score, reverse=True)
+        if sort_by == 'date':
+            aggregated_results.sort(key=lambda result: result.commit_date, reverse=True)
+        else:
+            aggregated_results.sort(key=lambda result: result.score, reverse=True)
         return aggregated_results
 
-    def pipeline(self, query, query_date, ranking_depth, aggregation_method, aggregate_on='file'):
+    def pipeline(self, query, query_date, ranking_depth, aggregation_method, aggregate_on='file', sort_by='score'):
         search_results = self.search(query, query_date, ranking_depth)
         if aggregation_method is not None:
             if aggregate_on == 'file':
-                aggregated_results = self.aggregate_file_scores(search_results, aggregation_method)
+                aggregated_results = self.aggregate_file_scores(search_results, aggregation_method, sort_by)
             elif aggregate_on == 'commit':
-                aggregated_results = self.aggregate_commit_scores(search_results, aggregation_method)
+                aggregated_results = self.aggregate_commit_scores(search_results, aggregation_method, sort_by)
             else:
                 raise ValueError(f"Unknown aggregation type {aggregate_on}")
             # aggregated_results = self.aggregate_file_scores(search_results, aggregation_method)

@@ -21,7 +21,8 @@ nvidia-smi
 # repo_path="2_7/apache_kafka"
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
-repo_path="2_8/django_django"
+# repo_path="2_8/django_django"
+repo_path="smalldata/ftr"
 
 
 index_path="${repo_path}/index_commit_tokenized"
@@ -84,19 +85,19 @@ python -u src/BERTReranker_v4.py \
     --aggregation_strategy $aggregation_strategy \
     --rerank_depth $rerank_depth \
     --openai_model $openai_model \
+    --sanity_check \
+    --do_train \
     --use_gpu \
-    --no_bm25 \
+    --do_eval \
     --eval_gold \
-    # --do_train \
-    # --do_eval \
+    --overwrite_cache \
+    # --no_bm25 \
     # --do_combined \
     # --best_model_path $best_model_path \
     # --repo_paths "${repo_paths[@]}" \
 
 
-    # --sanity_check \
     # --debug \
-    # --overwrite_cache \
 
 echo "Job completed"
 
