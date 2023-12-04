@@ -5,10 +5,10 @@
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --job-name="jupyter"
-#SBATCH --time=12:00:00
-#SBATCH --mem=32GB
+#SBATCH --time=24:00:00
+#SBATCH --mem=64GB
 #SBATCH --output=logs/jupyter.log
-#SBATCH --nodelist=boston-1-7
+#SBATCH --nodelist=boston-2-35
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ds
