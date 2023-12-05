@@ -264,3 +264,48 @@ def get_recent_df(combined_df, params):
     recent_df = recent_df.sample(params['train_commits'])
     print(f'Number of commits after sampling: {len(recent_df)}')
     return recent_df
+
+def prepare_code_triplets(diff_data):
+    # given diff_data, the passage column is way too long. We need to split it into passages of length psg_len with stride psg_stride
+    # then we can create triplets from that
+
+    # diff_data has columns: commit_id, file_path, query, passage, label
+    def full_tokenize(s):
+        return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
+
+    triplets = []
+
+    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
+        # get the input ids
+        # input_ids = file_content['input_ids'].squeeze()
+        # get the number of tokens in the file content
+        file_tokens = full_tokenize(row['passage'])
+        # query_tokens = full_tokenize(row['query'])
+        # path_tokens = full_tokenize(row['file_path'])
+        total_tokens = len(file_tokens)
+
+        cur_psg_cnt = 0
+        for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+            cur_passage = []
+            # add query tokens and path tokens
+            # cur_passage.extend(query_tokens)
+            # cur_passage.extend(path_tokens)
+
+            # add the file tokens
+            cur_passage.extend(file_tokens[cur_start:cur_start+code_reranker.psg_len])
+
+            # now convert cur_passage into a string
+            cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+
+
+            # add the cur_passage to cur_result_passages
+            triplets.append((row['query'], row['file_path'], cur_passage_decoded, row['passage'], row['label']))
+
+            cur_psg_cnt += 1
+
+            if cur_psg_cnt == code_reranker.psg_cnt:
+                break
+
+    # convert to pandas dataframe
+    triplets = pd.DataFrame(triplets, columns=['query', 'file_path', 'passage', 'full_passage', 'label'])
+    return triplets

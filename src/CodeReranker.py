@@ -50,15 +50,15 @@ class BERTCodeReranker:
             print(f"GPU Memory Usage: {torch.cuda.memory_allocated(0) / 1024 ** 2:.2f} MB")
 
 
-        # self.psg_len = parameters['psg_len']
+        self.psg_len = parameters['psg_len']
         self.psg_cnt = parameters['psg_cnt'] # how many contributing_results to use per file for reranking
-        # self.psg_stride = parameters.get('psg_stride', self.psg_len)
+        self.psg_stride = parameters.get('psg_stride', self.psg_len)
         self.aggregation_strategy = parameters['aggregation_strategy'] # how to aggregate the scores of the psg_cnt contributing_results
         self.batch_size = parameters['batch_size'] # batch size for reranking efficiently
         self.rerank_depth = parameters['rerank_depth']
         self.max_seq_length = self.tokenizer.model_max_length # max sequence length for the model
 
-        print(f"Initialized BERT reranker with parameters: {parameters}")
+        print(f"Initialized Code File BERT reranker with parameters: {parameters}")
 
 
     def rerank(self, query, aggregated_results: List[AggregatedSearchResult]):
@@ -73,22 +73,14 @@ class BERTCodeReranker:
 
         self.model.eval()
 
-        # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
-        # TODO change this to be for diffs instead of commit_messages
-        query_passage_pairs = []
-        for agg_result in aggregated_results:
-            # get the top psg_cnt contributing_results
-            contributing_results = agg_result.contributing_results[: self.psg_cnt]
-            # for each contributing_result, get the file_path and commit_id
-            # TODO maybe limit this with a diff_cnt
-            for contributing_result in contributing_results:
-                file_path = contributing_result.file_path
-                commit_id = contributing_result.commit_id
-                # get the diff from the df
-                diff = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['diff']
-                assert diff.shape[0] == 1, f"diff should only have one row, but has {diff.shape[0]} rows"
-                diff = str(diff.iloc[0])
-                query_passage_pairs.append((query, diff))
+        query_passage_pairs, per_result_contribution = self.split_into_query_passage_pairs(query, aggregated_results)
+
+
+        # for agg_result in aggregated_results:
+        #     query_passage_pairs.extend(
+        #         (query, result.commit_message)
+        #         for result in agg_result.contributing_results[: self.psg_cnt]
+        #     )
 
         if not query_passage_pairs:
             print('WARNING: No query passage pairs to rerank, returning original results from previous stage')
@@ -110,10 +102,10 @@ class BERTCodeReranker:
 
         score_index = 0
         # Now assign the scores to the aggregated results by mapping the scores to the contributing results
-        for agg_result in aggregated_results:
+        for i, agg_result in enumerate(aggregated_results):
             # Each aggregated result gets a slice of the scores equal to the number of contributing results it has which should be min(psg_cnt, len(contributing_results))
             assert score_index < len(scores), f'score_index {score_index} is greater than or equal to scores length {len(scores)}'
-            end_index = score_index + len(agg_result.contributing_results[: self.psg_cnt]) # only use psg_cnt contributing_results
+            end_index = score_index + per_result_contribution[i] # only use psg_cnt contributing_results
             cur_passage_scores = scores[score_index:end_index]
             score_index = end_index
 
@@ -161,6 +153,60 @@ class BERTCodeReranker:
         # else:
         raise ValueError(f"Invalid score aggregation method: {self.aggregation_strategy}")
 
+
+    def split_into_query_passage_pairs(self, query, aggregated_results):
+        # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
+        def full_tokenize(s):
+            return self.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
+        query_passage_pairs = []
+        per_result_contribution = []
+        for agg_result in aggregated_results:
+            agg_result.contributing_results.sort(key=lambda res: res.commit_date, reverse=True)
+            # get most recent file version
+            most_recent_search_result = agg_result.contributing_results[0]
+            # get the file_path and commit_id
+            file_path = most_recent_search_result.file_path
+            commit_id = most_recent_search_result.commit_id
+            # get the file content from combined_df
+            file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['cur_file_content'].values[0]
+
+            # now need to split this file content into psg_cnt passages
+            # first tokenize the file content
+            file_tokens = full_tokenize(file_content)
+            query_tokens = full_tokenize(query)
+            path_tokens = full_tokenize(file_path)
+
+
+            # now split the file content into psg_cnt passages
+            cur_result_passages = []
+            # get the input ids
+            # input_ids = file_content['input_ids'].squeeze()
+            # get the number of tokens in the file content
+            total_tokens = len(file_tokens)
+
+            for cur_start in range(0, total_tokens, self.psg_stride):
+                cur_passage = []
+                # add query tokens and path tokens
+                cur_passage.extend(query_tokens)
+                cur_passage.extend(path_tokens)
+
+                # add the file tokens
+                cur_passage.extend(file_tokens[cur_start:cur_start+self.psg_len])
+
+                # now convert cur_passage into a string
+                cur_passage_decoded = self.tokenizer.decode(cur_passage)
+
+                # add the cur_passage to cur_result_passages
+                cur_result_passages.append(cur_passage_decoded)
+
+                if len(cur_result_passages) == self.psg_cnt:
+                    break
+
+            # now add the query, passage pairs to query_passage_pairs
+            per_result_contribution.append(len(cur_result_passages))
+            query_passage_pairs.extend((query, passage) for passage in cur_result_passages)
+        return query_passage_pairs, per_result_contribution
+
     def rerank_pipeline(self, query, aggregated_results):
         if len(aggregated_results) == 0:
             return aggregated_results
@@ -177,31 +223,36 @@ class BERTCodeReranker:
         return reranked_results
 
 
-def do_training(triplet_data, code_reranker, hf_output_dir, args):
+def do_training(triplet_data, reranker, hf_output_dir, args):
     def tokenize_hf(example):
-        return code_reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=code_reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
+        len(example)
+        return reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
+
+
+    # triplet_data = triplet_data.sample(1000, random_state=42)
     print('Training the model...')
     print('Label distribution:')
     print(triplet_data['label'].value_counts())
 
-    if args.sanity_check_triplets:
-        print('Running sanity check on training data...')
-        triplet_data = sanity_check_triplets(triplet_data)
+    # merge columns file_path and passage into one column called passage
+    triplet_data['passage'] = triplet_data['file_path'] + ' ' + triplet_data['passage']
 
+    # if args.sanity_check:
+    #     print('Running sanity check on training data...')
+    #     triplet_data = sanity_check(triplet_data)
     # Step 7: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
     triplet_data['label'] = triplet_data['label'].astype(float)
     train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
     train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
     val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
-
     # Step 8: tokenize the data
     tokenized_train_dataset = train_hf_dataset.map(tokenize_hf, batched=True)
     tokenized_val_dataset = val_hf_dataset.map(tokenize_hf, batched=True)
 
     # Step 9: set format for pytorch
-    tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage'])
-    tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage'])
+    tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage', 'file_path', 'full_passage'])
+    tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage', 'file_path', 'full_passage'])
 
     # rename label column to labels
     tokenized_train_dataset = tokenized_train_dataset.rename_column('label', 'labels')
@@ -224,22 +275,22 @@ def do_training(triplet_data, code_reranker, hf_output_dir, args):
         save_total_limit=2,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        logging_steps=1000,
+        logging_steps=100,
         fp16=True,
         dataloader_num_workers=args.num_workers,
         )
 
-    small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
-    small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
+    # small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
+    # small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
 
-    if args.debug:
-        print('Running in debug mode, using small datasets')
-        tokenized_train_dataset = small_train_dataset
-        tokenized_val_dataset = small_val_dataset
+    # if args.debug:
+    #     print('Running in debug mode, using small datasets')
+    #     tokenized_train_dataset = small_train_dataset
+    #     tokenized_val_dataset = small_val_dataset
 
     # Step 11: set up trainer
     trainer = Trainer(
-        model = code_reranker.model,
+        model = reranker.model,
         args = train_args,
         train_dataset = tokenized_train_dataset, # type: ignore
         eval_dataset = tokenized_val_dataset, # type: ignore
