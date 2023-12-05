@@ -1,4 +1,4 @@
-commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt3
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
 3a94fb3dd92a05676a3c11cbcea314dd296ec059,1562806654,"[SPARK-28281][SQL][PYTHON][TESTS] Convert and port 'having.sql' into UDF test base
 
 ## What changes were proposed in this pull request?
@@ -274,7 +274,7 @@ Closes #30368 from ulysses-you/SPARK-33442.
 
 Authored-by: ulysses <youxiduo@weidian.com>
 Signed-off-by: Wenchen Fan <wenchen@databricks.com>
-","['sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/optimizer/Optimizer.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/optimizer/CombiningLimitsSuite.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/optimizer/LimitPushdownSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/streaming/StreamSuite.scala']","In ad-hoc scenarios, a limit is always added to the query unless specified by the user, leading to potential inefficiency. This is particularly problematic when the child max row is less than or equal to the specified limit. An example is the query: 
+","['sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/optimizer/Optimizer.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/optimizer/CombiningLimitsSuite.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/optimizer/LimitPushdownSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/streaming/StreamSuite.scala']","In ad-hoc scenarios, a limit is always added to the query unless specified by the user, leading to potential inefficiency. This is particularly problematic when the child max row is less than or equal to the specified limit. An example is the query:
 ```
 select count(*) from t limit 100000;
 ```
@@ -3901,7 +3901,7 @@ Closes #27677 from brkyvz/mergeChecks.
 
 Authored-by: Burak Yavuz <brkyvz@gmail.com>
 Signed-off-by: Wenchen Fan <wenchen@databricks.com>
-","['sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/parser/AstBuilder.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/parser/DDLParserSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/execution/command/PlanResolutionSuite.scala']","The Merge Into statement currently lacks thorough validation. This includes: 
+","['sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/parser/AstBuilder.scala', 'sql/catalyst/src/test/scala/org/apache/spark/sql/catalyst/parser/DDLParserSuite.scala', 'sql/core/src/test/scala/org/apache/spark/sql/execution/command/PlanResolutionSuite.scala']","The Merge Into statement currently lacks thorough validation. This includes:
 
 1. A lack of any WHEN statements, rendering the Merge statement virtually useless.
 2. In cases where there are two WHEN MATCHED statements, there is no condition required in the first WHEN MATCHED statement, causing the second WHEN MATCHED condition to become dormant code.

@@ -1,4 +1,4 @@
-commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt3
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
 07a31599c3f5b23158f83988ebc05381a1e86b00,1664217249,"KAFKA-10199: Fix switching to updating standbys if standby is removed (#12687)
 
 When the state updater only contains standby tasks and then a
@@ -29,7 +29,7 @@ Co-authored-by: Bruno Cadonna <cadonna@apache.org>
 Reviewers: Boyang Chen <boyang@apache.org>, Bruno Cadonna <cadonna@apache.org>","['streams/src/main/java/org/apache/kafka/streams/state/internals/RocksDBGenericOptionsToDbOptionsColumnFamilyOptionsAdapter.java', 'streams/src/test/java/org/apache/kafka/streams/state/internals/RocksDBGenericOptionsToDbOptionsColumnFamilyOptionsAdapterTest.java']","Streams currently disable the write-ahead log (WAL) offered by RocksDB as it mirrors the data in changelog topics, making it redundant to set WAL-related configurations for RocksDB."
 1d496a26c998cefc77223a7575980208620dfe2d,1575593843,"KAFKA-9179; Fix flaky test due to race condition when fetching reassignment state (#7786)
 
-This patch fixes a race condition on reassignment completion. The previous code fetched metadata first and then fetched the reassignment state. It is possible in between those times for the reassignment to complete, which leads to spurious URPs being reported. The fix here is to change the order of these checks and to explicitly check for reassignment completion. 
+This patch fixes a race condition on reassignment completion. The previous code fetched metadata first and then fetched the reassignment state. It is possible in between those times for the reassignment to complete, which leads to spurious URPs being reported. The fix here is to change the order of these checks and to explicitly check for reassignment completion.
 
 Note this patch fixes the flaky test `TopicCommandWithAdminClientTest.testDescribeUnderReplicatedPartitionsWhenReassignmentIsInProgress`.
 
@@ -319,9 +319,9 @@ f978d0551be5ffaec282cf8c3643bacbe90ad4b9,1605215355,"MINOR: Increase the amount 
 
 Increase the amount of time available to the `test_verifiable_producer` test to login and get the process name for the verifiable producer from 5 seconds to 10 seconds.
 
-We were seeing some test failures due to the assertion failing because the verifiable producer would complete before we could login, list the processes, and parse out the producer version. Previously, we were giving this operation 5 seconds to run, this PR bumps it up to 10 seconds. 
+We were seeing some test failures due to the assertion failing because the verifiable producer would complete before we could login, list the processes, and parse out the producer version. Previously, we were giving this operation 5 seconds to run, this PR bumps it up to 10 seconds.
 
-I verified locally that this does not flake, but even at 5 seconds I wasn't seeing any flakes. Ultimately we should find a better strategy than racing to query the producer process (as outlined in the existing comments). 
+I verified locally that this does not flake, but even at 5 seconds I wasn't seeing any flakes. Ultimately we should find a better strategy than racing to query the producer process (as outlined in the existing comments).
 
 Reviewers: Jason Gustafson <jason@confluent.io>",['tests/kafkatest/sanity_checks/test_verifiable_producer.py'],"The `test_verifiable_producer` test has occasionally failed due to an assertion failing. The failure occurs because the producer completes before the system can login, list the processes, and parse out the producer version. With the current setup, this operation is only given 5 seconds to run, which can lead to these sporadic test failures."
 fc6e91e19920a41a56ff60c65e3b9719f4506977,1657361162,"KAFKA-13474: Allow reconfiguration of SSL certs for broker to controller connection (#12381)
@@ -447,7 +447,7 @@ In a previous commit #6091, we've fixed a couple of edge cases and hence do not 
 Reviewers: Matthias J. Sax <mjsax@apache.org>,   Bill Bejeck <bbejeck@gmail.com>","['streams/src/main/java/org/apache/kafka/streams/KafkaStreams.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/test/java/org/apache/kafka/streams/KafkaStreamsTest.java']","'Due to previously existing race conditions, state listeners were intentionally removed when shutting down a stream thread. However, this procedure may no longer be needed as the mentioned race conditions have been eliminated in recent updates.'"
 9eface2e731ac53037bfa29b191171dae8c44d41,1579300051,"KAFKA-9449; Adds support for closing the producer's BufferPool. (#7967)
 
-The producer's BufferPool may block allocations if its memory limit has hit capacity. If the producer is closed, it's possible for the allocation waiters to wait for max.block.ms if progress cannot be made, even when force-closed (immediate), which can cause indefinite blocking if max.block.ms is particularly high. 
+The producer's BufferPool may block allocations if its memory limit has hit capacity. If the producer is closed, it's possible for the allocation waiters to wait for max.block.ms if progress cannot be made, even when force-closed (immediate), which can cause indefinite blocking if max.block.ms is particularly high.
 
 This patch fixes the problem by adding a `close()` method to `BufferPool`, which wakes up any waiters that have pending allocations and throws an exception.
 
@@ -479,9 +479,9 @@ Quick fix to make sure we log the actual source of the failure both in the actua
 
 Also prevents a NoSuchElementException from being thrown when trying to compute the minimum topology version across all threads when the last thread is being unregistered during shutdown.
 
-Reviewers: Guozhang Wang <guozhang@confluent.io>, Walker Carlson <wcarlson@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StateDirectory.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TopologyMetadata.java']","There are two issues that contribute to this problem: 
+Reviewers: Guozhang Wang <guozhang@confluent.io>, Walker Carlson <wcarlson@confluent.io>","['streams/src/main/java/org/apache/kafka/streams/processor/internals/StateDirectory.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/StreamThread.java', 'streams/src/main/java/org/apache/kafka/streams/processor/internals/TopologyMetadata.java']","There are two issues that contribute to this problem:
 
-1. In cases where topology directory cleanup fails, the actual source of the error is not appropriately logged in both the actual log message and the StreamsException reported to the user's exception handler, and the offending topology is not reported. 
+1. In cases where topology directory cleanup fails, the actual source of the error is not appropriately logged in both the actual log message and the StreamsException reported to the user's exception handler, and the offending topology is not reported.
 
 2. A NoSuchElementException is being thrown when attempting to compute the minimum topology version among all threads just as the last thread is being deregistered during shutdown."
 d9b139220ee253da673af44d58dc87bd184188f1,1670626956,"KAFKA-14318: KIP-878, Introduce partition autoscaling configs (#12962)
@@ -576,7 +576,7 @@ consumer in two ways:
 * It resumes processing when the PartitionGroup buffers are empty
 * It fetches the lag from the consumer
 
-We introduce updateLags() and 
+We introduce updateLags() and
 resumePollingForPartitionsWithAvailableSpace() methods that call into
 the task from the polling thread, in order to set up the consumer
 correctly for the next poll, and extract metadata from the consumer
@@ -645,7 +645,7 @@ prevent negative epochs from being applied or there was an assumption
 that epochs started at 1.
 
 A test has been added to LogSegmentTest to show the LogSegment
-recovery path works for the epoch cache. This was a test gap as none of the 
+recovery path works for the epoch cache. This was a test gap as none of the
 recover calls supply a leader epoch cache to recover.
 
 Reviewers: Jason Gustafson <jason@confluent.io>","['core/src/main/scala/kafka/log/LogSegment.scala', 'core/src/test/scala/unit/kafka/log/LogSegmentTest.scala']","The LeaderEpochCache recovery process is facing issues for leader epoch 0. This seems to happen because the assignment gets bypassed when epoch == 0, possibly due to precautions to avoid negative epochs or an initial assumption that epochs start at 1. There's also a gap in testing in LogSegmentTest, as none of the recovery calls supply a leader epoch cache to recover."
@@ -664,7 +664,7 @@ Reviewers: Jason Gustafson <jason@confluent.io>, Chia-Ping Tsai <chia7712@gmail.
 ","['core/src/main/scala/kafka/server/AuthHelper.scala', 'core/src/main/scala/kafka/server/KafkaApis.scala', 'core/src/main/scala/kafka/server/RequestHandlerHelper.scala', 'core/src/test/scala/unit/kafka/server/KafkaApisTest.scala']","The current ControllerApis shares a lot of functionality with KafkaApis leading to duplicated code. Furthermore, KafkaApis is frequently modified, increasing the risk of these two similar functionalities to diverge. As a result, maintaining and updating these functionalities could become complicated over a period of time."
 a3305c4b8b29c9fb4eede11aea4dd6fd60e445dc,1612543860,"MINOR: Remove ZK dependency for coordinator topics' partition counts (#10008)
 
-The group coordinator and the transaction state manager query ZooKeeper 
+The group coordinator and the transaction state manager query ZooKeeper
 to retrieve the partition count for the topics they manager. Since ZooKeeper
 won't be available when the broker is using a Raft-based metadata quorum,
 this PR changes the startup function to provide an accessor function instead.
@@ -679,7 +679,7 @@ Co-authored-by: Ismael Juma <ismael@juma.me.uk>","['core/src/main/scala/kafka/co
 This patch improves the authorizer integration tests in the following ways:
 
 1. We use a separate principal for inter-broker communications. This ensures that ACLs set in the test cases do not interfere with inter-broker communication. We had two test cases (`testCreateTopicAuthorizationWithClusterCreate` and `testAuthorizationWithTopicExisting`) which depend on topic creation and were timing out because of inter-broker metadata propagation failures. The timeouts were treated as successfully satisfying the expectation of authorization. So the tests passed, but not because of the intended reason.
-2. Previously `GroupAuthorizerIntegrationTest` was inheriting _all_ of the tests from `AuthorizerIntegrationTest`. This seemed like overkill since the ACL evaluation logic is essentially the same. 
+2. Previously `GroupAuthorizerIntegrationTest` was inheriting _all_ of the tests from `AuthorizerIntegrationTest`. This seemed like overkill since the ACL evaluation logic is essentially the same.
 
 Totally this should take about 5-10 minutes off the total build time and make the authorizer integration tests a little more resilient to problems with inter-broker communication.
 
@@ -882,7 +882,7 @@ The controller metrics in the controllers has three problems. 1) the active cont
 
 We fix these issues by only updating the metrics when processing committed metadata records and reset the metrics when the metadata state is reset.
 
-This change adds a new type `ControllerMetricsManager` which processes committed metadata records and updates the metrics accordingly. This change also removes metrics updating responsibilities from the rest of the controller managers. 
+This change adds a new type `ControllerMetricsManager` which processes committed metadata records and updates the metrics accordingly. This change also removes metrics updating responsibilities from the rest of the controller managers.
 
 Reviewers: Ron Dagostino <rdagostino@confluent.io>","['metadata/src/main/java/org/apache/kafka/controller/BrokersToIsrs.java', 'metadata/src/main/java/org/apache/kafka/controller/ClusterControlManager.java', 'metadata/src/main/java/org/apache/kafka/controller/ControllerMetrics.java', 'metadata/src/main/java/org/apache/kafka/controller/ControllerMetricsManager.java', 'metadata/src/main/java/org/apache/kafka/controller/PartitionChangeBuilder.java', 'metadata/src/main/java/org/apache/kafka/controller/QuorumController.java', 'metadata/src/main/java/org/apache/kafka/controller/QuorumControllerMetrics.java', 'metadata/src/main/java/org/apache/kafka/controller/ReplicationControlManager.java', 'metadata/src/test/java/org/apache/kafka/controller/ClusterControlManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/ControllerMetricsManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/MockControllerMetrics.java', 'metadata/src/test/java/org/apache/kafka/controller/ProducerIdControlManagerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/QuorumControllerTest.java', 'metadata/src/test/java/org/apache/kafka/controller/ReplicationControlManagerTest.java', 'server-common/src/main/java/org/apache/kafka/timeline/SnapshotRegistry.java']","The controller metrics within the controllers currently have several identified issues. Firstly, the active controller is exposing uncommitted data in the metrics. Secondly, this active controller is not updating the metrics when this uncommitted data gets aborted. Lastly, there lacks an update to the metrics when the entire state is reset. This could lead to inaccurate or misleading metrics being displayed."
 e2847e8603fe19a87ff03584fb38954e4bd3a59e,1558158345,"KAFKA-8365; Consumer and protocol support for follower fetching (#6731)
