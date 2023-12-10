@@ -470,7 +470,11 @@ def main(args):
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
 
-        recent_df = get_recent_df(combined_df, params, repo_name=repo_name, ignore_gold_in_training=False)
+        recent_df = get_recent_df(combined_df, repo_name=repo_name, ignore_gold_in_training=False)
+
+        # Step 6: randomly sample 1500 rows from recent_df
+        recent_df = recent_df.sample(params['train_commits'])
+        print(f'Number of commits after sampling: {len(recent_df)}')
 
         if not args.overwrite_cache and os.path.exists(os.path.join(repo_path, 'cache', 'code_data.parquet')):
             print('Loading code data from cache...')

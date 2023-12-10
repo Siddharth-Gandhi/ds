@@ -402,8 +402,10 @@ def main(args):
         # recent_df = recent_df.sample(params['train_commits'])
         # print(f'Number of commits after sampling: {len(recent_df)}')
 
-        recent_df = get_recent_df(combined_df=combined_df, params=params, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
-
+        recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
+        # Step 6: randomly sample 1500 rows from recent_df
+        recent_df = recent_df.sample(params['train_commits'])
+        print(f'Number of commits after sampling: {len(recent_df)}')
         # sys.exit(0)
 
         # Step 7: Prepare triplet data

@@ -125,6 +125,8 @@ def filter_df(combined_df):
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
 def transform_message(commit_message, model):
+    return commit_message
+
     user_message = f"Now do the same thing for this commit message: {commit_message}"
     response = client.chat.completions.create(
         model=model,
@@ -135,12 +137,96 @@ def transform_message(commit_message, model):
     )
     return response.choices[0].message.content
 
+def process_repository(repo_path, model_name, save_model_name, train_sample_size, test_sample_size, VERSION):
+    print(f'Processing {repo_path}')
+    repo_name = repo_path.split('/')[-1]
+    gold_dir = f'gold/{repo_name}'
+    train_dir = f'{gold_dir}/train'
+    gold_commit_ids_file = f'{gold_dir}/{repo_name}_gpt4_gold_commit_ids.txt'
+    combined_df = get_combined_df(repo_path)
+    filtered_df = filter_df(combined_df)
+    test_commit_ids = []
+    create_gold = False
+    # check if gold_commit_ids_file exists
+    if os.path.exists(gold_commit_ids_file):
+        print(f'Found gold commit ids file for {repo_path}')
+        with open(gold_commit_ids_file, 'r') as f:
+            for line in f:
+                test_commit_ids.append(line.strip())
+    else:
+        create_gold = True
+        print(f'No gold commit ids file found for {repo_path}')
+        # this repo does not have test commit ids, so we will randomly sample 100 commits
+        test_commit_ids = filtered_df['commit_id'].sample(n=test_sample_size, random_state=42, replace=False).tolist()
+
+        # write test_commit_ids to a file
+        with open(gold_commit_ids_file, 'w') as f:
+            for commit_id in test_commit_ids:
+                f.write(f'{commit_id}\n')
+
+    # filter out test_commit_ids from filtered_df to get train_df
+    train_df = filtered_df[~filtered_df['commit_id'].isin(test_commit_ids)]
+    print(f'Number of commits in train_df: {len(train_df)}')
+
+    assert not train_df['commit_id'].isin(test_commit_ids).any()
+
+    # sample train_sample_size commits from train_df with seed 42 without replacement
+    train_df = train_df.sample(n=train_sample_size, random_state=42, replace=False)
+
+    output_dir = os.path.join(save_dir, repo_name)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    def process_df(final_df, is_train):
+        print(f'Number of unique commit_ids: {len(final_df)}')
+        # add a new column to final_df
+        final_df[f'transformed_message_{save_model_name}'] = np.nan
+        for index, row in tqdm(final_df.iterrows(), total=final_df.shape[0]):
+            # check if transformed_message_gpt3 is NaN or not
+            if not pd.isna(row[f'transformed_message_{save_model_name}']):
+                continue
+            transformed_message = transform_message(row['commit_message'], model_name)
+            final_df.at[index, f'transformed_message_{save_model_name}'] = transformed_message
+        if not is_train:
+            csv_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold.csv')
+        else:
+            csv_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_train.csv')
+        final_df.to_csv(csv_save_path, index=False)
+        print(f'Saved {csv_save_path}')
+
+        if not is_train:
+            parquet_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold.parquet')
+        else:
+            parquet_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_train.parquet')
+        final_df.to_parquet(parquet_save_path, index=False)
+        print(f'Saved {parquet_save_path}')
+
+        # save a list of commit_ids to a file {repo_name}_{save_model_name}_gold_commit_ids.txt
+        # all_commit_ids = final_df['commit_id'].tolist()
+        # commit_ids_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold_commit_ids.txt')
+        #
+        # with open(commit_ids_save_path, 'w') as f:
+        #     for commit_id in all_commit_ids:
+        #         f.write(f'{commit_id}\n')
+
+        print(f'Finished processing {repo_path}')
+
+
+    if create_gold:
+        test_df = filtered_df[filtered_df['commit_id'].isin(test_commit_ids)]
+        print(f'Number of commits in test_df: {len(test_df)}')
+        process_df(test_df, is_train=False)
+
+    process_df(train_df, is_train=True)
+
 def main():
     save_dir = 'gold/'
     # model_name = "gpt-3.5-turbo"
     model_name = "gpt-4"
     save_model_name = 'gpt4' if model_name == 'gpt-4' else 'gpt3.5'
     VERSION = 'v2'
+    train_sample_size = 1000
+    test_sample_size = 100
 
     sample_size = 100
     # REPO_LIST = []
@@ -153,43 +239,7 @@ def main():
     print(f'Using model: {model_name} with sample size: {sample_size}')
 
     for repo_path in REPO_LIST:
-        print(f'Processing {repo_path}')
-        combined_df = get_combined_df(repo_path)
-        filtered_df = filter_df(combined_df)
-        # sample 100 commits from filtered_df with seed 42 without replacement
-        final_df = filtered_df.sample(n=sample_size, random_state=42, replace=False)
-        # number of unique commit_ids
-        print(f'Number of unique commit_ids: {len(final_df)}')
-        repo_name = repo_path.split('/')[-1]
-        output_dir = os.path.join(save_dir, repo_name)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        # add a new column to final_df
-        final_df[f'transformed_message_{save_model_name}'] = np.nan
-        for index, row in tqdm(final_df.iterrows(), total=final_df.shape[0]):
-            # check if transformed_message_gpt3 is NaN or not
-            if not pd.isna(row[f'transformed_message_{save_model_name}']):
-                continue
-            transformed_message = transform_message(row['commit_message'], model_name)
-            final_df.at[index, f'transformed_message_{save_model_name}'] = transformed_message
-
-        csv_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold.csv')
-        final_df.to_csv(csv_save_path, index=False)
-        print(f'Saved {csv_save_path}')
-
-        parquet_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold.parquet')
-        final_df.to_parquet(parquet_save_path, index=False)
-        print(f'Saved {parquet_save_path}')
-
-        # save a list of commit_ids to a file {repo_name}_{save_model_name}_gold_commit_ids.txt
-        all_commit_ids = final_df['commit_id'].tolist()
-        commit_ids_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold_commit_ids.txt')
-
-        with open(commit_ids_save_path, 'w') as f:
-            for commit_id in all_commit_ids:
-                f.write(f'{commit_id}\n')
-
-        print(f'Finished processing {repo_path}')
+        process_repository(repo_path, model_name, save_model_name, train_sample_size, test_sample_size, VERSION)
 
 if __name__ == "__main__":
     main()

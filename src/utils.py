@@ -240,7 +240,7 @@ def sanity_check_triplets(data):
     return data
 
 
-def get_recent_df(combined_df, params, repo_name=None, ignore_gold_in_training=False):
+def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
     # Prepare the data for training
     print('Preparing training data...')
     # Step 1: Filter out only the columns we need
@@ -282,10 +282,6 @@ def get_recent_df(combined_df, params, repo_name=None, ignore_gold_in_training=F
             print('Removing gold commits from training data...')
             recent_df = recent_df[~recent_df['commit_id'].isin(gold_commits)]
             print(f'Number of commits after removing gold commits: {len(recent_df)}')
-
-    # Step 6: randomly sample 1500 rows from recent_df
-    recent_df = recent_df.sample(params['train_commits'])
-    print(f'Number of commits after sampling: {len(recent_df)}')
     return recent_df
 
 def prepare_code_triplets(diff_data, code_reranker, cache_file, overwrite=False):
