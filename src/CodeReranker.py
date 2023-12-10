@@ -7,7 +7,9 @@ import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
+from regex import B
 from sklearn.model_selection import train_test_split
+from sympy import S
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import (
@@ -20,17 +22,114 @@ from transformers import (
 from BERTReranker_v4 import BERTReranker
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
-from utils import (
+from utils import (  # prepare_triplet_data_from_df,
     AggregatedSearchResult,
     get_combined_df,
     get_recent_df,
-    prepare_triplet_data_from_df,
+    prepare_code_triplets,
     sanity_check_triplets,
     set_seed,
 )
 
 # set seed
 set_seed(42)
+
+
+
+def sanity_check_code(data):
+    problems = 0
+    for i, row in tqdm(data.iterrows(), total=len(data)):
+        try:
+            if row['label'] == 0:
+                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 0
+            else:
+                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 1
+        except AssertionError:
+            print(f"Assertion failed at index {i}: {row}")
+            # break  # Optional: break after the first failure, remove if you want to see all failures
+            # remove the row with label 0
+
+            if row['label'] == 0:
+                problems += 1
+                # data.drop(i, inplace=True)
+                data = data.drop(i)
+                # print(f"Dropped row at index {i}")
+
+    print(f"Total number of problems in sanity check of training data: {problems}")
+    return data
+
+def get_code_df(df, searcher, search_depth, num_positives, num_negatives):
+    code_data = []
+    print(f'Preparing code data from dataframe of size: {len(df)} with search_depth: {search_depth}')
+    # for _, row in df.iterrows():
+    total_positives, total_negatives = 0, 0
+    for _, row in tqdm(df.iterrows(), total=len(df)):
+        cur_positives = 0
+        cur_negatives = 0
+        commit_message = row['commit_message']
+        actual_files_modified = row['actual_files_modified']
+
+        agg_search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump', sort_contributing_result_by_date=True)
+
+        for agg_result in agg_search_results:
+            most_recent_search_result = agg_result.contributing_results[0]
+            file_path = most_recent_search_result.file_path
+            commit_id = most_recent_search_result.commit_id
+
+            if file_path in actual_files_modified and cur_positives < num_positives:
+                # this is a positive sample
+                code_data.append((commit_message, file_path, commit_id, 1))
+                cur_positives += 1
+                total_positives += 1
+            elif file_path not in actual_files_modified and cur_negatives < num_negatives:
+                # this is a negative sample
+                code_data.append((commit_message, file_path, commit_id, 0))
+                cur_negatives += 1
+                total_negatives += 1
+
+            if cur_positives == num_positives and cur_negatives == num_negatives:
+                break
+
+    # convert to pandas dataframe
+    # data = pd.DataFrame(data, columns=['query', 'passage', 'label'])
+    code_df = pd.DataFrame(code_data, columns=['query', 'file_path', 'commit_id', 'label'])
+    # print distribution of labels
+    print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
+    # print percentage of positives and negatives
+    denom = total_positives + total_negatives
+    print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
+    return code_df
+
+def process_code_df(diff_data, df):
+    # given diff_data, we want to use commit_id and file_path to get the diff from the df
+
+    # first we need to get the diff from the df
+    # we can use the commit_id and file_path to get the diff
+    res_df = []
+    null_rows = 0
+    # for _, row in diff_data.iterrows():
+    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
+        commit_id = row['commit_id']
+        file_path = row['file_path']
+        # get the diff from the df
+        diff = df[(df['commit_id'] == commit_id) & (df['file_path'] == file_path)]['cur_file_content']
+        # check if diff is NA/NaN
+        if diff.isnull().values.any():
+            # if it is, then we can just skip this row
+            null_rows += 1
+            continue
+        diff = diff.values[0]
+
+        res_df.append((commit_id, file_path, row['query'], diff, row['label']))
+
+    res_df = pd.DataFrame(res_df, columns=['commit_id', 'file_path', 'query', 'passage', 'label'])
+    # make query and passage into strings and label into int
+    res_df['query'] = res_df['query'].astype(str)
+    res_df['passage'] = res_df['passage'].astype(str)
+    res_df['label'] = res_df['label'].astype(int)
+    print(f"Number of null rows: {null_rows}")
+    return res_df
+
 
 class BERTCodeReranker:
     def __init__(self, parameters):
@@ -172,9 +271,13 @@ class BERTCodeReranker:
 
             # now need to split this file content into psg_cnt passages
             # first tokenize the file content
+            assert file_content is not None, f'file_content is None for commit_id: {commit_id}, file_path: {file_path}'
+            assert file_path is not None, f'file_path is None for commit_id: {commit_id}'
+            assert query is not None, f'query is None'
             file_tokens = full_tokenize(file_content)
             query_tokens = full_tokenize(query)
             path_tokens = full_tokenize(file_path)
+
 
 
             # now split the file content into psg_cnt passages
@@ -251,8 +354,8 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
     tokenized_val_dataset = val_hf_dataset.map(tokenize_hf, batched=True)
 
     # Step 9: set format for pytorch
-    tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage', 'file_path', 'full_passage'])
-    tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage', 'file_path', 'full_passage'])
+    tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage', 'file_path'])
+    tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage', 'file_path'])
 
     # rename label column to labels
     tokenized_train_dataset = tokenized_train_dataset.rename_column('label', 'labels')
@@ -275,7 +378,7 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
         save_total_limit=2,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        logging_steps=100,
+        logging_steps=1000,
         fp16=True,
         dataloader_num_workers=args.num_workers,
         )
@@ -310,8 +413,8 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
 def main(args):
     # print torch devices available
     print('Available devices: ', torch.cuda.device_count())
-    print('Current cuda device: ', torch.cuda.current_device())
     if torch.cuda.is_available():
+        print('Current cuda device: ', torch.cuda.current_device())
         print(torch.cuda.get_device_name(torch.cuda.current_device()))
     metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
     repo_path = args.repo_path
@@ -343,19 +446,19 @@ def main(args):
         'num_workers': args.num_workers,
         'train_commits': args.train_commits,
         'bm25_aggr_strategy': BM25_AGGR_STRAT,
+        'psg_len': args.psg_len,
+        'psg_stride': args.psg_stride
     }
 
-    bert_reranker = BERTReranker(params)
     code_reranker = BERTCodeReranker(params)
-    code_reranker.rerank_depth = 100 # TODO Magic number
-    rerankers = [bert_reranker, code_reranker]
+    # rerankers = [bert_reranker, code_reranker]
     save_model_name = params['model_name'].replace('/', '_')
-    hf_output_dir = os.path.join(repo_path, f'code_{save_model_name}_model_output')
+    hf_output_dir = os.path.join(repo_path, 'models', f'code_{save_model_name}_model_output')
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
 
     # create eval directory to store results
-    eval_path = os.path.join(repo_path, 'eval', save_model_name)
+    eval_path = os.path.join(repo_path, 'eval', f'code_{save_model_name}')
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
 
@@ -363,16 +466,46 @@ def main(args):
 
 
     if args.do_train:
-        recent_df = get_recent_df(combined_df, params)
 
-        # Step 6: Prepare triplet data
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
-        triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
-        # TODO: filter eval commits from here
-        triplet_data = prepare_triplet_data_from_df(recent_df, bm25_searcher, search_depth=params['train_depth'], num_positives=params['num_positives'], num_negatives=params['num_negatives'], cache_file=triplet_cache, overwrite=args.overwrite_cache)
 
-        do_training(triplet_data, code_reranker, hf_output_dir, args)
+        recent_df = get_recent_df(combined_df, params, repo_name=repo_name, ignore_gold_in_training=False)
+
+        if not args.overwrite_cache and os.path.exists(os.path.join(repo_path, 'cache', 'code_data.parquet')):
+            print('Loading code data from cache...')
+            processed_code_df = pd.read_parquet(os.path.join(repo_path, 'cache', 'code_data.parquet'))
+        else:
+            code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'])
+            print(f'Code dataframe shape: {code_df.shape}')
+            print(code_df.info())
+            # process code_df
+            processed_code_df = process_code_df(code_df, combined_df)
+            processed_code_df.to_parquet(os.path.join(repo_path, 'cache', 'code_data.parquet'))
+
+        if args.sanity_check:
+                print('Running sanity check on training data...')
+                processed_code_df = sanity_check_code(processed_code_df)
+
+        print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
+        print(processed_code_df.info())
+
+
+        triplet_cache = os.path.join(repo_path, 'cache', 'code_triplets.parquet')
+
+        print(type(processed_code_df))
+        triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, overwrite=args.overwrite_cache)
+        triplet_size = len(triplets)
+        print(f'Triplet dataframe shape (before): {triplets.shape}')
+        triplets = triplets.sample(min(50000, triplet_size), random_state=42)
+        print(f'Triplet dataframe shape (after): {triplets.shape}')
+
+        # drop column called full_passage
+        if 'full_passage' in triplets.columns:
+            triplets = triplets.drop(columns=['full_passage'])
+        print(f'Triplet dataframe shape: {triplets.shape}')
+        print(triplets.info())
+        do_training(triplets, code_reranker, hf_output_dir, args)
 
 
     # load the best model from args.best_model_path for do_eval and eval_gold
@@ -383,12 +516,25 @@ def main(args):
         print(f'Loading model from {cur_best_model_path}...')
         code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
         code_reranker.model.to(code_reranker.device)
-        rerankers = [bert_reranker, code_reranker]
+        # rerankers = [bert_reranker, code_reranker]
+
+        if args.bert_best_model is not None:
+            bert_reranker = BERTReranker(bert_params)
+            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.bert_best_model, num_labels=1, problem_type='regression')
+            bert_reranker.model.to(bert_reranker.device)
+            rerankers = [bert_reranker, code_reranker]
+        else:
+            rerankers = [code_reranker]
+
+        # print rerankers with their rerank_depth and psg_cnt
+        print('Rerankers:')
+        for reranker in rerankers:
+            print(f'{reranker.__class__.__name__} with rerank_depth: {reranker.rerank_depth}, psg_cnt: {reranker.psg_cnt}')
 
 
     if args.do_eval:
 
-        bert_with_training_output_path = os.path.join(eval_path, 'multi_bert_with_training.txt')
+        bert_with_training_output_path = os.path.join(eval_path, 'bert_code_with_training.txt')
         bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
         print("BERT Evaluation with training")
@@ -399,14 +545,12 @@ def main(args):
         if not os.path.exists(gold_dir):
             raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
         # check if gold data exists
-        gold_data_path = os.path.join(gold_dir, f'{repo_name}_{args.openai_model}_gold.parquet')
+        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
         if not os.path.exists(gold_data_path):
             raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
         print(f'Model: {args.openai_model}')
         gold_df = pd.read_parquet(gold_data_path)
         # assert all transformed_message_gpt3 are not NaN
-        # rename the column transformed_message_gpt3 to transformed_message_{oai_model}
-        gold_df = gold_df.rename(columns={'transformed_message_gpt3': f'transformed_message_{args.openai_model}'})
         assert gold_df[f'transformed_message_{args.openai_model}'].notnull().all()
         # rename commit_message to original_message
         gold_df = gold_df.rename(columns={'commit_message': 'original_message'})
@@ -425,7 +569,7 @@ def main(args):
 
         # get gold eval with reranking
         print('Running BERT on gold data...')
-        bert_gold_output_path = os.path.join(eval_path, f'multi_bert_{args.openai_model}_gold.txt')
+        bert_gold_output_path = os.path.join(eval_path, f'bert_code_{args.openai_model}_gold.txt')
         bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
 
         print("BERT Gold Evaluation")
@@ -453,7 +597,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_depth', type=int, default=1000, help='Number of samples to train on (default: 1000)')
     parser.add_argument('--num_workers', type=int, default=8, help='Number of workers for dataloader (default: 8)')
     parser.add_argument('--train_commits', type=int, default=1500, help='Number of commits to train on (default: 1500)')
-    parser.add_argument('--psg_cnt', type=int, default=5, help='Number of passages to retrieve per query (default: 5)')
+    parser.add_argument('--psg_cnt', type=int, default=10, help='Number of passages to retrieve per query (default: 5)')
     parser.add_argument('--aggregation_strategy', type=str, default='sump', help='Aggregation strategy (default: sump)')
     parser.add_argument('--use_gpu', action='store_true', help='Use GPU.')
     parser.add_argument('--rerank_depth', type=int, default=250, help='Number of commits to rerank (default: 250)')
@@ -462,12 +606,31 @@ if __name__ == '__main__':
     parser.add_argument('--eval_gold', action='store_true', help='Evaluate the model on gold data.')
     parser.add_argument('--openai_model', choices=['gpt3', 'gpt4'], help='OpenAI model to use for transforming commit messages.')
     parser.add_argument('--overwrite_eval', action='store_true', help='Replace evaluation files if they already exist.')
-    parser.add_argument('--sanity_check_triplets', action='store_true', help='Run sanity check on training data.')
+    parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
     # parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
     # parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
+    parser.add_argument('--bert_best_model', type=str, help='Path to the best BERT model.')
+    parser.add_argument('--psg_len', type=int, default=250, help='Length of each passage (default: 250)')
+    parser.add_argument('--psg_stride', type=int, default=200, help='Stride of each passage (default: 250)')
     args = parser.parse_args()
     print(args)
     combined_df = get_combined_df(args.repo_path)
+    bert_params = {
+        'model_name': args.model_path,
+        'psg_cnt': 5,
+        'aggregation_strategy': args.aggregation_strategy,
+        'batch_size': args.batch_size,
+        'use_gpu': args.use_gpu,
+        'rerank_depth': 250,
+        'num_epochs': args.num_epochs,
+        'lr': args.learning_rate,
+        'num_positives': args.num_positives,
+        'num_negatives': args.num_negatives,
+        'train_depth': args.train_depth,
+        'num_workers': args.num_workers,
+        'train_commits': args.train_commits,
+        'bm25_aggr_strategy': 'sump',
+    }
     main(args)

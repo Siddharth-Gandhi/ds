@@ -180,6 +180,15 @@ def main():
         parquet_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold.parquet')
         final_df.to_parquet(parquet_save_path, index=False)
         print(f'Saved {parquet_save_path}')
+
+        # save a list of commit_ids to a file {repo_name}_{save_model_name}_gold_commit_ids.txt
+        all_commit_ids = final_df['commit_id'].tolist()
+        commit_ids_save_path = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_gold_commit_ids.txt')
+
+        with open(commit_ids_save_path, 'w') as f:
+            for commit_id in all_commit_ids:
+                f.write(f'{commit_id}\n')
+
         print(f'Finished processing {repo_path}')
 
 if __name__ == "__main__":

@@ -26,7 +26,13 @@ class BM25Searcher:
 
     def search(self, query, query_date, ranking_depth):
         # TODO maybe change this to mean returning reranking_depths total results instead of being pruned by the query date
-        hits = self.searcher.search(tokenize(query), ranking_depth)
+        tokenized_query = tokenize(query)
+        try:
+            hits = self.searcher.search(tokenized_query, ranking_depth)
+        except Exception as e:
+            print(e)
+            print(f"Error searching for query of length {len(tokenized_query)}")
+            return []
         unix_date = query_date
         filtered_hits = [
             SearchResult(hit.docid, json.loads(hit.raw)['file_path'], hit.score, int(json.loads(hit.raw)["commit_date"]), reverse_tokenize(json.loads(hit.raw)['contents']))

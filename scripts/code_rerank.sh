@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=bert_rerank
-#SBATCH --output=logs/bert_rerank/bert_rerank_output_%A.log
+#SBATCH --job-name=cr
+#SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=8
-#SBATCH --mem=50G
+#SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --gpus=1
 
@@ -18,12 +18,10 @@ echo "On host $(hostname)"
 nvidia-smi
 
 # repo_path="2_7/apache_spark"
-# repo_path="2_7/apache_kafka"
+repo_path="2_7/apache_kafka"
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
 # repo_path="2_8/django_django"
-# repo_path="2_9/huggingface_transformers"
-repo_path="2_9/redis_redis"
 # repo_path="smalldata/ftr"
 
 
@@ -45,31 +43,31 @@ num_negatives=10 # number of negative samples per querys
 train_depth=1000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
 train_commits=1000 # number of commits to train on (train + val)
-psg_cnt=5 # number of commits to use for psg generation
+psg_cnt=25 # number of commits to use for psg generation
+psg_len=250
+psg_stride=200
 aggregation_strategy="sump" # aggregation strategy for bert reranker
-# use_gpu=True # whether to use gpu or not
-rerank_depth=250 # depth to go while reranking
-# do_train=True # whether to train or not
-# do_eval=True # whether to evaluate or not
+rerank_depth=100 # depth to go while reranking
 openai_model="gpt4" # openai model to use
+bert_best_model="${repo_path}/models/microsoft_codebert-base_model_output/best_model"
 # best_model_path="data/combined/best_model"
 
-# repo_paths=(
-#     "2_7/apache_spark"
-#     "2_7/apache_kafka"
-#     "2_7/facebook_react"
-#     "2_8/angular_angular"
-#     "2_8/django_django"
-#     # "2_8/pytorch_pytorch"
-#     # "2_7/pandas-dev_pandas"
-#     # "2_7/julialang_julia"
-#     # "2_7/ruby_ruby"
-#     # "2_8/ansible_ansible"
-#     # "2_7/moby_moby"
-#     # "2_7/jupyter_notebook"
-# )
+repo_paths=(
+    "2_7/apache_spark"
+    "2_7/apache_kafka"
+    "2_7/facebook_react"
+    "2_8/angular_angular"
+    "2_8/django_django"
+    # "2_8/pytorch_pytorch"
+    # "2_7/pandas-dev_pandas"
+    # "2_7/julialang_julia"
+    # "2_7/ruby_ruby"
+    # "2_8/ansible_ansible"
+    # "2_7/moby_moby"
+    # "2_7/jupyter_notebook"
+)
 
-python -u src/BERTReranker_v4.py \
+python -u src/CodeReranker.py \
     --repo_path $repo_path \
     --index_path $index_path \
     --k $k \
@@ -84,23 +82,25 @@ python -u src/BERTReranker_v4.py \
     --num_workers $num_workers \
     --train_commits $train_commits \
     --psg_cnt $psg_cnt \
+    --psg_len $psg_len \
+    --psg_stride $psg_stride \
     --use_gpu \
     --aggregation_strategy $aggregation_strategy \
     --rerank_depth $rerank_depth \
     --openai_model $openai_model \
-    --sanity_check \
+    --bert_best_model $bert_best_model \
     --do_eval \
-    --do_train \
-    --ignore_gold_in_training \
-    # --eval_gold \
+    --eval_gold \
+    # --do_train \
+    # --sanity_check \
     # --overwrite_cache \
-    # --no_bm25 \
+
+
+
     # --do_combined \
     # --best_model_path $best_model_path \
     # --repo_paths "${repo_paths[@]}" \
 
-
-    # --debug \
 
 echo "Job completed"
 

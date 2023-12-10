@@ -1,5 +1,6 @@
 import argparse
 import os
+import re
 import sys
 from typing import List
 
@@ -22,6 +23,7 @@ from eval import ModelEvaluator, SearchEvaluator
 from utils import (
     AggregatedSearchResult,
     get_combined_df,
+    get_recent_df,
     prepare_triplet_data_from_df,
     set_seed,
 )
@@ -337,46 +339,74 @@ def main(args):
     bert_reranker = BERTReranker(params)
     rerankers = [bert_reranker]
     save_model_name = params['model_name'].replace('/', '_')
-    hf_output_dir = os.path.join(repo_path, f'{save_model_name}_model_output')
+    if not os.path.exists(os.path.join(repo_path, 'models')):
+        os.makedirs(os.path.join(repo_path, 'models'))
+    hf_output_dir = os.path.join(repo_path, 'models', f'{save_model_name}_model_output')
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
     # training methods
 
 
-    if args.eval_before_training:
-        # get results without training first
-        print('Evaluating model before training...')
-        bert_without_trainint_output_path = os.path.join(eval_path, 'bert_without_training.txt')
-        bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
-        print("BERT Evaluation without training")
-        print(bert_without_training_eval)
+    # if args.eval_before_training:
+    #     # get results without training first
+    #     print('Evaluating model before training...')
+    #     bert_without_trainint_output_path = os.path.join(eval_path, 'bert_without_training.txt')
+    #     bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
+    #     print("BERT Evaluation without training")
+    #     print(bert_without_training_eval)
 
     if args.do_train:
-        # Prepare the data for training
-        print('Preparing training data...')
-        # Step 1: Filter out only the columns we need
-        filtered_df = combined_df[['commit_date', 'commit_message', 'commit_id', 'file_path', 'diff']]
+        # # Prepare the data for training
+        # print('Preparing training data...')
+        # # Step 1: Filter out only the columns we need
+        # filtered_df = combined_df[['commit_date', 'commit_message', 'commit_id', 'file_path', 'diff']]
 
-        # Step 2: Group by commit_id
-        grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
-        grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
+        # # Step 2: Group by commit_id
+        # grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
+        # grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
 
-        # Step 3: Determine midpoint and filter dataframe
-        midpoint_date = np.median(grouped_df['commit_date'])
-        recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
-        print(f'Number of commits after midpoint date: {len(recent_df)}')
+        # # Step 3: Determine midpoint and filter dataframe
+        # midpoint_date = np.median(grouped_df['commit_date'])
+        # recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
+        # print(f'Number of commits after midpoint date: {len(recent_df)}')
 
-        # Step 4: Filter out commits with less than average length commit messages
-        average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
-        # filter out commits with less than average length
-        recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len] # type: ignore
-        print(f'Number of commits after filtering by commit message length: {len(recent_df)}')
+        # # Step 4: Filter out commits with less than average length commit messages
+        # average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
+        # # filter out commits with less than average length
+        # recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len] # type: ignore
+        # print(f'Number of commits after filtering by commit message length: {len(recent_df)}')
 
-        # Step 5: randomly sample 1500 rows from recent_df
-        recent_df = recent_df.sample(params['train_commits'])
-        print(f'Number of commits after sampling: {len(recent_df)}')
+        # # Step 5: Remove test commits from recent_df
 
-        # Step 6: Prepare triplet data
+        # gold_dir = os.path.join('gold', repo_name)
+        # gold_commit_file = os.path.join(gold_dir, f'{repo_name}_gpt4_gold_commit_ids.txt')
+
+
+        # if not os.path.exists(gold_commit_file):
+        #     print(f'Gold commit file {gold_commit_file} does not exist.')
+        #     if args.ignore_gold_in_training:
+        #         print('Skipping, gold commits could be in training...')
+        #     else:
+        #         print('Exiting...')
+        #         sys.exit(1)
+        # else:
+        #     gold_commits = pd.read_csv(gold_commit_file, header=None, names=['commit_id']).commit_id.tolist()
+
+        #     print(f'Found {len(gold_commits)} gold commits for {repo_name}')
+
+        #     print('Removing gold commits from training data...')
+        #     recent_df = recent_df[~recent_df['commit_id'].isin(gold_commits)]
+        #     print(f'Number of commits after removing gold commits: {len(recent_df)}')
+
+        # # Step 6: randomly sample 1500 rows from recent_df
+        # recent_df = recent_df.sample(params['train_commits'])
+        # print(f'Number of commits after sampling: {len(recent_df)}')
+
+        recent_df = get_recent_df(combined_df=combined_df, params=params, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
+
+        # sys.exit(0)
+
+        # Step 7: Prepare triplet data
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
         triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
@@ -406,7 +436,7 @@ def main(args):
         # bert_reranker.model.to(bert_reranker.device)
         # rerankers = [bert_reranker]
 
-        bert_with_training_output_path = os.path.join(eval_path, 'multi_bert_with_training.txt')
+        bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
         bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
         print("BERT Evaluation with training")
@@ -511,10 +541,11 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite_eval', action='store_true', help='Replace evaluation files if they already exist.')
     parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
-    parser.add_argument('--eval_before_training', action='store_true', help='Evaluate the model before training.')
+    # parser.add_argument('--eval_before_training', action='store_true', help='Evaluate the model before training.')
     parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
     parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
+    parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
     args = parser.parse_args()
     print(args)
     main(args)
