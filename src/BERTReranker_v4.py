@@ -286,6 +286,13 @@ def main(args):
 
     # create eval directory to store results
     eval_path = os.path.join(repo_path, 'eval')
+
+    # check for a eval_folder argument and if it exists, use that as the eval folder
+    if args.eval_folder:
+        eval_path = os.path.join(eval_path, args.eval_folder)
+        if not os.path.exists(eval_path):
+            os.makedirs(eval_path)
+
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
 
@@ -341,7 +348,13 @@ def main(args):
     save_model_name = params['model_name'].replace('/', '_')
     if not os.path.exists(os.path.join(repo_path, 'models')):
         os.makedirs(os.path.join(repo_path, 'models'))
-    hf_output_dir = os.path.join(repo_path, 'models', f'{save_model_name}_model_output')
+
+    model_name = f'{save_model_name}_bertrr'
+    if args.use_gpt_train:
+        model_name += '_gpt_train'
+
+
+    hf_output_dir = os.path.join(repo_path, 'models', model_name)
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
     # training methods
@@ -402,16 +415,30 @@ def main(args):
         # recent_df = recent_df.sample(params['train_commits'])
         # print(f'Number of commits after sampling: {len(recent_df)}')
 
-        recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
-        # Step 6: randomly sample 1500 rows from recent_df
-        recent_df = recent_df.sample(params['train_commits'])
-        print(f'Number of commits after sampling: {len(recent_df)}')
+        if args.use_gpt_train:
+            gold_dir = os.path.join('gold', repo_name)
+            if not os.path.exists(gold_dir):
+                raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+
+            gold_train_file = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_train.parquet')
+            if not os.path.exists(gold_train_file):
+                raise ValueError(f'Gold train file {gold_train_file} does not exist, please run openai_transform.py first')
+
+            recent_df = pd.read_parquet(gold_train_file)
+            # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
+            recent_df = recent_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
+            triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
+        else:
+            recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
+            # Step 6: randomly sample 1500 rows from recent_df
+            recent_df = recent_df.sample(params['train_commits'])
+            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
+        print(f'Number of commits in train_df: {len(recent_df)}')
         # sys.exit(0)
 
         # Step 7: Prepare triplet data
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
-        triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
         # TODO: filter eval commits from here
         triplet_data = prepare_triplet_data_from_df(recent_df, bm25_searcher, search_depth=params['train_depth'], num_positives=params['num_positives'], num_negatives=params['num_negatives'], cache_file=triplet_cache, overwrite=args.overwrite_cache)
 
@@ -548,6 +575,8 @@ if __name__ == '__main__':
     parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
     parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
+    parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT transformed training data.')
+    parser.add_argument('--eval_folder', type=str, help='Folder to store evaluation results for a particular experiment.')
     args = parser.parse_args()
     print(args)
     main(args)

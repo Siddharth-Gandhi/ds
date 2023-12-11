@@ -1,0 +1,2876 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
+06107541d3df39e3d9685e64c3b942d9aed06d75,1643368530,"Fixing support `batch_size` and `num_return_Sequences` in `text-generation` pipeline (#15318)
+
+* Fixing support `batch_size` and `num_return_Sequences` in
+`text-generation` pipeline
+
+And `text2text-generation` too.
+
+The bug was caused by the batch_size containing both the incoming batch
+**and** the generated `num_sequences`.
+
+The fix simply consists into splitting both of these again into
+different dimensions.
+
+* TF support.
+
+* Odd backward compatibility script in the way.","['src/transformers/pipelines/text2text_generation.py', 'src/transformers/pipelines/text_generation.py', 'tests/test_pipelines_text2text_generation.py', 'tests/test_pipelines_text_generation.py']","`batch_size` in `text-generation` pipeline incorrectly includes both incoming batch and generated `num_sequences`, affecting both text-generation and text2text-generation functionality."
+07c54413ac24f891fc37920f6c61ad8b7b035dc3,1685698622,"Add MobileViTv2 (#22820)
+
+* generated code from add-new-model-like
+
+* Add code for modeling, config, and weight conversion
+
+* add tests for image-classification, update modeling and config
+
+* add code, tests for semantic-segmentation
+
+* make style, make quality, make fix-copies
+
+* make fix-copies
+
+* Update modeling_mobilevitv2.py
+
+fix bugs
+
+* Update _toctree.yml
+
+* update modeling, config
+
+fix bugs
+
+* Edit docs - fix bug MobileViTv2v2 -> MobileViTv2
+
+* Update mobilevitv2.mdx
+
+* update docstrings
+
+* Update configuration_mobilevitv2.py
+
+make style
+
+* Update convert_mlcvnets_to_pytorch.py
+
+remove unused options
+
+* Update convert_mlcvnets_to_pytorch.py
+
+make style
+
+* Add suggestions from code review
+
+Co-Authored-By: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* make style, make quality
+
+* Add suggestions from code review
+
+Co-Authored-By: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* Add suggestions from code review
+
+Remove MobileViTv2ImageProcessor
+
+Co-Authored-By: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* make style
+
+* Add suggestions from code review
+
+Rename MobileViTv2 -> MobileViTV2
+
+Co-Authored-By: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* Add suggestions from code review
+
+Co-Authored-By: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* Update modeling_mobilevitv2.py
+
+make style
+
+* Update serialization.mdx
+
+* Update modeling_mobilevitv2.py
+
+---------
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/models/__init__.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/auto/image_processing_auto.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/mobilevitv2/__init__.py', 'src/transformers/models/mobilevitv2/configuration_mobilevitv2.py', 'src/transformers/models/mobilevitv2/convert_mlcvnets_to_pytorch.py', 'src/transformers/models/mobilevitv2/modeling_mobilevitv2.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/models/mobilevitv2/test_modeling_mobilevitv2.py']","Issues faced in integrating new model MobileViTv2 to the system, including bugs in configuration and modeling code. Documentation also contains incorrect or inconsistent naming conventions."
+0a057201a96565df29984d716f660fd8d634329a,1647330432,"Visual Attention Network (VAN) (#16027)
+
+* encoder works
+
+* addded files
+
+* norm in stage
+
+* convertion script
+
+* tests
+
+* fix copies
+
+* make fix-copies
+
+* fixed __init__
+
+* make fix-copies
+
+* fix
+
+* shapiro test needed
+
+* make fix-copie
+
+* minor changes
+
+* make style + quality
+
+* minor refactor conversion script
+
+* rebase + tests
+
+* removed unused variables
+
+* updated doc
+
+* toctree
+
+* CI
+
+* doc
+
+* Apply suggestions from code review
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* resolved conversations
+
+* make fixup
+
+* config passed to modules
+
+* config passed to modules
+
+* Apply suggestions from code review
+
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>
+
+* conversations
+
+* conversations
+
+* copyrights
+
+* normal test
+
+* tests
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/models/__init__.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/auto/feature_extraction_auto.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/van/__init__.py', 'src/transformers/models/van/configuration_van.py', 'src/transformers/models/van/convert_van_to_pytorch.py', 'src/transformers/models/van/modeling_van.py', 'src/transformers/testing_utils.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/van/test_modeling_van.py']","The Visual Attention Network (VAN) seems to have unresolved issues which include conversion script error. Also, unnecessary variables are cluttering the code and documentation is out of date.
+"
+0b5c7e4838fddeb4601acbb80cd2c71ddcf76726,1663271616,"Adds package and requirement spec output to version check exception (#18702)
+
+* Adds package and requirement spec output to version check exception
+
+It's difficult to understand what package is affected when `got_ver`
+here comes back None, so output the requirement and the package. The
+requirement probably contains the package but let's output both for good
+measure.
+
+Non-exhaustive references for this problem aside from my own encounter:
+
+* https://stackoverflow.com/questions/70151167/valueerror-got-ver-is-none-when-importing-tensorflow
+* https://discuss.huggingface.co/t/valueerror-got-ver-is-none/17465
+* https://github.com/UKPLab/sentence-transformers/issues/1186
+* https://github.com/huggingface/transformers/issues/13356
+
+I speculate that the root of the error comes from a conflict of
+conda-managed and pip-managed Python packages but I've not yet proven
+this.
+
+* Combines version presence check and streamlines exception message
+
+See also: https://github.com/huggingface/transformers/pull/18702#discussion_r953223275
+
+Co-authored-by: Stas Bekman <stas@stason.org>",['src/transformers/utils/versions.py'],"`got_ver` returns None for a package during version check, resulting in unclear identification of the affected package. The issue is speculated to stem from a conflict between conda-managed and pip-managed Python packages."
+1025a9b74291b8256357476e554e252658217e11,1649667970,"add a warning in `SpmConverter` for sentencepiece's model using the byte fallback feature  (#16629)
+
+* update proto sentencepiece model
+
+* Revert ""update proto sentencepiece model""
+
+This reverts commit b07f671747fec35773d0b3d4788b8b15aefa0229.
+
+* add check
+
+* add test
+
+* Revert ""Revert ""update proto sentencepiece model""""
+
+This reverts commit 46108257b8927b73627ec8f4f3eed53a95fc700d.
+
+* test for log level
+
+* test for log level 2
+
+* warning at the warning level
+
+* clean
+
+* format
+
+* add explanation in docstring","['src/transformers/convert_slow_tokenizer.py', 'src/transformers/utils/sentencepiece_model_pb2.py', 'tests/utils/test_convert_slow_tokenizer.py']",The `SpmConverter` fails to issue a warning when SentencePiece's model resorts to using the byte fallback feature.
+11b2e45ccc569f8ef8a8e4dfcb4c80af7fee0335,1668506698,"[WHISPER] Update modeling tests (#20162)
+
+* Update modeling tests
+
+* update tokenization test
+
+* typo
+
+* nit
+
+* fix expected attention outputs
+
+* Apply suggestions from code review
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+
+* Update tests from review
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>
+
+* remove problematics kwargs passed to the padding function
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>","['src/transformers/models/whisper/feature_extraction_whisper.py', 'tests/models/whisper/test_modeling_tf_whisper.py', 'tests/models/whisper/test_modeling_whisper.py', 'tests/models/whisper/test_tokenization_whisper.py']",The modeling and tokenization tests are outdated and erroneous kwargs are being passed to the padding function causing issues.
+125a2882b4997f8ad37beadb8a025114f0f0e1a0,1643660531,"Update modeling_wav2vec2.py (#15423)
+
+* Update modeling_wav2vec2.py
+
+With very tiny sound files (less than 0.1 seconds) the num_masked_span can be too long. The issue is described in issue #15366 and discussed with @patrickvonplaten.
+
+* correct errors with mask time indices
+
+* remove bogus file
+
+* make fix-copies
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>","['src/transformers/models/hubert/modeling_hubert.py', 'src/transformers/models/sew/modeling_sew.py', 'src/transformers/models/sew_d/modeling_sew_d.py', 'src/transformers/models/unispeech/modeling_unispeech.py', 'src/transformers/models/unispeech_sat/modeling_unispeech_sat.py', 'src/transformers/models/wav2vec2/modeling_wav2vec2.py', 'src/transformers/models/wavlm/modeling_wavlm.py', 'tests/test_modeling_wav2vec2.py']",Encountering issues with tiny sound files (less than 0.1 seconds) in wav2vec2 model as the num_masked_span can become excessively long.
+12b4d66a80419db30a15e7b9d4208ceb9887c03b,1633379332,"Update no_* argument (HfArgumentParser) (#13865)
+
+* update no_* argument
+
+Changes the order so that the no_* argument is created after the original argument AND sets the default for this no_* argument to False
+
+* import copy
+
+* update test
+
+* make style
+
+* Use kwargs to set default=False
+
+* make style","['src/transformers/hf_argparser.py', 'tests/test_hf_argparser.py']","The creation order of no_* argument in HfArgumentParser causes issues, and the no_* argument defaults are inconsistent."
+13254591054630b08d1a1338aa5ca9674d2513ed,1677777139,"Refactor whisper asr pipeline to include language too. (#21427)
+
+* [WIP] whisper refacto to support language output.
+
+* Handling merges.
+
+* A bit more cleanup and comments.
+
+* Many improvements.
+
+Lots of details everywhere.
+
+* Cleanup old code and tests.
+
+* Handle lone timestamp tokens (just recover when something bad happens).
+
+* Adding return_language example.
+
+* No ffmpeg.
+
+* Hmm.
+
+* Some corrections.
+
+* Both fast and slow.
+
+* New black.
+
+* Update src/transformers/models/whisper/tokenization_whisper.py
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* Update src/transformers/models/whisper/tokenization_whisper.py
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* Remove print.
+
+* Undoing tests modifications.
+
+* Smaller test modifications.
+
+* Rename.
+
+* Remove maxDiff.
+
+---------
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>","['src/transformers/models/whisper/tokenization_whisper.py', 'src/transformers/models/whisper/tokenization_whisper_fast.py', 'src/transformers/pipelines/automatic_speech_recognition.py', 'tests/models/whisper/test_tokenization_whisper.py', 'tests/pipelines/test_pipelines_automatic_speech_recognition.py']",Whisper ASR pipeline currently lacks language output support. This makes handling language specific features and compatibility harder.
+135703816441bdba59dd5154e293a5946ad538d5,1655899899,"Add logits_processor parameter, used by `generate`, to `Seq2SeqTrainer` methods `evaluate` and `predict` (#17805)
+
+* Add logits_processor parameter, used by `generate`, to `Seq2SeqTrainer` methods `evaluate` and `predict`
+
+* Add all generate parameters to `Seq2SeqTrainer`, and also to `QuestionAnsweringSeq2SeqTrainer` which overrides it
+
+* Remove `self._num_beams` from trainer classes
+
+* - Run fixup
+- Fix ""Constraint"" not exposed
+- Fix synced_gpus to actually read from param
+
+* Use kwargs
+
+* Copy kwargs before making changes to it
+
+* Fix style issues unused imports","['examples/pytorch/question-answering/trainer_seq2seq_qa.py', 'src/transformers/trainer_seq2seq.py']","Seq2SeqTrainer methods 'evaluate' and 'predict' are missing the logits_processor parameter, leading to inconsistencies with method 'generate'. Lack of all generate parameters in Seq2SeqTrainer and QuestionAnsweringSeq2SeqTrainer may cause function override issues.
+"
+182b83749a7058547e1e882c603cbf97e20259f8,1692684777,"Add Number Normalisation for SpeechT5 (#25447)
+
+* add: NumberNormalizer works for integers, floats, common currencies, negative numbers and percentages
+
+* fix: renamed number normalizer class and added normalization to SpeechT5Processor
+
+* fix: restyled with black and ruff, should pass code quality tests
+
+* fix: moved normalization to tokenizer and other small changes to normalizer
+
+* add: test for normalization and changed the existing full tokenizer test
+
+* fix: tokenization tests now pass, made changes to existing tokenization where normalization is covered; added normalize arg to func signature
+
+* fix: changed default normalize setting to False, modified the tests a bit
+
+* fix: added support for comma separated numbers, tokenization on the fly with kwargs and normalizer getter setter funcs","['src/transformers/models/speecht5/number_normalizer.py', 'src/transformers/models/speecht5/tokenization_speecht5.py', 'tests/models/speecht5/test_tokenization_speecht5.py']","SpeechT5 lacks number normalization for various formats like integers, floats, common currencies, negative numbers and percentages, leading to inconsistent results."
+1af4bee8965c80e54c0e21aa8aadd035fd1f4189,1670929197,"Add `keep_in_fp32_modules` support (#20683)
+
+* add `keep_in_fp32_modules` support
+
+* pass it as class attribute
+
+* few modifs
+
+- make tests `slow`
+- fix logic
+
+* better logic
+
+* fix failing test
+
+* `bfloat16` support
+
+* Update src/transformers/modeling_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* fix
+
+* simplify tests
+
+* simplify tests
+
+* fix test
+
+* modify message
+
+* more checks
+
+* fix failing tests
+
+* add more conditions
+
+- add `is_accelerate_available`
+- fixes pipleine tests that failed
+
+* add suggestions
+
+* Update src/transformers/modeling_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* fix failing `bnb` test
+
+* add last safety checker
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/modeling_utils.py', 'src/transformers/models/t5/modeling_t5.py', 'src/transformers/utils/bitsandbytes.py', 'tests/mixed_int8/test_mixed_int8.py', 'tests/models/t5/test_modeling_t5.py']",Lack of support for `keep_in_fp32_modules` causing issues in performance and functionality of models; tests failing due to unsupported `bfloat16`.
+1e3c9ddacc7fc4142253bc9ddcba85c4d5b977e7,1697011734,"Make Whisper Encoder's sinusoidal PE non-trainable by default (#26032)
+
+* set encoder's PE as non-trainable
+
+* freeze flax
+
+* init sinusoids
+
+* add test for non-trainable embed positions
+
+* simplify TF encoder embed_pos
+
+* revert tf
+
+* clean up
+
+* add sinusoidal init for jax
+
+* make consistent sinusoidal function
+
+* fix dtype
+
+* add default dtype
+
+* use numpy for sinusoids. fix jax
+
+* add sinusoid init for TF
+
+* fix
+
+* use custom embedding
+
+* use specialized init for each impl
+
+* fix sinusoids init. add test for pytorch
+
+* fix TF dtype
+
+* simplify sinusoid init for flax and tf
+
+* add tests for TF
+
+* change default dtype to float32
+
+* add sinusoid test for flax
+
+* Update src/transformers/models/whisper/modeling_flax_whisper.py
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+
+* Update src/transformers/models/whisper/modeling_tf_whisper.py
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+
+* move sinusoidal init to _init_weights
+
+---------
+
+Co-authored-by: sanchit-gandhi <sanchit@huggingface.co>
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>","['src/transformers/models/whisper/modeling_flax_whisper.py', 'src/transformers/models/whisper/modeling_tf_whisper.py', 'src/transformers/models/whisper/modeling_whisper.py', 'tests/models/whisper/test_modeling_flax_whisper.py', 'tests/models/whisper/test_modeling_tf_whisper.py', 'tests/models/whisper/test_modeling_whisper.py']",Whisper Encoder's sinusoidal Positional Encoding (PE) is trainable by default leading to potential inefficiencies in the learning process.
+212829ade6c719c044937a56d1478c64e4b73882,1673526724,"Remove more unused attributes in config classes (#21000)
+
+* Remove gradient_checkpointing from MarkupLMConfig
+
+* Remove predict_special_tokens from OpenAIGPTConfig
+
+* Remove enable_cls from RoCBertConfig
+
+* Remove batch_size from TrajectoryTransformerConfig
+
+* Remove searcher_seq_len from RealmConfig
+
+* Remove feat_quantizer_dropout from WavLMConfig
+
+* Remove position_biased_input from SEWDConfig
+
+* Remove max_source_positions from Speech2Text2Config
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>","['src/transformers/models/markuplm/configuration_markuplm.py', 'src/transformers/models/openai/configuration_openai.py', 'src/transformers/models/realm/configuration_realm.py', 'src/transformers/models/roc_bert/configuration_roc_bert.py', 'src/transformers/models/sew_d/configuration_sew_d.py', 'src/transformers/models/speech_to_text_2/configuration_speech_to_text_2.py', 'src/transformers/models/trajectory_transformer/configuration_trajectory_transformer.py', 'src/transformers/models/wavlm/configuration_wavlm.py']",Unused attributes in various config classes are cluttering the codebase.
+245da7ed38d9f0dbd428c48e2ec4111ae5be2680,1696324884,"[Doctest] Add `configuration_encoder_decoder.py` (#26519)
+
+* [Doctest] Add configuration_encoder_decoder.py
+
+Added configuration_encoder_decoder.py to utils/documentation_tests.txt for doctest
+
+* Revert ""[Doctest] Add configuration_encoder_decoder.py""
+
+This reverts commit bd653535a4356dc3c9f43e65883819079a2053b0.
+
+* [Doctest] Add configuration_encoder_decoder.py
+
+add configuration_encoder_decoder.py to utils/documentation_tests.txt
+
+* [Doctest] Add configuration_encoder_decoder.py
+
+add configuration_encoder_decoder.py to utils/documentation_tests.txt
+
+* [Doctest] Add configuration_encoder_decoder.py
+
+add configuration_encoder_decoder.py to utils/documentation_tests.txt
+
+* changed as per request
+
+* fixed line 46",['src/transformers/models/encoder_decoder/configuration_encoder_decoder.py'],The file configuration_encoder_decoder.py is lacking doctest and is not included in documentation_tests.txt.
+27e907386ad108b3fc6d5a9fc77aac8ba474592b,1655822735,"Fix Automatic Download of Pretrained Weights in DETR (#17712)
+
+* added use_backbone_pretrained
+
+* style fixes
+
+* update
+
+* Update detr.mdx
+
+* Update detr.mdx
+
+* Update detr.mdx
+
+* update using doc py
+
+* Update detr.mdx
+
+* Update src/transformers/models/detr/configuration_detr.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/models/detr/configuration_detr.py', 'src/transformers/models/detr/modeling_detr.py']",Automatic download of pretrained weights in DETR is not working as intended.
+2831826bc60ee11b86179252ffc8401cb03c5904,1649685088,"Add Doc Test for BERT (#16523)
+
+* Add doctest BERT
+
+* make fixup
+
+* fix typo
+
+* change checkpoints
+
+* make fixup
+
+* define doctest output value, update doctest for mobilebert
+
+* solve fix-copies
+
+* update QA target start index and end index
+
+* change checkpoint for docs and reuse defined variable
+
+* Update src/transformers/models/bert/modeling_tf_bert.py
+
+Co-authored-by: Yih-Dar <2521628+ydshieh@users.noreply.github.com>
+
+* Apply suggestions from code review
+
+Co-authored-by: Yih-Dar <2521628+ydshieh@users.noreply.github.com>
+
+* Apply suggestions from code review
+
+Co-authored-by: Yih-Dar <2521628+ydshieh@users.noreply.github.com>
+
+* make fixup
+
+Co-authored-by: Yih-Dar <2521628+ydshieh@users.noreply.github.com>","['src/transformers/models/bert/modeling_bert.py', 'src/transformers/models/bert/modeling_tf_bert.py', 'src/transformers/models/mobilebert/modeling_mobilebert.py', 'src/transformers/models/mobilebert/modeling_tf_mobilebert.py']","BERT model lacks documentation and testing, leading to unclear functionality and usage of the model."
+2898fd396831bccd71e4e7056c2ed816c4a11406,1687523269,"Fix some `TFWhisperModelIntegrationTests` (#24428)
+
+* fix
+
+* fix
+
+* fix
+
+* fix
+
+* fix
+
+* fix
+
+* fix
+
+* fix
+
+* fix
+
+* Update src/transformers/models/whisper/modeling_tf_whisper.py
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* Update src/transformers/models/whisper/modeling_tf_whisper.py
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* fix
+
+* fix
+
+* fix
+
+---------
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>","['src/transformers/models/whisper/modeling_tf_whisper.py', 'tests/models/whisper/test_modeling_tf_whisper.py']","Multiple issues detected within the `TFWhisperModelIntegrationTests`, causing tests to fail inconsistently."
+2f424d79797ea5344f1b3ac241be1a181cfc220d,1684784750,"[image-to-text pipeline] Add conditional text support + GIT (#23362)
+
+* First draft
+
+* Remove print statements
+
+* Add conditional generation
+
+* Add more tests
+
+* Remove scripts
+
+* Remove BLIP specific linkes
+
+* Add support for pix2struct
+
+* Add fast test
+
+* Address comment
+
+* Fix style","['src/transformers/models/auto/modeling_auto.py', 'src/transformers/pipelines/image_to_text.py', 'tests/pipelines/test_pipelines_image_to_text.py']",The Image-to-Text pipeline lacks conditional text generation and support for pix2struct resulting in inefficient processing.
+30d8919ab13dcc212cb00fbb4d3e969aee6c3fc5,1670939708,"in the resize() function in image_transforms.py, the line 267: (#20728)
+
+`image = to_channel_dimension_format(image, ChannelDimension.LAST)`
+is redundant as this same conversion is also applied in to_pil_image().
+
+This redundant call actually makes the training fail in rare cases.
+The problem can be reproduced with the following code snippet:
+```
+from transformers.models.clip import CLIPFeatureExtractor
+vision_processor = CLIPFeatureExtractor.from_pretrained('openai/clip-vit-large-patch14')
+images = [
+    torch.rand(size=(3, 2, 10), dtype=torch.float),
+    torch.rand(size=(3, 10, 1), dtype=torch.float),
+    torch.rand(size=(3, 1, 10), dtype=torch.float)
+]
+for image in images:
+    processed_image = vision_processor(images=image, return_tensors=""pt"")['pixel_values']
+    print(processed_image.shape)
+    assert processed_image.shape == torch.Size([1, 3, 224, 224])
+```
+
+The last image has a height of 1 pixel.
+The second call to to_channel_dimesion_format() will transpose the image, and the height
+dimension is wrongly treated as the channels dimension afterwards.
+Because of this, the following normalize() step will result in an
+exception.",['src/transformers/image_transforms.py'],"In image_transforms.py, redundant conversion in resize() function occurs, which fails the training in rare cases. Particularly, a transposition error arises when handling images with a height of 1 pixel, leading to an exception in a subsequent normalize() step."
+38e96324ef63c79cbe36fd9d167adb8aeffe5484,1695892383,"[`PEFT`] introducing `adapter_kwargs` for loading adapters from different Hub location (`subfolder`, `revision`) than the base model (#26270)
+
+* make use of adapter_revision
+
+* v1 adapter kwargs
+
+* fix CI
+
+* fix CI
+
+* fix CI
+
+* fixup
+
+* add BC
+
+* Update src/transformers/integrations/peft.py
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* fixup
+
+* change it to error
+
+* Update src/transformers/modeling_utils.py
+
+* Update src/transformers/modeling_utils.py
+
+* fixup
+
+* change
+
+* Update src/transformers/integrations/peft.py
+
+---------
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>","['src/transformers/integrations/peft.py', 'src/transformers/modeling_flax_utils.py', 'src/transformers/modeling_tf_utils.py', 'src/transformers/modeling_utils.py', 'src/transformers/models/auto/auto_factory.py', 'tests/peft_integration/test_peft_integration.py']","Current implementation doesn't allow loading of adapters from different Hub locations including 'subfolder', 'revision' than the base model."
+3d607df8f42dc13d18e0c2798880cd3d99beb8bc,1636645849,"fix loading flax bf16 weights in pt (#14369)
+
+* fix loading flax bf16 weights in pt
+
+* fix clip test
+
+* fix t5 test
+
+* add logging statement
+
+* Update src/transformers/modeling_flax_pytorch_utils.py
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>
+
+* switch back to native any
+
+* fix check for bf16 weights
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>","['src/transformers/modeling_flax_pytorch_utils.py', 'tests/test_modeling_flax_clip.py', 'tests/test_modeling_flax_common.py', 'tests/test_modeling_flax_t5.py']","Flax BF16 weights are not loading correctly in PyTorch, causing issues in clip test, t5 test and check for bf16 weights."
+3d66146afcc400b01ce59fcfed9cdb1c59016e33,1639401219,"Fixing tests for Perceiver (#14745)
+
+- Do not run image-classification pipeline (_CHECKPOINT_FOR_DOC uses the checkpoint for
+langage, which cannot load a FeatureExtractor so current logic fails).
+- Add a safeguard to not run tests when `tokenizer_class` or
+`feature_extractor_class` **are** defined, but cannot be loaded
+This happens for Perceiver for the ""FastTokenizer"" (which doesn't exist
+so None) and FeatureExtractor (which does exist but cannot be loaded
+because the checkpoint doesn't define one which is reasonable for the
+said checkpoint)
+- Added `get_vocab` function to `PerceiverTokenizer` since it is used by
+`fill-mask` pipeline when the argument `targets` is used to narrow a
+subset of possible values.
+
+Co-authored-by: Nicolas Patry <patry.nicolas@protonmail.com>","['src/transformers/models/auto/feature_extraction_auto.py', 'src/transformers/models/perceiver/tokenization_perceiver.py', 'tests/test_pipelines_common.py', 'tests/test_pipelines_image_classification.py']","Tests for Perceiver are failing due to image-classification pipeline attempting to load a FeatureExtractor from an incompatible checkpoint and missing `get_vocab` function in `PerceiverTokenizer`. Additionally, tests run even when `tokenizer_class` or `feature_extractor_class` are defined but cannot be loaded."
+3e142cb0f5b712eba058cdf2195dbca6eb387264,1686665067,"fix overflow when training mDeberta in fp16 (#24116)
+
+* Porting changes from https://github.com/microsoft/DeBERTa/ that hopefully allows for fp16 training of mdeberta
+
+* Updates to deberta modeling from microsoft repo
+
+* Performing some cleanup
+
+* Undoing changes that weren't necessary
+
+* Undoing float calls
+
+* Minimally change the p2c block
+
+* Fix error
+
+* Minimally changing the c2p block
+
+* Switch to torch sqrt
+
+* Remove math
+
+* Adding back the to calls to scale
+
+* Undoing attention_scores change
+
+* Removing commented out code
+
+* Updating modeling_sew_d.py to satisfy utils/check_copies.py
+
+* Missed changed
+
+* Further reduce changes needed to get fp16 working
+
+* Reverting changes to modeling_sew_d.py
+
+* Make same change in TF","['src/transformers/models/deberta_v2/modeling_deberta_v2.py', 'src/transformers/models/deberta_v2/modeling_tf_deberta_v2.py', 'src/transformers/models/sew_d/modeling_sew_d.py']","Training mDeberta in fp16 results in an overflow error, hindering the training process and model performance."
+3ec10e6c76362191b61260300fe1d6173a8dd7e1,1689690846,"Add DINOv2 (#24016)
+
+* First draft
+
+* More improvements
+
+* Convert patch embedding layer
+
+* Convert all weights
+
+* Make conversion work
+
+* Improve conversion script
+
+* Fix style
+
+* Make all tests pass
+
+* Add image processor to auto mapping
+
+* Add swiglu ffn
+
+* Add image processor to conversion script
+
+* Fix conversion of giant model
+
+* Fix documentation
+
+* Fix style
+
+* Fix tests
+
+* Address comments
+
+* Address more comments
+
+* Remove unused arguments
+
+* Remove more arguments
+
+* Rename parameters
+
+* Include mask token
+
+* Address comments
+
+* Add docstring
+
+* Transfer checkpoints
+
+* Empty commit","['src/transformers/__init__.py', 'src/transformers/models/__init__.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/auto/image_processing_auto.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/bit/image_processing_bit.py', 'src/transformers/models/dinov2/__init__.py', 'src/transformers/models/dinov2/configuration_dinov2.py', 'src/transformers/models/dinov2/convert_dinov2_to_hf.py', 'src/transformers/models/dinov2/modeling_dinov2.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/models/dinov2/test_modeling_dinov2.py']","There are issues in the current DINO implementation, including weight conversion problems, unoptimized image processing, incorrect parameter names, unused arguments, missing docstrings, non-passing tests, and issues with mask tokens."
+479322bfaa280c39ab3c33472a51ea2dccfba1f5,1675788570,"A new test to check config attributes being used (#21453)
+
+* Add a new test to check config attributes being used
+
+* Add a new test to check config attributes being used
+
+* Add a new test to check config attributes being used
+
+* Apply suggestions from code review
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Apply suggestions
+
+* Update allowed cases - part 1
+
+* Update allowed cases - part 2
+
+* final
+
+---------
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['utils/check_config_attributes.py'],Lack of adequate tests to verify if configuration attributes are properly utilized.
+4973d2a04c4745bda0c6973055789097e64b067f,1669053534,"Add Audio Spectogram Transformer (#19981)
+
+* First draft
+
+* Make conversion script work
+
+* Add id2label mapping, run code quality
+
+* Fix copies
+
+* Add first draft of feature extractor
+
+* Update conversion script to use feature extractor
+
+* Make more tests pass
+
+* Add docs
+
+* update input_features to input_values + pad by default to max length
+
+* Fix doc tests
+
+* Add feature extractor tests
+
+* Add proper padding/truncation to feature extractor
+
+* Add support for conversion of all audioset checkpoints
+
+* Improve docs and extend conversion script
+
+* Fix README
+
+* Rename spectogram to spectrogram
+
+* Fix copies
+
+* Add integration test
+
+* Remove dummy conv
+
+* Update to ast
+
+* Update organization
+
+* Fix init
+
+* Rename model to AST
+
+* Add require_torchaudio annotator
+
+* Move import of ASTFeatureExtractor under a is_speech_available
+
+* Fix rebase
+
+* Add pipeline config
+
+* Update name of classifier head
+
+* Rename time_dimension and frequency_dimension for clarity
+
+* Remove print statement
+
+* Fix pipeline test
+
+* Fix pipeline test
+
+* Fix index table
+
+* Fix init
+
+* Fix conversion script
+
+* Rename to ForAudioClassification
+
+* Fix index table
+
+Co-authored-by: Niels Rogge <nielsrogge@Nielss-MacBook-Pro.local>","['src/transformers/__init__.py', 'src/transformers/models/__init__.py', 'src/transformers/models/audio_spectrogram_transformer/__init__.py', 'src/transformers/models/audio_spectrogram_transformer/configuration_audio_spectrogram_transformer.py', 'src/transformers/models/audio_spectrogram_transformer/convert_audio_spectrogram_transformer_original_to_pytorch.py', 'src/transformers/models/audio_spectrogram_transformer/feature_extraction_audio_spectrogram_transformer.py', 'src/transformers/models/audio_spectrogram_transformer/modeling_audio_spectrogram_transformer.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/auto/feature_extraction_auto.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/utils/doc.py', 'src/transformers/utils/dummy_pt_objects.py', 'src/transformers/utils/dummy_speech_objects.py', 'tests/models/audio_spectrogram_transformer/test_feature_extraction_audio_spectrogram_transformer.py', 'tests/models/audio_spectrogram_transformer/test_modeling_audio_spectrogram_transformer.py', 'tests/pipelines/test_pipelines_common.py', 'tests/test_modeling_common.py']","The software lacks an audio spectogram transformer, rendering it incapable of proper audio analysis and feature extraction."
+4c5c0af7e5280ad5c78d698e3808ee0a543b7262,1678972918,"Update tiny model creation script (#22202)
+
+* Update UNCONVERTIBLE_MODEL_ARCHITECTURES
+
+* Deal with 2 model tester classes in single test file
+
+* Deal with 2 model tester classes in single test file
+
+* Deal with 2 model tester classes in single test file
+
+* make style and quality
+
+---------
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>",['utils/create_dummy_models.py'],Tiny model creation script doesn't handle files containing 2 model tester classes correctly and may be using outdated model architectures.
+4ccaf268fbfb3f5ca67b4e1c953fa10c05168432,1679481759,"add low_cpu_mem_usage option in run_clm.py example which will benefit… (#22288)
+
+* add low_cpu_mem_usage option in run_clm.py example which will benefit LLM loading
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+
+* update all the example and README under language-modeling
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+
+---------
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>","['examples/pytorch/language-modeling/run_clm.py', 'examples/pytorch/language-modeling/run_clm_no_trainer.py', 'examples/pytorch/language-modeling/run_mlm.py', 'examples/pytorch/language-modeling/run_mlm_no_trainer.py', 'examples/pytorch/language-modeling/run_plm.py']","The run_clm.py example currently lacks an option to manage and optimise low CPU memory usage during LLM loading, which often results in unexpected high memory usage."
+4ee0b755bd12dff0d10c460366e0fde30a48f79a,1638177308,"LayoutLMv2FeatureExtractor now supports non-English languages when applying Tesseract OCR. (#14514)
+
+* Added the lang argument to apply_tesseract in feature_extraction_layoutlmv2.py, which is used in pytesseract.image_to_data.
+
+* Added ocr_lang argument to LayoutLMv2FeatureExtractor.__init__, which is used when calling apply_tesseract
+
+* Updated the documentation of the LayoutLMv2FeatureExtractor
+
+* Specified in the documentation of the LayoutLMv2FeatureExtractor that the ocr_lang argument should be a language code.
+
+* Update src/transformers/models/layoutlmv2/feature_extraction_layoutlmv2.py
+
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>
+
+* Split comment into two lines to adhere to the max line size limit.
+
+* Update src/transformers/models/layoutlmv2/feature_extraction_layoutlmv2.py
+
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>
+
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>",['src/transformers/models/layoutlmv2/feature_extraction_layoutlmv2.py'],LayoutLMv2FeatureExtractor does not support non-English languages when applying Tesseract OCR.
+50f82e12823ef8844b45a0dd864a78eea80de879,1681318001,"Fix docstrings for TF BLIP (#22618)
+
+* Fix docstrings for TFBLIP
+
+* Fix missing line in TF port!
+
+* Use values from torch tests now other bugs fixed
+
+* Use values from torch tests now other bugs fixed
+
+* Fix doctest string","['src/transformers/models/blip/modeling_tf_blip.py', 'src/transformers/models/blip/modeling_tf_blip_text.py', 'tests/models/blip/test_modeling_tf_blip.py']",Docstrings for TFBLIP are incorrect and missing some lines. This is affecting the TF port and torch tests.
+546a91abe95117fb06d3ed34edfa0b8010d9b48c,1639471387,"Fixing tests for Perceiver (#14739)
+
+* Adding some slow test to check for perceiver at least from a high level.
+
+* Re-enabling fast tests for Perceiver ImageClassification.
+
+* Perceiver might try to run without Tokenizer (Fast doesn't exist) and
+with FeatureExtractor some text only pipelines.
+
+* Oops.
+
+* Adding a comment for `update_config_with_model_class`.
+
+* Remove `model_architecture` to get `tiny_config`.
+
+* Finalize rebase.
+
+* Smarter way to handle undefined FastTokenizer.
+
+* Remove old code.
+
+* Addressing some nits.
+
+* Don't instantiate `None`.","['src/transformers/models/perceiver/modeling_perceiver.py', 'src/transformers/pipelines/__init__.py', 'tests/test_pipelines_common.py', 'tests/test_pipelines_image_classification.py']","Perceiver tests are currently failing due to issues with tokenization, handling of undefined FastTokenizer and possibly inaccurate model configuration."
+55db70c63de2c07b6ffe36f24c0e7df8f967e935,1691697989,"GPTQ integration (#25062)
+
+* GTPQ integration
+
+* Add tests for gptq
+
+* support for more quantization model
+
+* fix style
+
+* typo
+
+* fix method
+
+* Update src/transformers/modeling_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* add dataclass and fix quantization_method
+
+* fix doc
+
+* Update tests/quantization/gptq/test_gptq.py
+
+Co-authored-by: Younes Belkada <49240599+younesbelkada@users.noreply.github.com>
+
+* Apply suggestions from code review
+
+Co-authored-by: Younes Belkada <49240599+younesbelkada@users.noreply.github.com>
+
+* modify dataclass
+
+* add gtpqconfig import
+
+* fix typo
+
+* fix tests
+
+* remove dataset as req arg
+
+* remove tokenizer import
+
+* add offload cpu quantization test
+
+* fix check dataset
+
+* modify dockerfile
+
+* protect trainer
+
+* style
+
+* test for config
+
+* add more log
+
+* overwrite torch_dtype
+
+* draft doc
+
+* modify quantization_config docstring
+
+* fix class name in docstring
+
+* Apply suggestions from code review
+
+Co-authored-by: Younes Belkada <49240599+younesbelkada@users.noreply.github.com>
+
+* more warning
+
+* fix 8bit kwargs tests
+
+* peft compatibility
+
+* remove var
+
+* fix is_gptq_quantized
+
+* remove is_gptq_quantized
+
+* fix wrap
+
+* Update src/transformers/modeling_utils.py
+
+Co-authored-by: Younes Belkada <49240599+younesbelkada@users.noreply.github.com>
+
+* add exllama
+
+* skip test
+
+* overwrite float16
+
+* style
+
+* fix skip test
+
+* Apply suggestions from code review
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* fix docsting formatting
+
+* add doc
+
+* better test
+
+---------
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+Co-authored-by: Younes Belkada <49240599+younesbelkada@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/modeling_utils.py', 'src/transformers/models/auto/auto_factory.py', 'src/transformers/testing_utils.py', 'src/transformers/trainer.py', 'src/transformers/utils/__init__.py', 'src/transformers/utils/import_utils.py', 'src/transformers/utils/quantization_config.py', 'tests/quantization/bnb/test_4bit.py', 'tests/quantization/bnb/test_mixed_int8.py', 'tests/quantization/gptq/test_gptq.py']","The codebase lacks GPTQ (Gradient Projection for Quantization) integration and corresponding tests, resulting in subpar model quantization performance and compatibility issues with PEFT (Precision Engine for Fast Training)."
+5722d05831caccd02848ff4095c3de509994fe65,1640101661,"Add custom `stopping_criteria` and  `logits_processor` to `generate` (#14779)
+
+* add custom `stopping_criteria` and `logits_processor` to `generate`
+
+* add tests for custom `stopping_criteria` and `logits_processor`
+
+* fix typo in RAG
+
+* address reviewer comments
+
+* improve custom logits processor/stopping criteria error message
+
+* fix types in merge function signature
+
+* change default for custom list from `None` to empty list
+
+* fix rag generate
+
+* add string split suggestion
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>","['src/transformers/generation_utils.py', 'src/transformers/models/rag/modeling_rag.py', 'tests/test_generation_utils.py']","`generate` function lacks the ability to use custom `stopping_criteria` and `logits_processor`, limiting its flexibility and use cases."
+5b40a37bc4da9dc6cd33876ce9bb3f7f48450a03,1648574655,"Add TF ViT MAE (#16255)
+
+* ported TFViTMAEIntermediate and TFViTMAEOutput.
+
+* added TFViTMAEModel and TFViTMAEDecoder.
+
+* feat: added a noise argument in the implementation for reproducibility.
+
+* feat: vit mae models with an additional noise argument for reproducibility.
+
+Co-authored-by: ariG23498 <aritra.born2fly@gmail.com>
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/models/auto/modeling_tf_auto.py', 'src/transformers/models/vit_mae/__init__.py', 'src/transformers/models/vit_mae/modeling_tf_vit_mae.py', 'src/transformers/models/vit_mae/modeling_vit_mae.py', 'src/transformers/utils/dummy_tf_objects.py', 'tests/vit_mae/test_modeling_tf_vit_mae.py', 'tests/vit_mae/test_modeling_vit_mae.py']","The TF ViT MAE model and decoder are missing in the current implementation. Also, there's no method to maintain reproducibility, leading to potential inconsistencies in results."
+5bb4ec6233d6414a922ad2818f0bcf879de81c28,1681842302,"Raise err if minimum Accelerate version isn't available (#22841)
+
+* Add warning about accelerate
+
+* Version block Accelerate
+
+* Include parse
+
+* Apply suggestions from code review
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Check partial state
+
+* Update param
+
+---------
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/training_args.py', 'src/transformers/utils/import_utils.py']",Software fails to function correctly without a minimum version of Accelerate and doesn't alert the user to this requirement.
+5c6b83cb69da2fbc58b3c25c0ed7ba354a3d4141,1697473615,"[docstring] Fix bert generation tokenizer (#26820)
+
+* Remove BertGenerationTokenizer from objects to ignore
+
+The file BertGenerationTokenizer is removed from
+objects to ignore as a first step to fix docstring.
+
+* Docstrings fix for BertGenerationTokenizer
+
+Docstring fix is generated for BertGenerationTokenizer
+by using check_docstrings.py.
+
+* Fix docstring for BertGenerationTokenizer
+
+Added sep_token type and docstring in BertGenerationTokenizer.","['src/transformers/models/bert_generation/tokenization_bert_generation.py', 'utils/check_docstrings.py']","BertGenerationTokenizer's docstrings are incorrect or missing, and it's not accounted for in check_docstrings.py. The sep_token type and docstring are also missing in BertGenerationTokenizer."
+5d8efc79db2a4e26dbe65944568601c501e7e672,1678121860,"Add TF contrastive image text finetuning example (#21939)
+
+* Initial commit
+
+* stash commit
+
+* Add model checkpointing and pushing
+
+* Fix model name inference
+
+* Update README
+
+* Update README
+
+* Remove a couple of Torch references
+
+* Update copyright date
+
+* make fixup
+
+* Update PushToHubCallback args!
+
+* Remove the torch summary
+
+* Add strategy.scope","['examples/tensorflow/contrastive-image-text/run_clip.py', 'examples/tensorflow/language-modeling/run_clm.py', 'examples/tensorflow/language-modeling/run_mlm.py', 'examples/tensorflow/multiple-choice/run_swag.py', 'examples/tensorflow/question-answering/run_qa.py', 'examples/tensorflow/summarization/run_summarization.py', 'examples/tensorflow/text-classification/run_glue.py', 'examples/tensorflow/text-classification/run_text_classification.py', 'examples/tensorflow/token-classification/run_ner.py', 'examples/tensorflow/translation/run_translation.py', 'src/transformers/models/vision_text_dual_encoder/modeling_tf_vision_text_dual_encoder.py']","The current example does not provide model checkpointing or pushing, and incorrectly infers the model name. Also, unwanted references to Torch are present."
+5e2f373705b27318738c87cebf14548f9246e1bd,1660069410,"Restore _init_weights value in no_init_weights (#18504)
+
+* Recover _init_weights value in no_init_weights
+
+For potential nested use. 
+In addition, users might modify private no_init_weights as well.
+
+* Apply suggestions from code review
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Remove private variable change check
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['src/transformers/modeling_utils.py'],Users are able to modify the private `no_init_weights` causing potential issues with nested use and restored `_init_weights` values.
+614e191c4d1c19163fe2a3b98fb78efc94661b3f,1682608106,"added GPTNeoXForTokenClassification (#23002)
+
+* initial commit
+
+* added GPTNeoXForTokenClassification
+
+* typo
+
+* doc
+fixed extra comma that turned into a tuple
+
+* unifying variable names
+fixing forward call
+
+* classifier_dropout is in config
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+---------
+
+Co-authored-by: Prof. Peter Schneider-Kamp <jps@ordbogen.com>
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/gpt_neox/__init__.py', 'src/transformers/models/gpt_neox/configuration_gpt_neox.py', 'src/transformers/models/gpt_neox/modeling_gpt_neox.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/models/gpt_neox/test_modeling_gpt_neox.py']","GPTNeoX model lacks support for token classification tasks, causing issues with variability in variable names and forward call handling. The configuration for 'classifier_dropout' is missing as well."
+6227078d0a95aed688578d37b319e969a1dcd30f,1663620138,"HPO: keep the original logic if there's only one process, pass the trial to trainer (#19096)
+
+need to find out solution for following cases
+     *if we need to use trial in model_init, how to do it for non-main rank, sync the model with rank0 in app?
+     *how to use optuna prune feature for DDP, if we do it in rank0, how does other rank know it.
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>",['src/transformers/integrations.py'],"How to use trial in model_init for non-main rank and sync it with rank0 in app? Additionally, how to use optuna prune feature for DDP, if it is in rank0, how could other ranks know about it?"
+62ba64b90a2786c74e202d9f1ad2e34da4e083ce,1685455687,"Adds a FlyteCallback (#23759)
+
+* initial flyte callback
+
+* lint
+
+* logs should still be saved to Flyte even if pandas isn't install (unlikely)
+
+* cr - flyte team
+
+* add docs for Flytecallback
+
+* fix doc string - cr sgugger
+
+* Apply suggestions from code review
+
+cr - sgugger fix doc strings
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+---------
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['src/transformers/integrations.py'],"In the absence of pandas library, logs aren't being saved to Flyte, indicating an issue in the library dependency management."
+640421c0ec38a4d5733f58acbc3e4a8284f5eb9a,1627574549,"ONNX v2 raises an Exception when using PyTorch < 1.8.0  (#12933)
+
+* Raise an issue if the pytorch version is < 1.8.0
+
+* Attempt to add a test to ensure it correctly raises.
+
+* Missing docstring.
+
+* Second attempt, patch with string absolute import.
+
+* Let's do the call before checking it was called ...
+
+* use the correct function ... :facepalm:
+
+* Raise ImportError and AssertionError respectively when unable to find torch and torch version is not sufficient.
+
+* Correct path mock patching
+
+* relax constraint for torch_onnx_dict_inputs to ge instead of eq.
+
+* Style.
+
+* Split each version requirements for torch.
+
+* Let's compare version directly.
+
+* Import torch_version after checking pytorch is installed.
+
+* @require_torch","['src/transformers/file_utils.py', 'src/transformers/onnx/convert.py', 'tests/test_onnx_v2.py']","When using PyTorch version less than 1.8.0, ONNX v2 is throwing an exception. Also, if torch is not found installed, ImportError and AssertionError are not correctly raised."
+6645eb61fa61cd24c773bcf2973d1b1e014d7964,1638453931,"fix #14524 (IndexError when mask prob is too low) (#14525)
+
+* fix #14524 (IndexError when mask prob is too low)
+
+* fix formatting
+
+* correct documentation, add option for setting min_num_masks
+
+* change the semantic meaning of `mask_prob` in _compute_mask_indices
+
+With this commit the meaing of `mask_prob` actually adhered to the probability for each
+vector to be the start of a masked span of length.
+
+* fix check_copies test
+
+* fix documentation to semantic meaning of `upper bound of overall masking percentage`, revert changes to _compute_mask_indices
+
+* fix typo","['src/transformers/models/hubert/configuration_hubert.py', 'src/transformers/models/hubert/modeling_hubert.py', 'src/transformers/models/sew/configuration_sew.py', 'src/transformers/models/sew/modeling_sew.py', 'src/transformers/models/sew_d/configuration_sew_d.py', 'src/transformers/models/sew_d/modeling_sew_d.py', 'src/transformers/models/unispeech/configuration_unispeech.py', 'src/transformers/models/unispeech/modeling_unispeech.py', 'src/transformers/models/unispeech_sat/configuration_unispeech_sat.py', 'src/transformers/models/unispeech_sat/modeling_unispeech_sat.py', 'src/transformers/models/wav2vec2/configuration_wav2vec2.py', 'src/transformers/models/wav2vec2/modeling_wav2vec2.py', 'tests/test_modeling_wav2vec2.py']","When mask probability is too low, it causes IndexError during the process. Additionally, ambiguity exists in the semantic meaning of 'mask_prob' in _compute_mask_indices and documentation."
+6890d1960f554c9b2b0a244b1f947f2d317e391f,1656701735,"Shifting labels for causal LM when using label smoother (#17987)
+
+* Shifting labels for causal LM when using label smoother
+
+When training CausalLM, loss is computed within model's foward() function and
+labels are shifted internally. However, if label smoothing is applied, loss is
+computed in trainer's compute_loss function and labels are not shifted.
+This causes unintended confusion during the alignment of labels and corresponding
+inputs. This commit is for resolving this confusion.
+
+Resolves #17960
+
+On branch shift_labels_for_causalLM
+Changes to be committed:
+	modified:   src/transformers/trainer.py
+	modified:   src/transformers/trainer_pt_utils.py
+
+* Update trainer.py
+
+* Update src/transformers/trainer.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/trainer.py', 'src/transformers/trainer_pt_utils.py']","Label shifting for CausalLM is inconsistent when label smoothing is applied, leading to misalignment of labels and corresponding inputs."
+6beae766eeaa0a5656d2a69df849041bfacf4851,1643292803,"Fix KerasMetricCallback prediction with generate() and inference of column names (#15351)
+
+* Fix prediction with generate() and the inference of column names
+Should now have very few differences with the PyTorch implementation
+
+* Minor edit to parent class
+
+* Update src/transformers/keras_callbacks.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Explaining the dict conversion
+
+* Putting main_input_name back
+
+* Fixes to main_input_name
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['src/transformers/keras_callbacks.py'],"The KerasMetricCallback is not correctly predicting with generate() function and also improperly inferencing column names, resulting in discrepancies with the PyTorch implementation."
+6ef7186b5d550a0f0eeb653b8cd8f23a349d25f7,1649676727,"fixed crash when deleting older checkpoint and a file f""{checkpoint_prefix}-*"" exist (#16686)
+
+I create an archive of older checkpoints during training the checkpoint has a  name with `f""{checkpoint_prefix}-*.zip/.tar ` 
+previously `glob(f""{checkpoint_prefix}-*"")` takes all files/folders starting with the name checkpoint, and later `shutil.rmtree(checkpoint)` takes a folder name; since at some point it my get a zip file; it crashes training; adding this `if os.path.isdir(x)` allows only folders on `glob_checkpoints`",['src/transformers/trainer.py'],"The training crashes when deleting older checkpoints due to a naming conflict with an existing file named as `f""{checkpoint_prefix}-*"".zip/.tar`, as it does not distinguish between folders and zip files."
+724e51c6e605639995e6cc0c6f7de99a749ba868,1644504422,"Compute loss independent from decoder for TF EncDec models (as #14139) (#15175)
+
+* Compute loss independent from decoder (as 14139)
+
+* fix expected seq_len + style
+
+* Apply the same change to TFVisionEncoderDecoderModel
+
+* fix style
+
+* Add case with labels in equivalence test
+
+* uncomment
+
+* Add case with labels in equivalence test
+
+* add decoder_token_labels
+
+* use hf_compute_loss
+
+* Apply suggestions from code review
+
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>
+
+* Add copied from
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>
+Co-authored-by: NielsRogge <48327001+NielsRogge@users.noreply.github.com>","['src/transformers/models/encoder_decoder/modeling_tf_encoder_decoder.py', 'src/transformers/models/vision_encoder_decoder/modeling_tf_vision_encoder_decoder.py', 'tests/test_modeling_tf_encoder_decoder.py', 'tests/test_modeling_tf_vision_encoder_decoder.py']","Loss computation is not independent from the decoder in TensorFlow Encoder-Decoder models, causing potential inconsistency and limitations in the loss calculation methodology."
+7490a97cac20cef6858f32e5f39a61f31ad64552,1658933447,"[Flax] Fix incomplete batches in example scripts (#17863)
+
+* [Flax] Fix incomplete batches in example scripts
+
+* fix dataloader batching
+
+* convert jnp batch idxs to np array
+
+* add missing `pad_shard_unpad` to final prediction generate step
+
+* only `pad_shard_unpad` at inference time
+
+* merge conflicts
+
+* remove incomplete batch step from eval
+
+* fix run_qa.py
+
+* add `pad_shard_unpad` to run_flax_ner.py
+
+* add `pad_shard_unpad` to run_flax_glue.py
+
+* add `pad_shard_unpad` to run_image_classification.py
+
+* make style
+
+* fix mlm flax eval batches
+
+* remove redundant imports","['examples/flax/language-modeling/run_clm_flax.py', 'examples/flax/language-modeling/run_mlm_flax.py', 'examples/flax/language-modeling/run_t5_mlm_flax.py', 'examples/flax/question-answering/run_qa.py', 'examples/flax/summarization/run_summarization_flax.py', 'examples/flax/text-classification/run_flax_glue.py', 'examples/flax/token-classification/run_flax_ner.py', 'examples/flax/vision/run_image_classification.py']","Example scripts are processing incomplete batches, causing issues in dataloader and prediction steps. This is also affecting various run modules like run_qa.py, run_flax_ner.py, run_flax_glue.py, and run_image_classification.py."
+74bec9865c7fdd0321c372d7dee5accefe80ca35,1642519292,"Add MAE (#15120)
+
+* First draft
+
+* More improvements
+
+* More improvements
+
+* More improvements
+
+* Fix embeddings
+
+* Add conversion script
+
+* Finish conversion script
+
+* More improvements
+
+* Fix forward pass
+
+* Remove print statements
+
+* Add weights initialization
+
+* Add initialization of decoder weights
+
+* Add support for other models in the conversion script
+
+* Fix patch_size for huge model
+
+* Fix most of the tests
+
+* Fix integration test
+
+* Fix docs
+
+* Fix archive_list
+
+* Apply suggestions from code review
+
+* Improve documentation
+
+* Apply more suggestions
+
+* Skip some tests due to non-deterministic behaviour
+
+* Fix test_initialization
+
+* Remove unneccessary initialization of nn.Embedding
+
+* Improve docs
+
+* Fix dummies
+
+* Remove ViTMAEFeatureExtractor from docs
+
+* Add model to README and table of contents
+
+* Delete inference file","['src/transformers/__init__.py', 'src/transformers/models/__init__.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/vit_mae/__init__.py', 'src/transformers/models/vit_mae/configuration_vit_mae.py', 'src/transformers/models/vit_mae/convert_vit_mae_to_pytorch.py', 'src/transformers/models/vit_mae/modeling_vit_mae.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/test_modeling_vit_mae.py']","There seem to be non-deterministic behaviours, integration issues, and inefficiencies in embedding, conversion script, and weight initialization with the new MAE model implementation. Also, problems were observed with test_initialization and documentation accuracy."
+7743caccb95acb26a8bcc8806bd697d8a882e786,1663239679,"[bnb] Small improvements on utils (#18646)
+
+* Small replacement
+
+- replace `modules_to_not_convert` by `module_to_not_convert`
+
+* refactor a bit
+
+- changed variables name
+- now output a list
+- change error message
+
+* make style
+
+* add list
+
+* make style
+
+* change args name
+
+Co-authored-by: stas00 <stas00@users.noreply.github.com>
+
+* fix comment
+
+* fix typo
+
+Co-authored-by: stas00 <stas00@users.noreply.github.com>
+
+* Update src/transformers/modeling_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+Co-authored-by: stas00 <stas00@users.noreply.github.com>
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/modeling_utils.py', 'src/transformers/utils/bitsandbytes.py']","Inconsistencies in argument names and variable names along with non-intuitive error messages in the 'utils' area, causing confusion and potential misuse."
+7b8bdd8601f1c9cc91434c858b848a34126a0a83,1643730505,"fix the `tokenizer_config.json` file for the slow tokenizer when a fast version is available (#15319)
+
+* add new test
+
+* update test
+
+* remove `tokenizer_file` from `additional_files_names` in `tokenization_utils_base.py`
+
+* add `tokenizer_file` for the fast only tokenizer
+
+* change global variables layoutxml
+
+* remove `""tokenizer_file""` from DPR tokenizer's Global variables
+
+* remove `tokenizer_file` from herbert slow tokenizer init
+
+* `""tokenizer_file""` from LED tokenizer's Global variables
+
+* remove `tokenizer_file` from mbart slow tokenizer init
+
+* remove `tokenizer_file` from slow tokenizer template
+
+* adapt to versioning
+
+* adapt the `test_tokenizer_mismatch_warning` test
+
+* clean test
+
+* clarify `VOCAB_FILES_NAMES` in tokenization_utils_fast.py
+
+* Revert ""remove `tokenizer_file` from mbart slow tokenizer init""
+
+This reverts commit 0dbb723fa9c7599d4640fe30b3647a74eb4a64e1.
+
+* Revert ""`""tokenizer_file""` from LED tokenizer's Global variables""
+
+This reverts commit 5a3f879bdd651233f3d74a3d1146c34cde82b0c2.
+
+* Revert ""remove `tokenizer_file` from herbert slow tokenizer init""
+
+This reverts commit f5e10007b7b0ec5345e015b9de7ffec72c5407fd.
+
+* Revert ""remove `""tokenizer_file""` from DPR tokenizer's Global variables""
+
+This reverts commit da0895330bedfafc81ae3073470a9348c669f032.
+
+* set `tokenizer_file` in super `__init__` of mbart","['src/transformers/models/layoutxlm/tokenization_layoutxlm_fast.py', 'src/transformers/models/mbart/tokenization_mbart.py', 'src/transformers/tokenization_utils_base.py', 'src/transformers/tokenization_utils_fast.py', 'templates/adding_a_new_model/cookiecutter-template-{{cookiecutter.modelname}}/tokenization_{{cookiecutter.lowercase_modelname}}.py', 'tests/test_tokenization_common.py']","When a fast tokenizer is available, the corresponding `tokenizer_config.json` for the slow tokenizer behaves erroneously."
+7fcee113c163a95d1b125ef35dc49a0a1aa13a50,1628275299,"Tpu tie weights (#13030)
+
+* Fix tied weights on TPU
+
+* Manually tie weights in no trainer examples
+
+* Fix for test
+
+* One last missing
+
+* Gettning owned by my scripts
+
+* Address review comments
+
+* Fix test
+
+* Fix tests
+
+* Fix reformer tests","['examples/pytorch/language-modeling/run_clm_no_trainer.py', 'examples/pytorch/language-modeling/run_mlm_no_trainer.py', 'src/transformers/modeling_utils.py', 'src/transformers/models/albert/modeling_albert.py', 'src/transformers/models/bert_generation/modeling_bert_generation.py', 'src/transformers/models/ibert/modeling_ibert.py', 'src/transformers/models/longformer/modeling_longformer.py', 'src/transformers/models/reformer/modeling_reformer.py', 'src/transformers/models/roberta/modeling_roberta.py', 'src/transformers/trainer.py']","Tied weights on TPU not functioning correctly, resulting in errors in no trainer examples and various tests including reformer tests."
+80468251bc3771d53427f77aa2dc9d49a55d2bf0,1660225504,"Change BartLearnedPositionalEmbedding's forward method signature to support Opacus training (#18486)
+
+* changing BartLearnedPositionalEmbedding forward signature and references to it
+
+* removing debugging dead code (thanks style checker)
+
+* blackened modeling_bart file
+
+* removing copy inconsistencies via make fix-copies
+
+* changing references to copied signatures in Bart variants
+
+* make fix-copies once more
+
+* using expand over repeat (thanks @michaelbenayoun)
+
+* expand instead of repeat for all model copies
+
+Co-authored-by: Daniel Jones <jonesdaniel@microsoft.com>","['src/transformers/models/bart/modeling_bart.py', 'src/transformers/models/mbart/modeling_mbart.py', 'src/transformers/models/mvp/modeling_mvp.py', 'src/transformers/models/plbart/modeling_plbart.py', 'src/transformers/models/trocr/modeling_trocr.py']","Current signature of BartLearnedPositionalEmbedding's forward method is not compatible with Opacus training, causing inconsistencies across the model copies."
+81ac45f85c35244831f11f73c09ea10eee4f953a,1648672115,"update smddp api to v1.4.0 (#16371)
+
+* update smddp api to v1.4.0
+
+* Update src/transformers/trainer.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Update src/transformers/trainer.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* address comments
+
+* fix style
+
+* remove unused import
+
+* fix indent
+
+* disable style check for import
+
+* fix space
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/sagemaker/training_args_sm.py', 'src/transformers/trainer.py', 'src/transformers/trainer_pt_utils.py', 'src/transformers/trainer_utils.py', 'src/transformers/training_args.py']",Current smddp API version is outdated which might cause incompatibility or missed features/enhancements issues in the trainer module.
+84f6bee5da3bdc4990124e2fd53ea2f43c365ac8,1666348839,"PT <-> TF for composite models (#19732)
+
+* First step of PT->TF for composite models
+
+* Update the tests
+
+* For VisionEncoderDecoderModel
+
+* Fix
+
+* Fix
+
+* Add comment
+
+* Fix
+
+* clean up import
+
+* Save memory
+
+* For (TF)EncoderDecoderModel
+
+* For (TF)EncoderDecoderModel
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>","['src/transformers/models/encoder_decoder/modeling_encoder_decoder.py', 'src/transformers/models/encoder_decoder/modeling_tf_encoder_decoder.py', 'src/transformers/models/vision_encoder_decoder/modeling_tf_vision_encoder_decoder.py', 'src/transformers/models/vision_encoder_decoder/modeling_vision_encoder_decoder.py', 'tests/models/encoder_decoder/test_modeling_tf_encoder_decoder.py', 'tests/models/vision_encoder_decoder/test_modeling_tf_vision_encoder_decoder.py']","Composite models are not correctly transferring from PyTorch to TensorFlow, causing potential test failures and memory inefficiencies."
+89514f0541f312945854236132a5f4ea2516fa86,1661970629,"Improve Text Generation doc (#18788)
+
+* fix args for bram search decoding in generation utils
+
+* fix missing PAD token in gpt2
+
+* add PAD EOS change to TF
+
+* Update src/transformers/generation_tf_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Update src/transformers/generation_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Update src/transformers/generation_utils.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/generation_tf_utils.py', 'src/transformers/generation_utils.py']","Text generation with bram search decoding in generation utils experiences argument issues, while GPT2 is missing a PAD token. Additionally, PAD EOS change is not present in TF."
+8f609ab9e00e99b05fe2463483748c1f664295d1,1694538082,"enable optuna multi-objectives feature (#25969)
+
+* enable optuna multi-objectives feature
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+
+* Apply suggestions from code review
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* update hpo doc
+
+* update docstring
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+
+* extend direction to List[str] type
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+
+* Update src/transformers/integrations/integration_utils.py
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+---------
+
+Signed-off-by: Wang, Yi A <yi.a.wang@intel.com>
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>","['src/transformers/integrations/integration_utils.py', 'src/transformers/trainer.py', 'src/transformers/trainer_utils.py', 'tests/trainer/test_trainer.py']","Optuna's multi-objective feature is currently not enabled, leading to restrictions in hyperparameter optimization."
+90178b0cefe94fef258a39cff5019b5ec150597b,1626185715,"Add option to load a pretrained model with mismatched shapes (#12664)
+
+* Add option to load a pretrained model with mismatched shapes
+
+* Fail at loading when mismatched shapes in Flax
+
+* Fix tests
+
+* Update src/transformers/modeling_flax_utils.py
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>
+
+* Address review comments
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>","['src/transformers/modeling_flax_utils.py', 'src/transformers/modeling_tf_utils.py', 'src/transformers/modeling_utils.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/deberta/modeling_deberta.py', 'src/transformers/models/deberta_v2/modeling_deberta_v2.py', 'tests/test_modeling_common.py', 'tests/test_modeling_flax_common.py', 'tests/test_modeling_tf_common.py']","Pretrained model loading fails when encountering mismatched shapes, causing disruption in the process."
+90f980ed356cc27b7faefc5e22abef5b7ded62bb,1633094948,"Fix warning situation: UserWarning: max_length is ignored when padding=True"" (#13829)
+
+* Removed wrong warning
+
+* Raise a warning when `max_length` is given with wrong `truncation`
+
+* Update the error message
+
+* Update the warning message
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['src/transformers/tokenization_utils_base.py'],"A UserWarning is displayed when 'max_length' parameter is ignored due to 'padding=True', creating confusion for users."
+91d6a593f13cd223f7931990dcc0250333862ad7,1681995174,"moved labels to the same device as logits for OTP, CODEGEN ,gptj and pixel2struct model (#22872)
+
+* moved labels to the same device as logits for OTP model
+
+* moved labels to the same device as logits for CODEGEN model
+
+* Update modeling_codegen.py
+
+* moved labels to the same device as logits for gptj and pix2struct model
+
+* Update modeling_pix2struct.py","['src/transformers/models/codegen/modeling_codegen.py', 'src/transformers/models/gptj/modeling_gptj.py', 'src/transformers/models/opt/modeling_opt.py', 'src/transformers/models/pix2struct/modeling_pix2struct.py']","Labels are not on the same device as logits for OTP, CODEGEN, gptj, and pixel2struct model, possibly affecting model performances."
+94ca7d2faa8fff13526b415c41f619887d8dfd63,1657292760,"Fix type issue in using bucketing with Trainer (#18051)
+
+* Fix type issue in using bucketing with Trainer
+
+- Fix type issues in LengthGrouperSampler,
+  DistributedLengthGroupedSampler
+
+refs: #18003
+
+* Change logging type in LengthGroupedSampler
+
+- Change `logger.warning` to `logger.info`
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Change logging type in DistributedLengthGroupedSampler
+
+- Change `logger.warning` to `logger.info`
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Remove adundant clause in LengthGroupedSampler
+
+- Use `elif`
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Remove adundant clause in DistributedLengthGroupedSampler
+
+- Use `elif`
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Apply black, isort to modified codes in the script
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['src/transformers/trainer_pt_utils.py'],"Type issues occur when using bucketing with Trainer. Additionally, redundant clauses found in both LengthGroupedSampler and DistributedLengthGroupedSampler."
+96b2b2de12fdf1d2649333700aec6be331495fce,1674481303,"Extend Script to enable conversion of Encoder Only  T5x Models to Pytorch (#20907)
+
+* add converter for t5x_retrieval model
+
+* update args
+
+* Update src/transformers/models/t5/convert_t5x_checkpoint_to_pytorch.py
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* style  editing -> convert t5x to pytorch
+
+* make style
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>",['src/transformers/models/t5/convert_t5x_checkpoint_to_pytorch.py'],"Current implementation does not support conversion of Encoder Only T5x Models to Pytorch, limiting flexibility in model usage."
+9d7afd2536ecd9816dd2ea9592a01e52fec17d17,1692355240,"Replaces calls to `.cuda` with `.to(torch_device)` in tests (#25571)
+
+* Replaces calls to `.cuda` with `.to(torch_device)` in tests
+`torch.Tensor.cuda()` is a pre-0.4 solution to changing a tensor's device. It is recommended to prefer `.to(...)` for greater flexibility and error handling. Furthermore, this makes it more consistent with other tests (that tend to use `.to(torch_device)`) and ensures the correct device backend is used (if `torch_device` is neither `cpu` or `cuda`).
+
+* addressing review comments
+
+* more formatting changes in Bloom test
+
+* `make style`
+
+* Update tests/models/bloom/test_modeling_bloom.py
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* fixes style failures
+
+---------
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>","['tests/models/bloom/test_modeling_bloom.py', 'tests/models/jukebox/test_modeling_jukebox.py', 'tests/models/opt/test_modeling_opt.py', 'tests/models/xglm/test_modeling_xglm.py']",Inconsistency in tests due to usage of outdated `.cuda` call for changing tensor's device leading to potential flexibility and error handling issues.
+9e56aff58a742b48fc8edea8d28d5b80330efbcc,1670534563,"Add video classification pipeline (#20151)
+
+* :construction: wip video classification pipeline
+
+* :construction: wip - add is_decord_available check
+
+* :bug: add missing import
+
+* :white_check_mark: add tests
+
+* :wrench: add decord to setup extras
+
+* :construction: add is_decord_available
+
+* :sparkles: add video-classification pipeline
+
+* :memo: add video classification pipe to docs
+
+* :bug: add missing VideoClassificationPipeline import
+
+* :pushpin: add decord install in test runner
+
+* :white_check_mark: fix url inputs to video-classification pipeline
+
+* :sparkles: updates from review
+
+* :memo: add video cls pipeline to docs
+
+* :memo: add docstring
+
+* :fire: remove unused import
+
+* :fire: remove some code
+
+* :memo: docfix","['.circleci/create_circleci_config.py', 'setup.py', 'src/transformers/__init__.py', 'src/transformers/dependency_versions_table.py', 'src/transformers/pipelines/__init__.py', 'src/transformers/pipelines/video_classification.py', 'src/transformers/testing_utils.py', 'src/transformers/utils/__init__.py', 'src/transformers/utils/import_utils.py', 'tests/pipelines/test_pipelines_video_classification.py', 'utils/update_metadata.py']","The software currently lacks a video classification pipeline, causing issues with video processing and classification tasks. Additionally, the package 'decord' availability isn't being checked properly and some imports are missing."
+9f89fa02ed3fbb137ed8fce1d0ab196a07dc1141,1641474054,"Add Flax image captioning example (#14864)
+
+* add image captioning example
+
+* update README
+
+* fix style & quality
+
+* simplify
+
+* apply review suggestions
+
+* Apply suggestions from code review
+
+Co-authored-by: Suraj Patil <surajp815@gmail.com>
+
+* Apply suggestions from code review
+
+Co-authored-by: Suraj Patil <surajp815@gmail.com>
+
+* Apply review suggestions
+
+* add comments about using np instead jax array
+
+* remove unused lines
+
+* add model creation script
+
+* only support from_pretrained
+
+* fix style
+
+* fix
+
+* not use cache_dir when creating model
+
+* fix tokenizer creation
+
+* update README
+
+* fix quality
+
+* apply suggestion
+
+* simplify some blocks
+
+* Update examples/flax/image-captioning/README.md
+
+
+* Update examples/flax/image-captioning/run_image_captioning_flax.py
+
+Co-authored-by: Suraj Patil <surajp815@gmail.com>
+
+* apply suggestion
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>
+Co-authored-by: Suraj Patil <surajp815@gmail.com>","['examples/flax/image-captioning/create_model_from_encoder_decoder_models.py', 'examples/flax/image-captioning/run_image_captioning_flax.py']","Image captioning example is missing in Flax, causing lack of reference for users attempting to implement this feature."
+a0cbbba31f498dac4bf92af350d48d968d048c44,1679687157,"Resnet flax (#21472)
+
+* [WIP] flax resnet
+
+* added pretrained flax models, results reproducible
+
+* Added pretrained flax models, results reproducible
+
+* working on tests
+
+* no real code change, just some comments
+
+* [flax] adding support for batch norm layers
+
+* fixing bugs related to pt+flax integration
+
+* removing loss from modeling flax output class
+
+* fixing classifier tests
+
+* fixing comments, model output
+
+* cleaning comments
+
+* review changes
+
+* review changes
+
+* Apply suggestions from code review
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* renaming Flax to PyTorch
+
+---------
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/modeling_flax_outputs.py', 'src/transformers/models/auto/modeling_flax_auto.py', 'src/transformers/models/resnet/__init__.py', 'src/transformers/models/resnet/modeling_flax_resnet.py', 'src/transformers/utils/dummy_flax_objects.py', 'tests/models/resnet/test_modeling_flax_resnet.py']","Issues detected in the integration of PyTorch and Flax in the Resnet model, with specific problems in supporting batch norm layers, the modeling flax output class, and classifier tests."
+a192f61e0825150e54e15fdc451cf37e23532b3f,1649780702,"Change the chunk_iter function to handle (#16730)
+
+* Change the chunk_iter function to handle
+
+the subtle cases where the last chunk gets ignored since all the
+data is in the `left_strided` data.
+
+We need to remove the right striding on the previous item.
+
+* Remove commented line.","['src/transformers/pipelines/automatic_speech_recognition.py', 'tests/pipelines/test_pipelines_automatic_speech_recognition.py']",The `chunk_iter` function is not handling cases correctly where the last chunk gets ignored due to all data being in the `left_strided` data.
+a33168aa7894d5665eacf891ffdcb433cde0f38c,1637099404,"Avoid looping when data exhausted (#14413)
+
+* stop training when a finite IterableDataset is exhausted
+
+when using an iterable dataset num_epochs is set to
+sys.maxsize to make sure all data is consumed
+likewise we want to set max_steps high enough
+but still stop when all data is consumed
+
+(cherry picked from commit 6f0e1d6363153da9051e93acffe1cbab3a3f3b12)
+
+* fix typo flase -> false
+
+* add test for stopping training on exhausted finite iterable dataset
+
+* remove redundant gradient_accumulation_steps
+
+* run make style
+
+reformat training_args docstring","['src/transformers/trainer.py', 'src/transformers/training_args.py', 'tests/test_trainer.py']","Finite IterableDataset does not stop training when all data is consumed, causing unnecessary looping."
+aa19f478acc8f46b7f70e9c525a2bd07dfed548c,1643633898,"Add (M)Luke model training for Token Classification in the examples (#14880)
+
+* Add Luke training
+
+* Fix true label tags
+
+* Fix true label tags
+
+* Fix true label tags
+
+* Update the data collator for Luke
+
+* Some training refactor for Luke
+
+* Improve data collator for Luke
+
+* Fix import
+
+* Fix datasets concatenation
+
+* Add the --max_entity_length argument for Luke models
+
+* Remove unused code
+
+* Fix style issues
+
+* Fix style issues
+
+* Move the Luke training into a separate folder
+
+* Fix style
+
+* Fix naming
+
+* Fix filtering
+
+* Fix filtering
+
+* Fix filter
+
+* Update some preprocessing
+
+* Move luke to research_projects
+
+* Checkstyle
+
+* Address comments
+
+* Fix style","['examples/research_projects/luke/luke_utils.py', 'examples/research_projects/luke/run_luke_ner_no_trainer.py']","The current Luke model lacks token classification training examples, and existing label tags, data collators, and preprocessing mechanisms need improvements. The dataset concatenation and filter methods are causing issues.
+"
+abaca9f9432a84cfaa95531de4c72334f38a42f2,1688755941,"Enable `conversational` pipeline for `GPTSw3Tokenizer` (#24648)
+
+* feat: Add `_build_conversation_input_ids` to GPT-SW3 tokenizer, adjust line length
+
+* feat: Merge in PR https://github.com/huggingface/transformers/pull/24504.
+
+This allows the GPT-SW3 models (and other GPT-2 based models) to be 4-bit quantised
+using `load_in_4bit` with `bitsandbytes`.
+
+* fix: F-string
+
+* fix: F-string
+
+* fix: Remove EOS token from all responses
+
+* fix: Remove redundant newlines
+
+* feat: Add `load_in_4bit` to `Pipeline`
+
+* fix: Separate turns with `\n<s>\n` rather than `<s>`
+
+* fix: Add missing newline in prompt
+
+* tests: Add unit tests for the new `_build_conversation_input_ids` method
+
+* style: Automatic style correction
+
+* tests: Compare encodings rather than decodings
+
+* fix: Remove `load_in_4bit` from pipeline arguments
+
+* docs: Add description and references of the GPT-SW3 chat format
+
+* style: Line breaks
+
+* Apply suggestions from code review
+
+Fix Conversation type hints
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>
+
+* fix: Import TYPE_CHECKING
+
+* style: Run automatic fixes
+
+* tests: Remove `_build_conversation_input_ids` unit tests
+
+* tests: Remove import of `Conversation` in GPT-SW3 unit test
+
+* style: Revert formatting
+
+* style: Move TYPE_CHECKING line after all imports
+
+* style: Imports order
+
+* fix: Change prompt to ensure that `sp_model.encode` and `encode` yields same result
+
+* docs: Add TODO comment related to the addition of whitespace during decoding
+
+* style: Automatic style checks
+
+* fix: Remove final whitespace in prompt, as prefix whitespace is used by sentencepiece
+
+---------
+
+Co-authored-by: Arthur <48595927+ArthurZucker@users.noreply.github.com>",['src/transformers/models/gpt_sw3/tokenization_gpt_sw3.py'],"`GPTSw3Tokenizer` unable to process conversational pipeline inputs, causing issues with quantisation, incorrect EOS token placement and dysfunctional handling of whitespaces in prompt and resultant encoding inconsistencies."
+adc0ff25028d29af30386f2d7d3f85e290fbef57,1652888838,"Add CvT (#17299)
+
+* Adding cvt files
+
+* Adding cvt files
+
+* changes in init file
+
+* Adding cvt files
+
+* changes in init file
+
+* Style fixes
+
+* Address comments from code review
+
+* Apply suggestions from code review
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Format lists in docstring
+
+* Fix copies
+
+* Apply suggestion from code review
+
+Co-authored-by: AnugunjNaman <anugunjjha@gmail.com>
+Co-authored-by: Ayushman Singh <singhayushman13@protonmail.com>
+Co-authored-by: Niels Rogge <nielsrogge@Nielss-MacBook-Pro.local>
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/models/__init__.py', 'src/transformers/models/auto/configuration_auto.py', 'src/transformers/models/auto/feature_extraction_auto.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/cvt/__init__.py', 'src/transformers/models/cvt/configuration_cvt.py', 'src/transformers/models/cvt/convert_cvt_original_pytorch_checkpoint_to_pytorch.py', 'src/transformers/models/cvt/modeling_cvt.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/models/cvt/test_modeling_cvt.py']","The project lacks CVT files, causing potential issues with initialisation and code style."
+b338414e614a30af5f940269484ef15bf716d078,1678224674,"Update tiny model creation script and some others files (#22006)
+
+* Update 1
+
+* Update 2
+
+* Update 3
+
+* Update 4
+
+* Update 5
+
+* Update 6
+
+* Update 7
+
+* Update 8
+
+* Update 9
+
+* Update 10
+
+---------
+
+Co-authored-by: ydshieh <ydshieh@users.noreply.github.com>","['src/transformers/models/auto/feature_extraction_auto.py', 'src/transformers/models/auto/image_processing_auto.py', 'src/transformers/models/auto/processing_auto.py', 'src/transformers/models/gptsan_japanese/configuration_gptsan_japanese.py', 'src/transformers/models/timesformer/configuration_timesformer.py', 'src/transformers/models/tvlt/configuration_tvlt.py', 'src/transformers/models/xmod/configuration_xmod.py', 'tests/models/oneformer/test_modeling_oneformer.py', 'tests/models/speecht5/test_modeling_speecht5.py', 'utils/check_config_docstrings.py', 'utils/create_dummy_models.py']",The script for small model creation and some other files are outdated and causing issues in the current setup.
+b473617d639bc43f05050020abe9ad37d25c5240,1648223965,"Checkpoint sharding (#16343)
+
+* Sharded checkpoint support
+
+* Handle distant sharded checkpoints
+
+* Add tests
+
+* TODO is done
+
+* Apply suggestions from code review
+
+Co-authored-by: Stas Bekman <stas00@users.noreply.github.com>
+
+* Fix docstring
+
+* Add example and format
+
+* Address review comments
+
+* More review comments
+
+* End of merge
+
+* Revert unintentional change
+
+* VsCode what did you do?
+
+* Style
+
+* Changes
+
+* Address final comments
+
+* Quality
+
+* Moar tests
+
+* Move import beneath is_pt_available
+
+Co-authored-by: Stas Bekman <stas00@users.noreply.github.com>","['src/transformers/file_utils.py', 'src/transformers/modeling_utils.py', 'src/transformers/utils/__init__.py', 'tests/test_modeling_common.py']","Checkpointing process does not support sharding, leading to inefficiencies and issues in handling distributed scale sharded checkpoints."
+b52a03cd3bec92d0ee84f0b1f7edee0d5117200a,1688101243,"⚠️⚠️[`T5Tokenize`] Fix T5 family tokenizers⚠️⚠️ (#24565)
+
+* don't add space before single letter chars that don't have a merge
+
+* fix the fix
+
+* fixup
+
+* add a test
+
+* more testing
+
+* fixup
+
+* hack to make sure fast is also fixed
+
+* update switch transformers test
+
+* revert convert slow
+
+* Update src/transformers/models/t5/tokenization_t5.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* add typechecking
+
+* quality
+
+---------
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/models/t5/tokenization_t5.py', 'tests/models/switch_transformers/test_modeling_switch_transformers.py', 'tests/models/t5/test_tokenization_t5.py']","T5 family tokenizers are erroneously adding spaces before single-letter characters that don't have a merge, causing tokenization issues. Also, fast tokenization needs a fix."
+b610c47f8953c359f2cff677907912779e0f478f,1670402558,"[MaskFormer] Add support for ResNet backbone (#20483)
+
+* Add SwinBackbone
+
+* Add hidden_states_before_downsampling support
+
+* Fix Swin tests
+
+* Improve conversion script
+
+* Add id2label mappings
+
+* Add vistas mapping
+
+* Update comments
+
+* Fix backbone
+
+* Improve tests
+
+* Extend conversion script
+
+* Add Swin conversion script
+
+* Fix style
+
+* Revert config attribute
+
+* Remove SwinBackbone from main init
+
+* Remove unused attribute
+
+* Use encoder for ResNet backbone
+
+* Improve conversion script and add integration test
+
+* Apply suggestion
+
+Co-authored-by: Niels Rogge <nielsrogge@Nielss-MacBook-Pro.local>","['src/transformers/models/maskformer/configuration_maskformer.py', 'src/transformers/models/maskformer/configuration_maskformer_swin.py', 'src/transformers/models/maskformer/convert_maskformer_resnet_to_pytorch.py', 'src/transformers/models/maskformer/convert_maskformer_swin_to_pytorch.py', 'src/transformers/models/regnet/modeling_regnet.py', 'src/transformers/models/resnet/modeling_resnet.py', 'src/transformers/models/swin/configuration_swin.py', 'tests/models/maskformer/test_modeling_maskformer.py']","MaskFormer lacks support for ResNet backbone, resulting in suboptimal downstream task performance and limited backbone flexibility."
+b8f69d0d10e74c3718e5c79891fdc2a5ac8887d0,1692290087,"Add Text-To-Speech pipeline (#24952)
+
+* add AutoModelForTextToSpeech class
+
+* add TTS pipeline and tessting
+
+* add docstrings to text_to_speech pipeline
+
+* fix torch dependency
+
+* corrector 'processor is None' case in Pipeline
+
+* correct repo id
+
+* modify text-to-speech -> text-to-audio
+
+* remove processor
+
+* rename text_to_speech pipelines files to text_audio
+
+* add textToWaveform and textToSpectrogram instead of textToAudio classes
+
+* update TTS pipeline to the bare minimum
+
+* update tests TTS pipeline
+
+* make style and erase useless import torch in TTS pipeline tests
+
+* modify how to check if generate or forward in TTS pipeline
+
+* remove unnecessary extra new lines
+
+* Apply suggestions from code review
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+
+* refactor input_texts -> text_inputs
+
+* correct docstrings of TTS.__call__
+
+* correct the shape of generated waveform
+
+* take care of Bark tokenizer special case
+
+* correct run_pipeline_test TTS
+
+* make style
+
+* update TTS docstrings
+
+* address Sylvain nit refactors
+
+* make style
+
+* refactor into one liners
+
+* correct squeeze
+
+* correct way to test if forward or generate
+
+* Update output audio waveform shape
+
+* make style
+
+* correct import
+
+* modify how the TTS pipeline test if a model can generate
+
+* align shape output of TTS pipeline with consistent shape
+
+---------
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/models/auto/__init__.py', 'src/transformers/models/auto/modeling_auto.py', 'src/transformers/models/auto/tokenization_auto.py', 'src/transformers/pipelines/__init__.py', 'src/transformers/pipelines/text_to_audio.py', 'src/transformers/utils/dummy_pt_objects.py', 'tests/pipelines/test_pipelines_text_to_audio.py', 'tests/test_pipeline_mixin.py', 'utils/update_metadata.py']","The project lacks a Text-To-Speech (TTS) pipeline, causing compatibility problems with AutoModelForTextToSpeech class and inconsistency with the shape of output audio waveforms."
+b96e82c80a918f6348d89e4871051f7f04a56316,1650378728,"Add image classification script, no trainer (#16727)
+
+* Add first draft
+
+* Improve README and run fixup
+
+* Make script aligned with other scripts, improve README
+
+* Improve script and add test
+
+* Remove print statement
+
+* Apply suggestions from code review
+
+* Add num_labels to make test pass
+
+* Improve README","['examples/pytorch/image-classification/run_image_classification_no_trainer.py', 'examples/pytorch/test_accelerate_examples.py']","Image classification script is missing, leading to the inability to perform image classification tasks."
+c1f85598eb637bb7b21f8c3b15886aaed40ca42e,1678276075,"Generate - add 1 to cur_len to make up the new beam length (#21993)
+
+* add 1 to cur_len to make up the new beam length
+
+cur_len is 1 token shorter comparing to the length of the sequence whose best_sum_logprobs is the numerator.
+
+* cur_len+=1 before check if beam hyp is done
+
+* format code
+
+* reformat with black
+
+---------
+
+Co-authored-by: Chiming <chiming@biomap.com>",['src/transformers/generation/beam_search.py'],"In the generate method, the current length (cur_len) is off by one token compared to the sequence length, leading to inaccurate processing in the beam hypotheses."
+c33f6046c3dab8f41bedf893404e6469dea3bce8,1652276233,"[WIP] Enable reproducibility for distributed trainings (#16907)
+
+* add seed worker and set_deterministic_seed_for_cuda function to enforce reproducability
+
+* change function name to enable determinism, add docstrings, reproducability support for tf
+
+* change function name to enable_determinism_for_distributed_training
+
+* revert changes in set_seed and call set_seed within enable_full_determinism
+
+* add one position argument for seed_worker function
+
+* add full_determinism flag in training args and call enable_full_determinism when it is true
+
+* add enable_full_determinism to documentation
+
+* apply make fixup after the last commit
+
+* Update src/transformers/training_args.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>","['src/transformers/__init__.py', 'src/transformers/trainer.py', 'src/transformers/trainer_tf.py', 'src/transformers/trainer_utils.py', 'src/transformers/training_args.py']","Distributed trainings lack reproducibility due to variable seed generation across different systems, causing inconsistencies in results."
+c51dc4f92755c67a83f3fc8a0bd6b3e64df199e4,1677494762,"[torch] remove deprecated uint8 in favor of bool (#21384)
+
+* uint8 -> bool
+
+* fix copies
+
+* style
+
+* update test modeling commen when checking attention buffers
+
+* style
+
+* use logical not on random mask instead of subtraction with 1
+
+* remove torch uint8
+
+* quality
+
+* remove modified modeling utils
+
+* Update based on review
+
+Co-authored-by: sgugger <sylvain.gugger@gmail.com>
+
+---------
+
+Co-authored-by: sgugger <sylvain.gugger@gmail.com>","['src/transformers/models/codegen/modeling_codegen.py', 'src/transformers/models/deberta/modeling_deberta.py', 'src/transformers/models/deberta_v2/modeling_deberta_v2.py', 'src/transformers/models/decision_transformer/modeling_decision_transformer.py', 'src/transformers/models/gpt2/modeling_gpt2.py', 'src/transformers/models/gpt_neo/modeling_gpt_neo.py', 'src/transformers/models/gpt_neox/modeling_gpt_neox.py', 'src/transformers/models/gpt_neox_japanese/modeling_gpt_neox_japanese.py', 'src/transformers/models/gpt_sw3/convert_megatron_to_pytorch.py', 'src/transformers/models/gptj/modeling_gptj.py', 'src/transformers/models/imagegpt/modeling_imagegpt.py', 'src/transformers/models/jukebox/modeling_jukebox.py', 'src/transformers/models/longformer/modeling_longformer.py', 'src/transformers/models/reformer/modeling_reformer.py', 'src/transformers/models/sew_d/modeling_sew_d.py', 'src/transformers/models/transfo_xl/modeling_transfo_xl.py', 'tests/test_modeling_common.py']",Use of deprecated 'uint8' in the code instead of 'bool' is causing unwanted style errors and issues with attention buffer tests in the torch library.
+c87654dca12cab75774b660e320cbbc42328f8a9,1677763041,"[Whisper] Add rescaling function with `do_normalize` (#21263)
+
+* add `zero_mean_unit_var_norm` function
+
+* normalize before MEL computation
+
+* fixup
+
+* add simple test
+
+* quality
+
+* Update tests/models/whisper/test_feature_extraction_whisper.py
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+
+* fixup
+
+* use attention masks if padding was applied
+
+* Update based on review
+
+Co-authored-by: bofeng huang <bofenghuang7@gmail.com>
+
+---------
+
+Co-authored-by: Sanchit Gandhi <93869735+sanchit-gandhi@users.noreply.github.com>
+Co-authored-by: bofeng huang <bofenghuang7@gmail.com>","['src/transformers/models/whisper/feature_extraction_whisper.py', 'tests/models/whisper/test_feature_extraction_whisper.py']",Whisper is missing a rescaling function resulting in lack of normalization before MEL computation. Issues arise when padding is applied due to absence of attention masks.
+d37a68e6850e7c6941108de76a8e35ba7e726e51,1655985523,"Add missing type hints for QDQBertModel (#17783)
+
+* Feat: add missing type hints for QDQBertModel
+
+* fix: ran black and isort
+
+* feat: Add missing output type for QDQBertModel
+
+* feat: Add type hints for QDQBertLMHeadModel and models starting with QDQBertFor
+
+* fix: add missing return type for QDQBertModel
+
+* fix: remove wrong return type for QDQBertEmbeddings
+
+* fix: readded config argument to load_tf_weights_in_qdqbert
+
+* fix: add BertConfig type to BertEmbeddings config due t checko error in ci
+
+* fix: removed config type hints to avoid copy checks",['src/transformers/models/qdqbert/modeling_qdqbert.py'],"Missing and incorrect type hints for QDQBertModel and related models, causing errors and inconsistencies in the codebase."
+d49f8d31893534ace807e756567fab18ff516490,1647960359,"Added type hints for Pytorch Marian calls (#16200)
+
+* Added type hinting for forward functions in pytorch marian
+
+* typo correction
+
+* Removed type hints on functions from BART per Suraj Patil request
+
+* fix import pb
+
+* fix typo
+
+* corrected tuple call
+
+* ran black
+
+* after fix-copies
+Some optional tags on primitives were removed, past_key_values in MarianForCausalLM changed from Tuple of Tuple to List
+
+* Fixing copies to roformer and pegasus
+
+Co-authored-by: Clementine Fourrier <cfourrie@inria.fr>
+Co-authored-by: matt <rocketknight1@gmail.com>","['src/transformers/models/marian/modeling_marian.py', 'src/transformers/models/pegasus/modeling_pegasus.py', 'src/transformers/models/roformer/modeling_roformer.py']",Lack of type hints for forward functions in Pytorch Marian calls is leading to ambiguity and misunderstanding in the code base.
+d4bd33cc9f11ca48635e54983d75249c78d72e2a,1691475131,"Register ModelOutput subclasses as supported torch.utils._pytree nodes (#25358)
+
+* Register ModelOutput subclasses as supported torch.utils._pytree nodes
+
+Fixes #25357 where DDP with static_graph=True does not sync gradients when calling backward() over tensors contained in ModelOutput subclasses
+
+* Add test for torch pytree ModelOutput serialization and deserialization","['src/transformers/utils/generic.py', 'tests/utils/test_model_output.py']",DDP with static_graph=True fails to sync gradients when calling backward() over tensors contained in ModelOutput subclasses.
+d58926ab1d99f56758a1d2f981a3fba181d0e916,1628849058,"Moving fill-mask pipeline to new testing scheme (#12943)
+
+* Fill mask pipelines test updates.
+
+* Model eval !!
+
+* Adding slow test with actual values.
+
+* Making all tests pass (skipping quite a bit.)
+
+* Doc styling.
+
+* Better doc cleanup.
+
+* Making an explicit test with no pad token tokenizer.
+
+* Typo.","['src/transformers/pipelines/base.py', 'src/transformers/pipelines/fill_mask.py', 'tests/test_modeling_reformer.py', 'tests/test_pipelines_common.py', 'tests/test_pipelines_fill_mask.py']","The fill-mask pipeline is not compatible with the new testing scheme, causing tests to fail and documentation to be inconsistent."
+dc540dd316819dc77d8c9d719c89c74df42b4d05,1635514168,"Adding `handle_long_generation` paramters for `text-generation` pipeline. (#14118)
+
+* Adding `handle_long_generation` paramters for `text-generation` pipeline.
+
+* More error handling
+
+* Fixing tests by dropping tf support on this functionality, it needs
+
+`max_new_tokens` to make it possible to understand user's intent.
+Otherwise, `max_length` == `tokenizer.model_max_length` <
+input_ids.shape[0].
+
+* Fixing doc ?
+
+* Doc ?
+
+* Remove link from doc.
+
+* Catched an issue on roberta.
+
+* Damn doc.
+
+* Non BC proposal ?
+
+* Cleaning the fix ?
+
+* Finally using only a test override.
+
+* Don't need to modify this.
+
+* Bad print.","['src/transformers/models/reformer/modeling_reformer.py', 'src/transformers/pipelines/text_generation.py', 'tests/test_pipelines_common.py', 'tests/test_pipelines_text_generation.py']","Long text generation in the pipeline lacks appropriate handling, leading to errors. Additionally, user intent is unclear when `max_length` is smaller than the input token size in TensorFlow."
+dee4d72e7236fe19a52587a11306c18575c88711,1676301618,"annotated TFvisionEncoderDecoder input type hints (#21432)
+
+* annotated TFvisionEncoderDecoder input type hints
+
+Co-authored-by: JuheonChu <chuj@dickinson.edu>
+Co-authored-by: AdiaWu <wua@dickinson.edu>
+
+* fixed failing tests
+
+* make fix-copies
+
+* failed test fix
+
+* style fix
+
+* revert
+
+---------
+
+Co-authored-by: JuheonChu <chuj@dickinson.edu>
+Co-authored-by: AdiaWu <wua@dickinson.edu>
+Co-authored-by: Matt <rocketknight1@gmail.com>",['src/transformers/models/vision_encoder_decoder/modeling_tf_vision_encoder_decoder.py'],Lack of type hints for input parameters in TFvisionEncoderDecoder leads to confusion and is causing unexpected errors.
+e7ed7ffdcb66c78d3437ed4c3a63c3640f50f436,1639496776,"Adding support for multiple mask tokens. (#14716)
+
+* Adding support for multiple mask tokens.
+
+- Original implem: https://github.com/huggingface/transformers/pull/10222
+
+Co-authored-by: njafer <naveen.jafer@oracle.com>
+
+* In order to accomodate optionally multimodal models like Perceiver
+
+we add information to the tasks to specify tasks where we know for sure
+if we need the tokenizer/feature_extractor or not.
+
+* Adding info in the documentation about multi masks.
+
++ marked as experimental.
+
+* Add a copy() to prevent overriding the same tensor over and over.
+
+* Fixup.
+
+* Adding small test for multi mask with real values..
+
+Co-authored-by: njafer <naveen.jafer@oracle.com>","['src/transformers/pipelines/__init__.py', 'src/transformers/pipelines/fill_mask.py', 'tests/test_pipelines_fill_mask.py']","The current implementation supports only a single mask token, which hinders optionally multimodal models like Perceiver from functioning efficiently and accurately."
+eb16be415a74328e5ab62e050330a43054f6bd11,1655802255,"add onnx support for deberta and debertav2 (#17617)
+
+* add onnx support for debertav2
+
+* debertav2 -> deberta-v2 in onnx features file
+
+* remove causal lm
+
+* add deberta-v2-xlarge to onnx tests
+
+* use self.type().dtype() in xsoftmax
+
+Co-authored-by: Jingya HUANG <44135271+JingyaHuang@users.noreply.github.com>
+
+* remove hack for deberta
+
+* remove unused imports
+
+* Update src/transformers/models/deberta_v2/configuration_deberta_v2.py
+
+Co-authored-by: Jingya HUANG <44135271+JingyaHuang@users.noreply.github.com>
+
+* use generate dummy inputs
+
+* linter
+
+* add imports
+
+* add support for deberta v1 as well
+
+* deberta does not support multiple choice
+
+* Update src/transformers/models/deberta/configuration_deberta.py
+
+Co-authored-by: Jingya HUANG <44135271+JingyaHuang@users.noreply.github.com>
+
+* Update src/transformers/models/deberta_v2/configuration_deberta_v2.py
+
+Co-authored-by: Jingya HUANG <44135271+JingyaHuang@users.noreply.github.com>
+
+* one line ordered dict
+
+* fire build
+
+Co-authored-by: Jingya HUANG <44135271+JingyaHuang@users.noreply.github.com>","['src/transformers/models/deberta/__init__.py', 'src/transformers/models/deberta/configuration_deberta.py', 'src/transformers/models/deberta/modeling_deberta.py', 'src/transformers/models/deberta_v2/__init__.py', 'src/transformers/models/deberta_v2/configuration_deberta_v2.py', 'src/transformers/models/deberta_v2/modeling_deberta_v2.py', 'src/transformers/models/sew_d/modeling_sew_d.py', 'src/transformers/onnx/convert.py', 'src/transformers/onnx/features.py', 'tests/onnx/test_onnx_v2.py']","DeBERTa and DeBERTaV2 lack ONNX support, and DeBERTa is currently incompatible with multiple choice inputs."
+eb734e51479be7d16d41d0f60c565cac3e57367a,1697122294,"[docstring] Fix `UniSpeech`, `UniSpeechSat`, `Wav2Vec2ForCTC` (#26664)
+
+* Remove UniSpeechConfig
+
+* Remove , at the end otherwise check_docstring changes order
+
+* Auto add new docstring
+
+* Update docstring for UniSpeechConfig
+
+* Remove from check_docstrings
+
+* Remove UniSpeechSatConfig and UniSpeechSatForCTC from check_docstrings
+
+* Remove , at the end
+
+* Fix docstring
+
+* Update docstring for Wav2Vec2ForCTC
+
+* Update Wav2Vec2ForCTC docstring
+
+Co-authored-by: Yih-Dar <2521628+ydshieh@users.noreply.github.com>
+
+* fix style
+
+---------
+
+Co-authored-by: Yih-Dar <2521628+ydshieh@users.noreply.github.com>","['src/transformers/models/unispeech/configuration_unispeech.py', 'src/transformers/models/unispeech/modeling_unispeech.py', 'src/transformers/models/unispeech_sat/configuration_unispeech_sat.py', 'src/transformers/models/unispeech_sat/modeling_unispeech_sat.py', 'src/transformers/models/wav2vec2/modeling_wav2vec2.py', 'utils/check_docstrings.py']","Docstrings for `UniSpeech`, `UniSpeechSat`, `Wav2Vec2ForCTC` are incorrect with some instances causing order changes in `check_docstring`."
+ebc69afc30687006d85d3380b7a5f02fd6a979b9,1625666808,"Adding support for `pipeline(""automatic-speech-recognition"")`. (#11525)
+
+* Adding support for `pipeline(""automatic-speech-recognition"")`.
+
+- Ugly `""config""` choice for AutoModel. It would be great to have the
+possibility to have something like `AutoModelFor` that would implement
+the same logic (Load the config, check Architectures and load the first
+one)
+
+* Remove `model_id` was not needed in the end.
+
+* Rebased !
+
+* Remove old code.
+
+* Rename `nlp`.","['src/transformers/pipelines/__init__.py', 'src/transformers/pipelines/base.py', 'tests/test_pipelines_automatic_speech_recognition.py']",The system lacks support for automatic speech recognition pipeline and there's no elegant model choice functionalities for AutoModel.
+ebd5258975ad8673bc4532ba5f6bdbe2496066ec,1677674837,"Change the way tensor is reshaped in BartAttention (from .view to .reshape) (#21860)
+
+* Change the .view call to .reshape
+
+* Change the .view call to .reshape to all the copies from bart attention
+
+* Fix copies and style
+
+* Fix copies and style
+
+* Fix copies and style
+
+* Fix copies and style
+
+* Fix copies and style
+
+* Revert unneccessary changes
+
+* Revert unneccessary changes
+
+* Revert unneccessary changes
+
+* Revert unneccessary changes","['src/transformers/models/bart/modeling_bart.py', 'src/transformers/models/bigbird_pegasus/modeling_bigbird_pegasus.py', 'src/transformers/models/biogpt/modeling_biogpt.py', 'src/transformers/models/blenderbot/modeling_blenderbot.py', 'src/transformers/models/blenderbot_small/modeling_blenderbot_small.py', 'src/transformers/models/data2vec/modeling_data2vec_audio.py', 'src/transformers/models/gptsan_japanese/modeling_gptsan_japanese.py', 'src/transformers/models/hubert/modeling_hubert.py', 'src/transformers/models/m2m_100/modeling_m2m_100.py', 'src/transformers/models/marian/modeling_marian.py', 'src/transformers/models/mbart/modeling_mbart.py', 'src/transformers/models/pegasus/modeling_pegasus.py', 'src/transformers/models/pegasus_x/modeling_pegasus_x.py', 'src/transformers/models/plbart/modeling_plbart.py', 'src/transformers/models/sew/modeling_sew.py', 'src/transformers/models/speech_to_text/modeling_speech_to_text.py', 'src/transformers/models/speech_to_text_2/modeling_speech_to_text_2.py', 'src/transformers/models/time_series_transformer/modeling_time_series_transformer.py', 'src/transformers/models/unispeech/modeling_unispeech.py', 'src/transformers/models/unispeech_sat/modeling_unispeech_sat.py', 'src/transformers/models/wav2vec2/modeling_wav2vec2.py', 'src/transformers/models/whisper/modeling_whisper.py']","Reshaping of tensor in BartAttention module causes issues, possibly as a result of the .view method."
+ee0d001de71f0da892f86caa3cf2387020ec9696,1656327981,"Add a TF in-graph tokenizer for BERT (#17701)
+
+* Add a TF in-graph tokenizer for BERT
+
+* Add from_pretrained
+
+* Add proper truncation, option handling to match other tokenizers
+
+* Add proper imports and guards
+
+* Add test, fix all the bugs exposed by said test
+
+* Fix truncation of paired texts in graph mode, more test updates
+
+* Small fixes, add a (very careful) test for savedmodel
+
+* Add tensorflow-text dependency, make fixup
+
+* Update documentation
+
+* Update documentation
+
+* make fixup
+
+* Slight changes to tests
+
+* Add some docstring examples
+
+* Update tests
+
+* Update tests and add proper lowercasing/normalization
+
+* make fixup
+
+* Add docstring for padding!
+
+* Mark slow tests
+
+* make fixup
+
+* Fall back to BertTokenizerFast if BertTokenizer is unavailable
+
+* Fall back to BertTokenizerFast if BertTokenizer is unavailable
+
+* make fixup
+
+* Properly handle tensorflow-text dummies","['setup.py', 'src/transformers/__init__.py', 'src/transformers/dependency_versions_table.py', 'src/transformers/models/bert/__init__.py', 'src/transformers/models/bert/tokenization_bert_tf.py', 'src/transformers/testing_utils.py', 'src/transformers/utils/__init__.py', 'src/transformers/utils/dummy_tensorflow_text_objects.py', 'src/transformers/utils/import_utils.py', 'tests/models/bert/test_tokenization_bert_tf.py', 'utils/check_dummies.py']","BERT lacks an in-graph tokenizer within TF, causing mismatches with other tokenizers and issues in text truncation and normalization, particularly with paired texts in graph mode."
+ef0f85cd5705092c728feb5a0d4e910c7e605f63,1670263854,"[Vision] `.to` function for ImageProcessors (#20536)
+
+* add v1 with tests
+
+* add checker
+
+* simplified version
+
+* update docstring
+
+* better version
+
+* fix docstring + change order
+
+* make style
+
+* tests + change conditions
+
+* final tests
+
+* modify docstring
+
+* Update src/transformers/feature_extraction_utils.py
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>
+
+* replace by `ValueError`
+
+* fix logic
+
+* apply suggestions
+
+* `dtype` is not needed
+
+* adapt suggestions
+
+* remove `_parse_args_to_device`
+
+Co-authored-by: amyeroberts <22614925+amyeroberts@users.noreply.github.com>","['src/transformers/feature_extraction_utils.py', 'src/transformers/utils/__init__.py', 'src/transformers/utils/generic.py', 'tests/models/deit/test_feature_extraction_deit.py', 'tests/test_feature_extraction_common.py']","ImageProcessors lack a `.to` function for handling device and type conversion, leading to issues with image transformation processes."
+ef83dc4f0cf87f078c988ba2e6af239b7f84db1a,1630325296,"Improve documentation of pooler_output in ModelOutput (#13228)
+
+* update documentation of pooler_output in modeling_outputs, making it more clear and available for generic usage
+
+* Update src/transformers/modeling_outputs.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* Update src/transformers/modeling_outputs.py
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>
+
+* run make style
+
+Co-authored-by: Sylvain Gugger <35901082+sgugger@users.noreply.github.com>",['src/transformers/modeling_outputs.py'],The documentation for 'pooler_output' in 'modeling_outputs' is unclear and not well-suited for generic use.
+f0d6e952c08dec04589c3a9cc09669d83ffc8ff8,1635975799,"Quality explain (#14264)
+
+* Start PR doc
+
+* Cleanup the quality checks and document them
+
+* Add reference in the contributing guide
+
+* Apply suggestions from code review
+
+Co-authored-by: Stas Bekman <stas00@users.noreply.github.com>
+
+* Rename file as per review suggestion
+
+Co-authored-by: Stas Bekman <stas00@users.noreply.github.com>",['utils/link_tester.py'],"Current quality checks for the project are disorganized and not well-documented, causing confusion among collaborators and slowing down the contribution process."
+f394a2a50d8729cd1ca9b368e330ec50664c3292,1654009650,"[Json configs] Make json prettier for all saved tokenizer files & ensure same json format for all processors (tok + feat_extract) (#17457)
+
+* [Json dump] Make json prettier
+
+* correct more tokenizeirs
+
+* more patterns
+
+* add aggressive test
+
+* the aggressive test was actually useful :-)
+
+* more tests
+
+* Apply suggestions from code review","['src/transformers/feature_extraction_utils.py', 'src/transformers/models/bart/tokenization_bart.py', 'src/transformers/models/blenderbot_small/tokenization_blenderbot_small.py', 'src/transformers/models/clip/tokenization_clip.py', 'src/transformers/models/ctrl/tokenization_ctrl.py', 'src/transformers/models/fsmt/tokenization_fsmt.py', 'src/transformers/models/gpt2/tokenization_gpt2.py', 'src/transformers/models/layoutlmv3/tokenization_layoutlmv3.py', 'src/transformers/models/luke/tokenization_luke.py', 'src/transformers/models/mluke/tokenization_mluke.py', 'src/transformers/models/openai/tokenization_openai.py', 'src/transformers/models/roberta/tokenization_roberta.py', 'src/transformers/models/speech_to_text_2/tokenization_speech_to_text_2.py', 'src/transformers/models/tapex/tokenization_tapex.py', 'src/transformers/models/wav2vec2/tokenization_wav2vec2.py', 'src/transformers/models/wav2vec2_phoneme/tokenization_wav2vec2_phoneme.py', 'src/transformers/models/xlm/tokenization_xlm.py', 'src/transformers/testing_utils.py', 'src/transformers/tokenization_utils_base.py', 'src/transformers/tokenization_utils_fast.py', 'tests/test_feature_extraction_common.py', 'tests/test_tokenization_common.py']","The current JSON formatting across different tokenizer files and processors is inconsistent, leading to hard-to-read code and potential processing errors."
+f5a49bfa4d2ae9b07d6f08000b5ace3489671e38,1634901100,"Replace assert statements with exceptions (#13871) (#13901)
+
+* Replace assert statements with exceptions (#13871)
+
+* Change f-strings when not needed (flake8)
+
+* Replace assert statements with exceptions (#13871)
+
+* Change f-strings when not needed (flake8)
+
+* Improve error message as suggested by reviewer
+
+* Fix identation bug
+
+* Fix style errors",['src/transformers/generation_beam_search.py'],"Assert statements replaced by exceptions causing indentation and style errors, along with unneeded f-strings and sub-par error messages."
+faacd747299f6bf3304f215c8570cbce867c870f,1638274014,"[Flax] Add FlaxBlenderbot (#13633)
+
+* Init Flax implementation for Blenderbot
+
+* Add a majority of stuff except for tests
+
+* make style quality
+
+* Add tests and fix some bugs
+
+* Add tests
+
+* Clean source code and fix some bugs
+
+* Fix copies and docs
+
+* Fix jax device condition for tests
+
+* Fix layer norm in the encoder
+
+* Fix a few typos in the test file
+
+* make fix-copies
+
+* make fix-copies
+
+* fix layer norm
+
+* Fix Flax params dtype (#13090)
+
+* Fix PR reference (#13098)
+
+* make fix-copies
+
+* Update tests/test_modeling_flax_blenderbot.py
+
+Co-authored-by: Patrick von Platen <patrick.v.platen@gmail.com>
+Co-authored-by: Suraj Patil <surajp815@gmail.com>","['src/transformers/__init__.py', 'src/transformers/models/auto/modeling_flax_auto.py', 'src/transformers/models/bart/modeling_flax_bart.py', 'src/transformers/models/blenderbot/__init__.py', 'src/transformers/models/blenderbot/modeling_flax_blenderbot.py', 'src/transformers/models/marian/modeling_flax_marian.py', 'src/transformers/models/mbart/modeling_flax_mbart.py', 'src/transformers/models/pegasus/modeling_flax_pegasus.py', 'src/transformers/testing_utils.py', 'src/transformers/utils/dummy_flax_objects.py', 'tests/test_modeling_flax_blenderbot.py']","Initial implementation of FlaxBlenderbot has several bugs and typos, failing tests, layer norm issues in the encoder, and inappropriate datatype for Flax parameters."

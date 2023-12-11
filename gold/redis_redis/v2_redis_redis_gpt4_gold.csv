@@ -1,0 +1,1223 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
+04056b767fbcdc1df6fc536467234c04d88bee9d,1606770233,"BITOP speedup when or/and output is 0/255, stop processing further keys (#8110)
+
+when performing the and operation, if the output is 0, we can jump out of the loop.
+when performing an or operation, if the output is 0xff, we can jump out of the loop.",['src/bitops.c'],BITOP operations continue processing keys unnecessarily after AND operation gives 0 or OR operation yields 0xff output.
+0835f596b8d6ab3d41a76cf468877273a6afa961,1629616853,"BITSET and BITFIELD SET only propagate command when the value changed. (#9403)
+
+In old way, we always increase server.dirty in BITSET and BITFIELD SET.
+Even the command doesn't really change anything. This commit make 
+sure BITSET and BITFIELD SET only increase dirty when the value changed.
+
+Because of that, if the value not changed, some others implications:
+- Avoid adding useless AOF
+- Reduce replication traffic
+- Will not trigger keyspace notifications (setbit)
+- Will not invalidate WATCH
+- Will not sent the invalidation message to the tracking client","['src/bitops.c', 'tests/unit/bitops.tcl']","BITSET and BITFIELD SET commands increase server dirty count even when no actual value changes occur, resulting in unnecessary AOF additions, increased replication traffic, and invalidation of WATCH and tracking client messages."
+085615af97c658530153e0040b35d8e65a384379,1635156085,"Improve code doc of allowed_firstargs following #9504 (#9674)
+
+Improve code doc for allowed_firstargs (used to be allowed_commands before #9504.
+I don't think the text in the code needs to refer to the history (it's not there just for backwards compatibility).
+instead it should just describe what it does.",['src/server.h'],"The code documentation for 'allowed_firstargs' is insufficient and unclear, failing to adequately describe its functionality."
+09327f11dd718461b3a1d577729c1e9969f37080,1531213901,"Streams: fix unblocking logic into a consumer group.
+
+When a client blocks for a consumer group, we don't know the actual ID
+we want to be served: other clients blocked in the same consumer group
+may be served first, so the consumer group latest delivered ID changes.
+This was not handled correctly, all the clients in the consumer group
+were unblocked without data but the first.
+",['src/blocked.c'],"""Incorrect handling of Consumer Group blocking in Streams results in all clients except first being unblocked without data."""
+0990dec3f5c331c7eae6e219716b4d57dd185ccb,1644338747,"Fix SENTINEL DEBUG with wrong arguments (#10258)
+
+There are two issues in SENTINEL DEBUG:
+1. The error message should mention SENTINEL DEBUG
+2. Add missing reuturn in args parse.
+
+```
+redis> sentinel debug INFO-PERIOD aaa
+(error) ERR Invalid argument 'aaa' for SENTINEL SET 'INFO-PERIOD'
+
+redis> sentinel debug a b c d
+(error) ERR Unknown option or number of arguments for SENTINEL SET 'a'
+redis> ping
+(error) ERR Unknown option or number of arguments for SENTINEL SET 'b'
+```
+
+Introduced in #9291. Also do some cleanups in the code.",['src/sentinel.c'],'SENTINEL DEBUG' in Redis incorrectly presents the error message related to 'SENTINEL SET' and fails to handle argument parsing properly.
+0af467d18f9d12b137af3b709c0af579c29d8414,1577898793,"Fix active expire division by zero.
+
+Likely fix #6723.
+
+This is what happens AFAIK: we enter the main loop where we expire stuff
+until a given percentage of keys is still found to be logically expired.
+There are however other potential exit conditions.
+
+However the ""sampled"" variable is not always incremented inside the
+loop, because we may found no valid slot as we scan the hash table, but
+just NULLs ad dict entries. So when the do/while loop condition is
+triggered at the end, we do (expired*100/sampled), dividing by zero if
+we sampled 0 keys.
+",['src/expire.c'],"Main loop for key expiry can potentially lead to division by zero error when no valid slots are found during a hash table scan, resulting in no keys being sampled."
+0c4733c8d7c50e0b0dc3373733fddfff3f62dda0,1650205006,"Optimize integer zset scores in listpack (converting to string and back) (#10486)
+
+When the score doesn't have fractional part, and can be stored as an integer,
+we use the integer capabilities of listpack to store it, rather than convert it to string.
+This already existed before this PR (lpInsert dose that conversion implicitly).
+
+But to do that, we would have first converted the score from double to string (calling `d2string`),
+then pass the string to `lpAppend` which identified it as being an integer and convert it back to an int.
+Now, instead of converting it to a string, we store it using lpAppendInteger`.
+
+Unrelated:
+---
+* Fix the double2ll range check (negative and positive ranges, and also the comparison operands
+  were slightly off. but also, the range could be made much larger, see comment).
+* Unify the double to string conversion code in rdb.c with the one in util.c
+* Small optimization in lpStringToInt64, don't attempt to convert strings that are obviously too long.
+
+Benchmark;
+---
+Up to 20% improvement in certain tight loops doing zzlInsert with large integers.
+(if listpack is pre-allocated to avoid realloc, and insertion is sorted from largest to smaller)","['src/listpack.c', 'src/listpack.h', 'src/rdb.c', 'src/t_zset.c', 'src/util.c', 'src/util.h']","Integer scores in zset are inefficiently converted to a string and back to integer while storing in listpack, leading to performance concerns."
+0f8b634cd5cdfd77696d34d744dfc25fa97f3b73,1633349870,"Fix invalid memory write on lua stack overflow (CVE-2021-32626) (#9591)
+
+When LUA call our C code, by default, the LUA stack has room for 10
+elements. In most cases, this is more than enough but sometimes it's not
+and the caller must verify the LUA stack size before he pushes elements.
+
+On 3 places in the code, there was no verification of the LUA stack size.
+On specific inputs this missing verification could have lead to invalid
+memory write:
+1. On 'luaReplyToRedisReply', one might return a nested reply that will
+   explode the LUA stack.
+2. On 'redisProtocolToLuaType', the Redis reply might be deep enough
+   to explode the LUA stack (notice that currently there is no such
+   command in Redis that returns such a nested reply, but modules might
+   do it)
+3. On 'ldbRedis', one might give a command with enough arguments to
+   explode the LUA stack (all the arguments will be pushed to the LUA
+   stack)
+
+This commit is solving all those 3 issues by calling 'lua_checkstack' and
+verify that there is enough room in the LUA stack to push elements. In
+case 'lua_checkstack' returns an error (there is not enough room in the
+LUA stack and it's not possible to increase the stack), we will do the
+following:
+1. On 'luaReplyToRedisReply', we will return an error to the user.
+2. On 'redisProtocolToLuaType' we will exit with panic (we assume this
+   scenario is rare because it can only happen with a module).
+3. On 'ldbRedis', we return an error.","['src/scripting.c', 'tests/unit/scripting.tcl']","In certain scenarios, the LUA stack might overflow leading to invalid memory writes as the current LUA stack size verification is missing in some parts of the code. This can cause the program to crash or behave unpredictably."
+1013cbeae2060bf14b9b430f3ae1f1bf9a0aad1c,1653802718,"Fix sentinel disconnect test timing issue after auth-pass change (#10784)
+
+There is a timing issue reported in test-sanitizer-address (gcc):
+```
+Sentinels (re)connection following SENTINEL SET mymaster auth-pass:
+FAILED: Expected to be disconnected from master due to wrong password
+```
+
+The reason we reach it, is because the test is fast enough to modify
+auth-pass and test sentinel connection status with the server,
+before its scheduled operation got the chance to update connection
+status with the server.
+
+We need to wait for `sentinelTimer` to kick in, and then update the
+connection status. Replace condition with wait_for_condition on the check.
+
+Fix just like #10480 did",['tests/sentinel/tests/03-runtime-reconf.tcl'],Sentinel disconnection test incorrectly passes due to a timing issue - sentinel connection status with the server updates before the test can modify the 'auth-pass' and test sentinel connection status.
+1190f25ca7644e5cdea0b5c8c88e07daaccc36aa,1688604383,"Process loss of slot ownership in cluster bus (#12344)
+
+Process loss of slot ownership in cluster bus
+
+When a node no longer owns a slot, it clears the bit corresponding
+to the slot in the cluster bus messages. The receiving nodes
+currently don't record the fact that the sender stopped claiming
+a slot until some other node in the cluster starts claiming the slot.
+This can cause a slot to go missing during slot migration when subjected
+to inopportune race with addition of new shards or a failover.
+This fix forces the receiving nodes to process the loss of ownership
+to avoid spreading wrong information.","['src/cluster.c', 'src/cluster.h', 'tests/cluster/tests/15-cluster-slots.tcl']","Receiving nodes do not record the absence of a slot in cluster bus messages when a node stops claiming it, leading to potential loss of slot during migrations due to race conditions."
+153f8f082e96da08a2d1763a8e45db1bcd1209ff,1687691547,"Fix use after free on blocking RM_Call. (#12342)
+
+blocking RM_Call was introduced on: #11568, It allows a module to perform
+blocking commands and get the reply asynchronously.If the command gets
+block, a special promise CallReply is returned that allow to set the unblock
+handler. The unblock handler will be called when the command invocation
+finish and it gets, as input, the command real reply.
+
+The issue was that the real CallReply was created using a stack allocated
+RedisModuleCtx which is no longer available after the unblock handler finishes.
+So if the module keeps the CallReply after the unblock handler finished, the
+CallReply holds a pointer to invalid memory and will try to access it when the
+CallReply will be released.
+
+The solution is to create the CallReply with a NULL context to make it totally
+detached and can be freed freely when the module wants.
+
+Test was added to cover this case, running the test with valgrind before the
+fix shows the use after free error. With the fix, there are no valgrind errors.
+
+unrelated: adding a missing `$rd close` in many tests in that file.","['src/module.c', 'tests/modules/blockedclient.c', 'tests/unit/moduleapi/async_rm_call.tcl']","The blocking RM_Call, once unblocked, attempts to access a CallReply that was created using a stack-allocated RedisModuleCtx, leading to use-after-free errors if the module keeps the CallReply after the unblock handler has finished."
+1677efb9dadf1d0450e695c7232f1ea7f95cc1a2,1623656288,"cleanup around loadAppendOnlyFile (#9012)
+
+Today when we load the AOF on startup, the loadAppendOnlyFile checks if
+the file is openning for reading.
+This check is redundent (dead code) as we open the AOF file for writing at initServer,
+and the file will always be existing for the loadAppendOnlyFile.
+
+In this commit:
+- remove all the exit(1) from loadAppendOnlyFile, as it is the caller
+  responsibility to decide what to do in case of failure.
+- move the opening of the AOF file for writing, to be after we loading it.
+- avoid return -ERR in DEBUG LOADAOF, when the AOF is existing but empty","['src/aof.c', 'src/debug.c', 'src/server.c', 'src/server.h', 'tests/integration/aof.tcl']","The loadAppendOnlyFile function redundantly checks if the AOF file is open for reading on startup, even though it is always opened for writing during initialization, leading to unnecessary exit(1). Debugging results in avoidable return -ERR when AOF is empty but exists."
+16e04ed9442ed31ab2ec01035047e8118c7511a5,1625115918,"Don't start in sentinel mode if only the folder name contains redis-sentinel (#9176)
+
+Before this commit, redis-server starts in sentinel mode if the first startup
+argument has the string redis-sentinel, so redis also starts in sentinel mode
+if the directory it was started from contains the string redis-sentinel.
+Now we check the executable name instead of directory.
+
+Some examples:
+1. Execute ./redis-sentinel/redis/src/redis-sentinel, starts in sentinel mode.
+2. Execute ./redis-sentinel/redis/src/redis-server, starts in server mode,
+   but before, redis will start in sentinel mode.
+3. Execute ./redis-sentinel/redis/src/redis-server --sentinel, of course, like
+   before, starts in sentinel mode.",['src/server.c'],"Redis-server starts in sentinel mode if directory name contains 'redis-sentinel', regardless of actual mode designated by executable."
+175a9e3199f79305827e826b5d2da3ed5d8a3502,1618288503,"Fix busy loop in ae.c when timer event is about to fire (#8764)
+
+The code used to decide on the next time to wake on a timer with
+microsecond accuracy, but when deciding to go to sleep it used
+milliseconds accuracy (with truncation), this means that it would wake
+up too early, see that there's no timer to process, and go to sleep
+again for 0ms again and again until the right microsecond arrived.
+
+i.e. a timer for 100ms, would sleep for 99ms, but then do a busy loop
+through the kernel in the last millisecond, triggering many calls to
+beforeSleep.
+
+The fix is to change all the logic in ae.c to work with microseconds,
+which is good since most of the ae backends support micro (or even nano)
+seconds. however the epoll backend, doesn't support micro, so to avoid
+this problem it needs to round upwards, rather than truncate.
+
+Issue created by the monotonic timer PR #7644 (redis 6.2)
+Before that, all the timers in ae.c were in milliseconds (using
+mstime), so when it requested the backend to sleep till the next timer
+event, it would have worked ok.","['src/ae.c', 'src/ae_epoll.c']","There's a busy loop in ae.c when a timer event is about to fire. This is due to mismatched accuracy in time calculations, causing the system to wake up too early and repeatedly go back to sleep with a 0ms wait."
+18cb4a7d938d01981e9f6c565532a2056ceb269b,1653211674,"Remove ziplist dead code in object.c (#10751)
+
+Remove some dead code in object.c, ziplist is no longer used in 7.0
+
+Some backgrounds:
+zipmap - hash: replaced by ziplist in #285
+ziplist - hash: replaced by listpack in #8887
+ziplist - zset: replaced by listpack in #9366
+ziplist - list: replaced by quicklist (listpack) in #2143 / #9740
+
+Moved the location of ziplist.h in the server.c","['src/object.c', 'src/server.h']",The ziplist code in object.c is dead because it's no longer used in version 7.0. This could cause unnecessary code bloat and confusion when maintaining code.
+1f8ea99b4bc25083d909b3228601fb82efe1e67f,1590743233,"Fix handling of special chars in ACL LOAD.
+
+Now it is also possible for ACL SETUSER to accept empty strings
+as valid operations (doing nothing), so for instance
+
+    ACL SETUSER myuser """"
+
+Will have just the effect of creating a user in the default state.
+
+This should fix #7329.
+",['src/acl.c'],"Special characters in ACL LOAD are not properly processed, and ACL SETUSER fails to accept empty strings as valid operations."
+2825b6057bee911e69b6fd30eb338d02e9d7ff90,1658133379,"Fix heap overflow corruption in XAUTOCLAIM (CVE-2022-31144) (#11002)
+
+The temporary array for deleted entries reply of XAUTOCLAIM was
+insufficient, but also in fact the COUNT argument should be used to
+control the size of the reply, so instead of terminating the loop by
+only counting the claimed entries, we'll count deleted entries as well.
+
+Fix #10968
+Addresses CVE-2022-31144","['src/t_stream.c', 'tests/unit/type/stream-cgroups.tcl']","Heap overflow corruption issue in XAUTOCLAIM due to insufficient array size for deleted entries reply, ignoring COUNT argument control over reply size."
+2ab6767744a3b31db9cba7445ae6cc94f33b6d51,1656826479,"Always set server.aof_last_write_errno in aof write error (#10917)
+
+The `can_log` variable prevents us from outputting too
+many error logs. But it should not include the modification
+of server.aof_last_write_errno.
+
+We are doing this because:
+1. In the short write case, we always set aof_last_write_errno
+to ENOSPC, we don't care the `can_log` flag.
+
+2. And we always set aof_last_write_status to C_ERR in aof write
+error (except for FSYNC_ALWAYS, we exit). So there may be a chance
+that `aof_last_write_errno` is not right.
+
+An innocent bug or just a code cleanup.",['src/aof.c'],"In cases of AOF write error, `server.aof_last_write_errno` is not consistently updated due to interference from the `can_log` variable, possibly leading to incorrect error logging."
+2d7d3911daccc17f038ad8f8faf395ffdb750e3e,1686463361,"Allow bigger tolerance in eventloop duration test. (#12179)
+
+In #11963, some new tests about eventloop duration were added, which includes time measurement in TCL scripts. This has caused some unexpected CI failures, such as #12169 and #12177, due to slow test servers or some performance jittering.",['tests/unit/info.tcl'],"Eventloop duration tests introduced in #11963 are causing unexpected CI failures (#12169, #12177) possibly due to performance variability or slow test servers."
+2f8476df9124dfbd298a7ecce87870d44bdbb172,1515752789,"Fix getKeysUsingCommandTable() in the case of nagative arity.
+
+This fixes a crash with Redis Cluster when OBJECT is mis-used, because
+getKeysUsingCommandTable() will call serverPanic() detecting we are
+accessing an invalid argument in the case ""OBJECT foo"" is called.
+
+This bug was introduced when OBJECT HELP was introduced, because the key
+argument is set fixed at index 2 in the command table, however now
+OBJECT may be called with an insufficient number of arguments to extract
+the key.
+
+The ""Right Thing"" would be to have a specific function to extract keys
+from the OBJECT command, however this is kinda of an overkill, so I
+preferred to make getKeysUsingCommandTable() more robust and just return
+no keys when it's not possible to honor the command table, because new
+commands are often added and also there are a number with an HELP
+subcommand violating the normal form, and crashing for this trivial
+reason or having many command-specific key extraction functions is not
+great.
+",['src/db.c'],Redis Cluster crashes when the 'OBJECT' command is misused due to the invalid argument access in getKeysUsingCommandTable(). This was introduced after the 'OBJECT HELP' implementation.
+315df9ada056841c3acb6e4c1052b60ef61072e8,1617015122,"Add cluster slot migration tests (#8649)
+
+Add tests for fixing migrating slot at all stages:
+
+1. when migration is half inited on ""migrating"" node
+2. when migration is half inited on ""importing"" node
+3. migration inited, but not finished
+4. migration is half finished on ""migrating"" node
+5. migration is half finished on ""importing"" node
+
+Also add tests for many simultaneous slot migrations.
+
+Co-authored-by: Yossi Gottlieb <yossigo@gmail.com>","['tests/cluster/tests/20-half-migrated-slot.tcl', 'tests/cluster/tests/21-many-slot-migration.tcl', 'tests/cluster/tests/includes/utils.tcl', 'tests/support/cluster.tcl', 'tests/support/util.tcl']","There are no tests to verify that slot migration works under partial initialization and migration, or during simultaneous slot migrations."
+362786c58a28b35b3249f97751535f9f72d4c6be,1623826045,"Remove gopher protocol support. (#9057)
+
+Gopher support was added mainly because it was simple (trivial to add).
+But apparently even something that was trivial at the time, does cause complications
+down the line when adding more features.
+We recently ran into a few issues with io-threads conflicting with the gopher support.
+We had to either complicate the code further in order to solve them, or drop gopher.
+AFAIK it's completely unused, so we wanna chuck it, rather than keep supporting it.","['src/config.c', 'src/gopher.c', 'src/networking.c', 'src/server.h']","Conflicts encountered between io-threads and the gopher protocol support, complicating the addition of new features."
+376b689b03e22889b62e60013d7622cbf98d3dc7,1669624661,"Simplified geoAppendIfWithinShape() and removed spurious calls do sdsdup and sdsfree (#11522)
+
+In scenarios in which we have large datasets and the elements are not
+contained within the range we do spurious calls do sdsdup and sdsfree.
+I.e. instead of pre-creating an sds before we know if we're gonna use it
+or not, change the role of geoAppendIfWithinShape to just do geoWithinShape,
+and let the caller create the string only when needed.
+
+Co-authored-by: Oran Agra <oran@redislabs.com>",['src/geo.c'],Unnecessary pre-creation and deletion of strings increases load when dealing with large datasets where elements are not contained within the specified range.
+3d56f607b7083aff7606aeb19068d48f19a73059,1654586139,"Handle multiple_token flag in generate-command-help.rb (#10822)
+
+Currently generate-command.help.rb dose not handle the
+multiple_token flag, handle this flag in this PR.
+The format is the same as redis-cli rendering.
+```diff
+- bitfield_ro key GET encoding offset [encoding offset ...]
++ bitfield_ro key GET encoding offset [GET encoding offset ...]
+```
+
+Re run generate-command-code.py which was forget in #10820.
+Also change the flag value from string to bool, like ""true"" to true","['src/commands.c', 'src/help.h', 'utils/generate-command-help.rb']","The `generate-command-help.rb` does not process the `multiple_token` flag correctly, leading to inaccurate command help format rendering. This could eventually lead to misunderstandings about command usage.
+"
+3e09a8c09770dfbe5c8a1c3d2ebc4599448ba7c4,1649226813,"Fixes commands' syntices (#10534)
+
+Fixes in command argument in json files
+* Fixes BITFIELD's syntax (""sub-commands"" can be repeated, and OVERFLOW is only valid for SET and INCR)
+* Improves readability of SET (reordered)
+* Fixes GEOSEARCH and GEOSEARCH_RO syntices (use `oneof` for mutually exclusive group instead of `optional`)
+* Fixes MIGRATE syntax (use `oneof` for mutually exclusive group instead of `optional`)
+* Fixes MODULE LOADEX syntax (the `CONFIG` token should be repeated too when using multiple configs)
+
+other:
+* make generate-command-help.rb accept a path to commands.json, or read it from stdin (e.g. `generate-commands-json.py | generate-command-help.rb -`)","['src/commands.c', 'src/help.h', 'utils/generate-command-help.rb']",Several Redis commands in JSON files have incorrect argument syntax and misuse of `oneof` and `optional` causing command errors and decreased readability.
+3e39ea0b83f5588a5460a366072a5c7b3bd42635,1622990130,"tests: prevent name clash in variables leading to wrong test name (#8995)
+
+running the ""geo"" unit would have shown that it completed a unit named
+""north"". this was because the variable `$name` was overwritten.
+This commit isn't perfect, but it slightly reduces the chance for
+variable name clash.
+
+```
+$ ./runtest --single unit/geo
+.......
+Testing unit/geo
+.......
+[1/1 done]: north (15 seconds)
+```",['tests/test_helper.tcl'],"Variable `$name` is overwritten during ""geo"" unit test execution causing confusion with showing the wrong unit test name as ""north""."
+40d555dbb72d0294ea35dcf8af45ecdbb28d5095,1615889834,"set module eviction context flag only in masters (#8631)
+
+REDISMODULE_CTX_FLAGS_EVICT and REDISMODULE_CTX_FLAGS_MAXMEMORY
+shouldn't be set when the module is run inside a replica that doesn't do eviction.
+
+one may argue that the database is under eviction (the master does eviction and sends DELs to the replica).
+but on the other hand, we don't really know the master's configuration.
+all that matters is if the current instance does evictions or not.",['src/module.c'],"Redis Module context flags for 'EVICT' and 'MAXMEMORY' are incorrectly applied in replicas not performing evictions, despite actual evictions happening only in master instances."
+451531f1c89e34cc1aef0eb4bc1cdc78340f0bda,1649321548,"Fix RM_Yield bug (#10548)
+
+The bug was when using REDISMODULE_YIELD_FLAG_CLIENTS.
+in that case we would have only set the CLIENTS type flag in
+server.busy_module_yield_flags and then clear that flag when exiting
+RM_Yield, so we would never call unblockPostponedClients when the
+context is destroyed.
+
+This didn't really have any actual implication, which is why the tests
+couldn't (and still can't) find that since the bug only happens when
+using CLIENT, but in this case we won't have any clients to un-postpone
+i.e. clients will get rejected with BUSY error, rather than being
+postponed.
+
+Unrelated:
+* Adding tests for nested contexts, just in case.
+* Avoid nested RM_Yield calls","['src/module.c', 'tests/unit/moduleapi/blockedclient.tcl']","When using REDISMODULE_YIELD_FLAG_CLIENTS in RM_Yield, the CLIENTS type flag is cleared, causing clients to be rejected with a BUSY error instead of being postponed."
+46f4ebbe842620f0976a36741a72482620aa4b48,1619500510,"Prevent replicas from sending commands that interact with keyspace (#8868)
+
+This solves an issue reported in #8712 in which a replica would bypass
+the client write pause check and cause an assertion due to executing a
+write command during failover.
+
+The fact is that we don't expect replicas to execute any command other
+than maybe REPLCONF and PING, etc. but matching against the ADMIN
+command flag is insufficient, so instead i just block keyspace access
+for now.",['src/server.c'],"Replicas interacting with keyspace during failover bypass client write pause check, triggering unexpected assertions."
+48757934ffb8e3d84b3e4457bf2ded5ea0a733a1,1684412686,"Performance improvement to ZADD and ZRANGESTORE, convert to skiplist and expand dict in advance (#12185)
+
+For zsets that will eventually be stored as the skiplist encoding (has a dict),
+we can convert it to skiplist ahead of time. This change checks the number
+of arguments in the ZADD command, and converts the data-structure
+if the number of new entries exceeds the listpack-max-entries configuration.
+This can cause us to over-allocate memory if there are duplicate entries in the
+input, which is unexpected.
+
+For ZRANGESTORE, we know the size of the zset, so we can expand
+the dict in advance, to avoid the temporary dict from being rehashed
+while it grows.
+
+Simple benchmarks shows it provides some 4% improvement in ZADD and 20% in ZRANGESTORE","['src/t_zset.c', 'tests/unit/type/zset.tcl']","Performance degradation in ZADD and ZRANGESTORE operations due to unnecessary memory rehashing, inefficient data structure conversion and potential over-allocation of memory with duplicate entries."
+48d54265ce16cff0764b0aad7b56e091401b3d4b,1635700941,"Fix failing cluster tests (#9707)
+
+Fix failures introduced by #9695 which was an attempt to solve failures introduced by #9679.
+And alternative to #9703 (i didn't like the extra argument to kill_instance).
+
+Reverting #9695.
+Instead of stopping AOF on all terminations, stop it only on the two which need it.
+Do it as part of the test rather than the infra (it was add that kill_instance used `R`
+to communicate to the instance)
+
+Note that the original purpose of these tests was to trigger a crash, but that upsets
+valgrind so in redis 6.2 i changed it to use SIGTERM, so i now rename the tests
+(remove ""kill"" and ""crash"").
+
+Also add some colors to failures, and the word ""FAILED"" so that it's searchable.
+
+And solve a semi-related race condition in 14-consistency-check.tcl","['tests/cluster/tests/03-failover-loop.tcl', 'tests/cluster/tests/04-resharding.tcl', 'tests/cluster/tests/14-consistency-check.tcl', 'tests/instances.tcl']","Recent commits are causing cluster tests to fail, with AOF stopping on all terminations. There's also an identified race condition in 14-consistency-check.tcl potentially exacerbating the issue."
+4988b92850f131393b2aaf049e63bfc92f908dc2,1678262934,"Fix an issue when module decides to unblock a client which is blocked on keys (#11832)
+
+Currently (starting at #11012) When a module is blocked on keys it sets the
+CLIENT_PENDING_COMMAND flag.
+However in case the module decides to unblock the client not via the regular flow
+(eg timeout, key signal or CLIENT UNBLOCK command) it will attempt to reprocess the
+module command and potentially blocked again.
+
+This fix remove the CLIENT_PENDING_COMMAND flag in case blockedForKeys is
+issued from module context.","['src/blocked.c', 'tests/modules/blockonkeys.c', 'tests/unit/moduleapi/blockonkeys.tcl']","If a module decides to unblock a client outside of the regular unblock flow (such as through a timeout or CLIENT UNBLOCK command), it results in an endless loop where the module command is processed and blocked repeatedly."
+49890c8ee9776f13aaabf7fe76d796a89de6bf1a,1525105981,"Adds memory information about the script's cache to INFO
+
+Implementation notes: as INFO is ""already broken"", I didn't want to break it further. Instead of computing the server.lua_script dict size on every call, I'm keeping a running sum of the body's length and dict overheads.
+
+This implementation is naive as it **does not** take into consideration dict rehashing, but that inaccuracy pays off in speed ;)
+
+Demo time:
+
+```bash
+$ redis-cli info memory | grep ""script""
+used_memory_scripts:96
+used_memory_scripts_human:96B
+number_of_cached_scripts:0
+$ redis-cli eval """" 0 ; redis-cli info memory | grep ""script""
+(nil)
+used_memory_scripts:120
+used_memory_scripts_human:120B
+number_of_cached_scripts:1
+$ redis-cli script flush ; redis-cli info memory | grep ""script""
+OK
+used_memory_scripts:96
+used_memory_scripts_human:96B
+number_of_cached_scripts:0
+$ redis-cli eval ""return('Hello, Script Cache :)')"" 0 ; redis-cli info memory | grep ""script""
+""Hello, Script Cache :)""
+used_memory_scripts:152
+used_memory_scripts_human:152B
+number_of_cached_scripts:1
+$ redis-cli eval ""return redis.sha1hex(\""return('Hello, Script Cache :)')\"")"" 0 ; redis-cli info memory | grep ""script""
+""1be72729d43da5114929c1260a749073732dc822""
+used_memory_scripts:232
+used_memory_scripts_human:232B
+number_of_cached_scripts:2
+✔ 19:03:54 redis [lua_scripts-in-info-memory L ✚…⚑] $ redis-cli evalsha 1be72729d43da5114929c1260a749073732dc822 0
+""Hello, Script Cache :)""
+```","['src/scripting.c', 'src/server.c', 'src/server.h']","Lack of memory utilization information for the script's cache in the INFO endpoint, leading to difficulty in monitoring and diagnosing memory-related issues."
+4c6d9bbd626bb25cf7d154ea0b7d347172015cfb,1649718345,"Extending the use of hashTypeGetValue. (#10567)
+
+* Extending the use of hashTypeGetValue.
+
+Functions hashTypeExists, hashTypeGetValueLength and addHashFieldToReply
+have a similar pattern on calling hashTypeGetFromHashTable or
+hashTypeGetFromZipList depending on the underlying data structure. What
+does functions are duing is exactly what hashTypeGetValue does. Those
+functions were changed to use existing function hashTypeGetValue making
+the code more consistent.
+
+Co-authored-by: Madelyn Olson <madelyneolson@gmail.com>",['src/t_hash.c'],"'Redundant code exists in hashTypeExists, hashTypeGetValueLength and addHashFieldToReply functions, with each replicating the functionality of hashTypeGetValue.'"
+4de4fcf280648519239927d408624ea34953c0e0,1697010338,"Fix redis-cli pubsub_mode and connect minor prompt / crash issue (#12571)
+
+When entering pubsub mode and using the redis-cli only
+connect command, we need to reset pubsub_mode because
+we switch to a different connection.
+
+This will affect the prompt when the connection is successful,
+and redis-cli will crash when the connect fails:
+```
+127.0.0.1:6379> subscribe ch
+1) ""subscribe""
+2) ""ch""
+3) (integer) 1
+127.0.0.1:6379(subscribed mode)> connect 127.0.0.1 6380
+127.0.0.1:6380(subscribed mode)> ping
+PONG
+127.0.0.1:6380(subscribed mode)> connect a b
+Could not connect to Redis at a:0: Name or service not known
+Segmentation fault
+```",['src/redis-cli.c'],Switching to a different connection in pubsub mode using redis-cli causes incorrect prompt display upon successful connection and crashes when the connection fails.
+5521910de77d8a9d7587ec8497cc589c4245a599,1577630440,"Inline protocol: handle empty strings well.
+
+This bug is from the first version of Redis. Probably the problem here
+is that before we used an SDS split function that created empty strings
+for additional spaces, like in ""SET    foo          bar"".
+AFAIK later we replaced it with the curretn sdssplitarg() API that has
+no such a problem. As a result, we introduced a bug, where it is no
+longer possible to do something like:
+
+    SET foo """"
+
+Using the inline protocol. Now it is fixed.
+",['src/networking.c'],"Empty strings are not handled properly in inline protocol, rendering ""SET foo """""" operation impossible."
+556acefe7556443b6d1741d804add92047bf4a8b,1603360665,"WATCH no longer ignores keys which have expired for MULTI/EXEC. (#7920)
+
+This wrong behavior was backed by a test, and also documentation, and dates back to 2010.
+But it makes no sense to anyone involved so it was decided to change that.
+
+Note that 20eeddf (invalidate watch on expire on access) was released in 6.0 RC2
+and 2d1968f released in in 6.0.0 GA (invalidate watch when key is evicted).
+both of which do similar changes.","['src/expire.c', 'tests/unit/multi.tcl']","WATCH command in MULTI/EXEC sequence is incorrectly ignoring keys which have already expired, a behavior that is both documented and backed by a test."
+573246f73c0d9de6155a7bf5f0cbce98da129afb,1599399837,"if diskless repl child is killed, make sure to reap the pid (#7742)
+
+Starting redis 6.0 and the changes we made to the diskless master to be
+suitable for TLS, I made the master avoid reaping (wait3) the pid of the
+child until we know all replicas are done reading their rdb.
+
+I did that in order to avoid a state where the rdb_child_pid is -1 but
+we don't yet want to start another fork (still busy serving that data to
+replicas).
+
+It turns out that the solution used so far was problematic in case the
+fork child was being killed (e.g. by the kernel OOM killer), in that
+case there's a chance that we currently disabled the read event on the
+rdb pipe, since we're waiting for a replica to become writable again.
+and in that scenario the master would have never realized the child
+exited, and the replica will remain hung too.
+Note that there's no mechanism to detect a hung replica while it's in
+rdb transfer state.
+
+The solution here is to add another pipe which is used by the parent to
+tell the child it is safe to exit. this mean that when the child exits,
+for whatever reason, it is safe to reap it.
+
+Besides that, i'm re-introducing an adjustment to REPLCONF ACK which was
+part of #6271 (Accelerate diskless master connections) but was dropped
+when that PR was rebased after the TLS fork/pipe changes (5a47794).
+Now that RdbPipeCleanup no longer calls checkChildrenDone, and the ACK
+has chance to detect that the child exited, it should be the one to call
+it so that we don't have to wait for cron (server.hz) to do that.","['src/rdb.c', 'src/replication.c', 'src/server.c', 'src/server.h', 'tests/integration/replication.tcl', 'tests/support/util.tcl', 'tests/unit/oom-score-adj.tcl']","When diskless replication child process is killed (e.g., by kernel OOM killer), the current system fails to recognize the exit of the child, leading to hung replicas in rdb transfer state with no recovery mechanism."
+583c31472577fb8175e17ee0ce243972f4dd8425,1511804362,"LFU: do some changes about LFU to find hotkeys
+
+Firstly, use access time to replace the decreas time of LFU.
+For function LFUDecrAndReturn,
+it should only try to get decremented counter,
+not update LFU fields, we will update it in an explicit way.
+And we will times halve the counter according to the times of
+elapsed time than server.lfu_decay_time.
+Everytime a key is accessed, we should update the LFU
+including update access time, and increment the counter after
+call function LFUDecrAndReturn.
+If a key is overwritten, the LFU should be also updated.
+Then we can use `OBJECT freq` command to get a key's frequence,
+and LFUDecrAndReturn should be called in `OBJECT freq` command
+in case of the key has not been accessed for a long time,
+because we update the access time only when the key is read or
+overwritten.
+","['src/db.c', 'src/evict.c', 'src/object.c', 'src/server.h']","Current LFU implementation updates frequency fields in a non-explicit way and relies on decrement time instead of access time, causing issues in identifying hotkeys and inaccurately updating key frequency when a key is accessed or overwritten."
+5843a45d01f76c55288abe00c29931a2520fe521,1610093001,"Skip defrag tests on systems with bigger page sizes (#8294)
+
+The defragger works well on these systems, but the tests and their
+thresholds are not adjusted for these big pages, so the defragger isn't
+able to get down the fragmentation to the levels the test expects and it
+fails on ""defrag didn't stop"".
+
+Randomly choosing 8k as the threshold for the skipping
+
+Fixes #8265 (which had 65k pages)",['tests/unit/memefficiency.tcl'],"Defrag tests are failing on systems with larger page sizes due to unadjusted test thresholds, causing persistent ""defrag didn't stop"" errors."
+5a3de81925130792f78c35e9e4d0204213a3a41e,1625470460,"Use accept4 on linux instead of fcntl to make a client socket non-blocking (#9177)
+
+This reduces system calls on linux when a new connection is made / accepted.
+
+Changes:
+* Add the SOCK_CLOEXEC option to the accept4() call
+  This  ensure that a fork/exec call does not leak a file descriptor.
+* Move anetCloexec and connNonBlock info anetGenericAccept
+* Moving connNonBlock from accept handlers to anetGenericAccept
+
+Moving connNonBlock from createClient, is safe because createClient is
+used in the following ways:
+1. without a connection (fake client)
+2. on an accepted connection (see above)
+3. creating the master client by using connConnect (see below)
+
+The third case, can either use anetTcpNonBlockConnect, or connTLSConnect
+which is by default non-blocking.
+
+Co-authored-by: Rajiv Kurian <geetasen@gmail.com>
+Co-authored-by: Oran Agra <oran@redislabs.com>
+Co-authored-by: Yoav Steinberg <yoav@redislabs.com>","['src/anet.c', 'src/cluster.c', 'src/config.h', 'src/networking.c']",The current mechanism to make a client socket non-blocking using fcntl causes an increase in system calls when a new connection is made/accepted on Linux systems.
+62a4b817c6e83eedf96a451f45dd943099258fd0,1512486123,"add linkClient(): adds the client and caches the list node.
+
+We have this operation in two places: when caching the master and
+when linking a new client after the client creation. By having an API
+for this we avoid incurring in errors when modifying one of the two
+places forgetting the other. The function is also a good place where to
+document why we cache the linked list node.
+
+Related to #4497 and #4210.
+","['src/networking.c', 'src/replication.c', 'src/server.h']","There's a redundancy issue where linking client operation is implemented in two different places, leading to potential errors if modifications are performed on just one of these locations."
+63e2a6d212e9a30d9768b1d044348420e5b128c9,1628151175,"Add sentinel debug option command (#9291)
+
+This makes it possible to tune many parameters that were previously hard coded.
+We don't intend these to be user configurable, but only used by tests to accelerate certain conditions which would otherwise take a long time and slow down the test suite.
+
+Co-authored-by: Lucas Guang Yang <l84193800@china.huawei.com>",['src/sentinel.c'],"Hard-coded parameters for tuning the Sentinel debugging command could not be easily changed for testing, making test suite unnecessarily slow."
+641780a9c6d116c66d2bd66fe906afdc065c7132,1629741640,"config memory limits: handle values larger than (signed) LLONG_MAX (#9313)
+
+This aims to solve the issue in CONFIG SET maxmemory can only set maxmemory to up
+to 9223372036854775807 (2^63) while the maxmemory should be ULLONG.
+Added a memtoull function to convert a string representing an amount of memory
+into the number of bytes (similar to memtoll but for ull). Also added ull2string to
+convert a ULLong to string (Similar to ll2string).","['src/config.c', 'src/util.c', 'src/util.h']","Maxmemory configuration in CONFIG SET only accepts up to 2^63, instead of ULLONG, restricting the limit of memory allocation.';
+"
+644d94558a739656f81343f3b8a12205d53eeeb7,1681754736,"Fix RDB check regression caused by PR 12022 (#12051)
+
+The nightly tests showed that the recent PR #12022 caused random failures
+in aof.tcl on checking RDB preamble inside an AOF file.
+
+Root cause:
+When checking RDB preamble in an AOF file, what's passed into redis_check_rdb is
+aof_filename, not aof_filepath. The newly introduced isFifo function does not check return
+status of the stat call and hence uses the uninitailized stat_p object.
+
+Fix:
+1. Fix isFifo by checking stat call's return code.
+2. Pass aof_filepath instead of aof_filename to redis_check_rdb.
+3. move the FIFO check to rdb.c since the limitation is the re-opening of the file, and not
+  anything specific about redis-check-rdb.","['src/anet.c', 'src/anet.h', 'src/rdb.c', 'src/redis-check-aof.c', 'src/redis-check-rdb.c']","Random failures emerging in aof.tcl during RDB preamble checks inside an AOF file, suspected to be related to recent changes made in PR #12022."
+663fbd34592aef3d24ac347ad00dbd02f3c7b713,1664778316,"Stabilize cluster hostnames tests (#11307)
+
+This PR introduces a couple of changes to improve cluster test stability:
+1. Increase the cluster node timeout to 3 seconds, which is similar to the
+   normal cluster tests, but introduce a new mechanism to increase the ping
+   period so that the tests are still fast. This new config is a debug config.
+2. Set `cluster-replica-no-failover yes` on a wider array of tests which are
+   sensitive to failovers. This was occurring on the ARM CI.","['src/cluster.c', 'src/config.c', 'src/server.h', 'tests/support/cluster_helper.tcl', 'tests/support/server.tcl', 'tests/unit/cluster/hostnames.tcl']","Cluster tests are unstable due to insufficient node timeout and unnecessary failovers, specifically evident on the ARM CI. Ping period adjustments for quick tests also needed."
+6af021007a70f42e41f2a8abda3719d68b15ada4,1656307745,"Add missing REDISMODULE_CLIENTINFO_INITIALIZER (#10885)
+
+The module API docs mentions this macro, but it was not defined (so no one could have used it).
+
+Instead of adding it as is, we decided to add a _V1 macro, so that if / when we some day extend this struct,
+modules that use this API and don't need the extra fields, will still use the old version
+and still be compatible with older redis version (despite being compiled with newer redismodule.h)","['src/module.c', 'src/redismodule.h', 'tests/modules/misc.c']","The REDISMODULE_CLIENTINFO_INITIALIZER macro mentioned in the module API docs is not defined, causing it to be non-usable."
+6ddf0ea29340891d9934892b6c239d160d1ee0c4,1509528747,"PSYNC2: safe free backlog when reach the time limit
+
+When we free the backlog, we should use a new
+replication ID and clear the ID2. Since without
+backlog we can not increment master_repl_offset
+even do write commands, that may lead to inconsistency
+when we try to connect a ""slave-before"" master
+(if this master is our slave before, our replid
+equals the master's replid2). As the master have our
+history, so we can match the master's replid2 and
+second_replid_offset, that make partial sync work,
+but the data is inconsistent.
+",['src/replication.c'],"Freeing the backlog without proper ID management potentially leads to data inconsistency during partial syncs, especially when connecting a master that was previously a slave."
+71d452876ebf8456afaadd6b3c27988abadd1148,1626873919,"On 32 bit platform, the bit position of GETBIT/SETBIT/BITFIELD/BITCOUNT,BITPOS may overflow (see CVE-2021-32761) (#9191)
+
+GETBIT, SETBIT may access wrong address because of wrap.
+BITCOUNT and BITPOS may return wrapped results.
+BITFIELD may access the wrong address but also allocate insufficient memory and segfault (see CVE-2021-32761).
+
+This commit uses `uint64_t` or `long long` instead of `size_t`.
+related https://github.com/redis/redis/pull/8096
+
+At 32bit platform:
+> setbit bit 4294967295 1
+(integer) 0
+> config set proto-max-bulk-len 536870913
+OK
+> append bit ""\xFF""
+(integer) 536870913
+> getbit bit 4294967296
+(integer) 0
+
+When the bit index is larger than 4294967295, size_t can't hold bit index. In the past,  `proto-max-bulk-len` is limit to 536870912, so there is no problem.
+
+After this commit, bit position is stored in `uint64_t` or `long long`. So when `proto-max-bulk-len > 536870912`, 32bit platforms can still be correct.
+
+For 64bit platform, this problem still exists. The major reason is bit pos 8 times of byte pos. When proto-max-bulk-len is very larger, bit pos may overflow.
+But at 64bit platform, we don't have so long string. So this bug may never happen.
+
+Additionally this commit add a test cost `512MB` memory which is tag as `large-memory`. Make freebsd ci and valgrind ci ignore this test.","['src/bitops.c', 'src/server.h', 'tests/unit/bitops.tcl']","On a 32-bit platform, the bit positions for GETBIT, SETBIT, BITCOUNT, BITFIELD, and BITPOS may overflow, leading to potential memory access errors & segmentation faults. May also cause problems with `proto-max-bulk-len > 536870912`. Issue persists for 64bit platforms as well but it is rarely encountered due to longer strings."
+747be463d2f825c1e0b620ef2b120a0695121d8a,1570695814,"Cluster: fix memory leak of cached master.
+
+This is what happened:
+
+1. Instance starts, is a slave in the cluster configuration, but
+actually server.masterhost is not set, so technically the instance
+is acting like a master.
+
+2. loadDataFromDisk() calls replicationCacheMasterUsingMyself() even if
+the instance is a master, in the case it is logically a slave and the
+cluster is enabled. So now we have a cached master even if the instance
+is practically configured as a master (from the POV of
+server.masterhost value and so forth).
+
+3. clusterCron() sees that the instance requires to replicate from its
+master, because logically it is a slave, so it calls
+replicationSetMaster() that will in turn call
+replicationCacheMasterUsingMyself(): before this commit, this call would
+overwrite the old cached master, creating a memory leak.
+","['src/replication.c', 'src/server.c']","Memory leak occurs in instances configured as masters in the cluster configuration due to repeated calls to replicationCacheMasterUsingMyself(), overwriting the old cached master."
+74959a0f73a44cfe56d5fb95957021c55b0ae214,1681973359,"Misuse of bool in redis (#12077)
+
+We currently do not allow the use of bool type in redis project.
+
+We didn't catch it in script.c because we included hdr_histogram.h in server.h
+
+Removing it (but still having it in some c files) reducing
+the chance to miss the usage of bool type in the future and catch it
+in compiling stage.
+
+It also removes the dependency on hdr_histogram for every unit
+that includes server.h","['src/latency.c', 'src/module.c', 'src/script.c', 'src/server.c', 'src/server.h']",Inclusion of hdr_histogram.h in server.h is allowing misuse of bool type in Redis project which is not caught during the compiling stage.
+795c454db1ce74b6eb2aee9db124f8316e9f188c,1600938160,"Stream: Inconsistency between master and replica some XREADGROUP case (#7526)
+
+XREADGROUP auto-creates the consumer inside the consumer group the
+first time it saw it.
+When XREADGROUP is being used with NOACK option, the message will not
+be added into the client's PEL and XGROUP SETID would be propagated.
+When the replica gets the XGROUP SETID it will only update the last delivered
+id of the group, but will not create the consumer.
+
+So, in this commit XGROUP CREATECONSUMER is being added.
+Command pattern: XGROUP CREATECONSUMER <key> <group> <consumer>.
+
+When NOACK option is being used, createconsumer command would be
+propagated as well.
+
+In case of AOFREWRITE, consumer with an empty PEL would be saved with
+XGROUP CREATECONSUMER whereas consumer with pending entries would be
+saved with XCLAIM","['src/aof.c', 'src/blocked.c', 'src/rdb.c', 'src/stream.h', 'src/t_stream.c', 'tests/unit/type/stream-cgroups.tcl']","In some XREADGROUP cases, inconsistency arises between master and replica due to auto-created consumer not being in the client's PEL when NOACK option is used."
+7a3d1487e443c3cb5fde3605aebea20698a940b4,1618828064,"ACL channels permission handling for save/load scenario. (#8794)
+
+In the initial release of Redis 6.2 setting a user to only allow pubsub access to
+a specific channel, and doing ACL SAVE, resulted in an assertion when
+ACL LOAD was used. This was later changed by #8723 (not yet released),
+but still not properly resolved (now it errors instead of crash).
+
+The problem is that the server that generates an ACL file, doesn't know what
+would be the setting of the acl-pubsub-default config in the server that will load it.
+so ACL SAVE needs to always start with resetchannels directive.
+
+This should still be compatible with old acl files (from redis 6.0), and ones from earlier
+versions of 6.2 that didn't mess with channels.
+
+Co-authored-by: Harkrishn Patro <harkrisp@amazon.com>
+Co-authored-by: Oran Agra <oran@redislabs.com>","['src/acl.c', 'tests/unit/acl.tcl']",Redis 6.2's user pubsub permission to specific channel causes a server crash or error when attempting ACL SAVE and ACL LOAD due to incompatible acl-pubsub-default configs.
+7d6744c739b25ae27a42f6fcf235e0d6bfbb3e61,1634733628,"fix new cluster tests issues (#9657)
+
+Following #9483 the daily CI exposed a few problems.
+
+* The cluster creation code (uses redis-cli) is complicated to test with TLS enabled.
+  for now i'm just skipping them since the tests we run there don't really need that kind of coverage
+* cluster port binding failures
+  note that `find_available_port` already looks for a free cluster port
+  but the code in `wait_server_started` couldn't detect the failure of binding
+  (the text it greps for wasn't found in the log)","['src/cluster.c', 'src/server.c', 'tests/unit/cluster.tcl', 'tests/unit/moduleapi/cluster.tcl']",Issues with new cluster tests: TLS complicates cluster creation testing and failures in cluster port binding are not properly detected.
+815a6f846a3836b87a4601e5ce6152d8d534dce1,1652183772,"Dediacted member to hold RedisModuleCommand (#10681)
+
+Fix #10552
+
+We no longer piggyback getkeys_proc to hold the RedisModuleCommand struct, when exists
+
+Others:
+Use `doesCommandHaveKeys` in `RM_GetCommandKeysWithFlags` and `getKeysSubcommandImpl`.
+It causes a very minor behavioral change in commands that don't have actual keys, but have a spec
+with `CMD_KEY_NOT_KEY`.
+For example, before this command `COMMAND GETKEYS SPUBLISH` would return
+`Invalid arguments specified for command` but not it returns `The command has no key arguments`","['src/db.c', 'src/module.c', 'src/server.c', 'src/server.h']","RedisModuleCommand struct improperly piggybacks on getkeys_proc, causing erroneous behaviour in certain commands that don't have actual keys but have a spec with CMD_KEY_NOT_KEY."
+8351a10b959364cff9fc026188ebc9c653ef230a,1621321785,"redis-cli: Sleep for a while in each cliConnect when we got connect error in cluster mode. (#8884)
+
+There's an infinite loop when redis-cli fails to connect in cluster mode.
+This commit adds a 1 second sleep to prevent flooding the console with errors.
+It also adds a specific error print in a few places that could have error without printing anything.
+
+Co-authored-by: Oran Agra <oran@redislabs.com>",['src/redis-cli.c'],"In cluster mode, redis-cli fails to connect, resulting in an infinite loop and possibly flooding the console with error messages without sufficient context."
+837c063baf103c4389d8109ff0ef7fa8576a90d5,1652692099,"Replica fail and retry the PSYNC if the master is unresponsive (#10726)
+
+We observed from our replication testing that when the master becomes unresponsive,
+or the replication connection is broken during PSYNC so the replica doesn't get a
+response from the master, it was not able to recognize that condition as a failure
+and instead moved into the full-sync code path. This fix makes the replica fail and
+retry the PSYNC with the master in such scenarios.",['src/replication.c'],The replica enters full-sync mode when the master becomes unresponsive or the replication connection breaks during PSYNC. The replica does not recognize these scenarios as failures.
+89e11486880a59dad3857499e69e54c0b27be689,1661168695,"Introduce redis module ctx flag 'server startup'
+
+A module may be loaded only during initial stage, a typical case is
+connection type shared library.
+
+Introduce REDISMODULE_CTX_FLAGS_SERVER_STARTUP context flag
+to tell the module the stage of Redis. Then the module gets the flag
+by RedisModule_GetContextFlags(ctx), tests flags and returns error in
+onload handler.
+
+Suggested-by: Oran Agra <oran@redislabs.com>
+Signed-off-by: zhenwei pi <pizhenwei@bytedance.com>
+","['src/module.c', 'src/redismodule.h']","Redis modules are unable to determine the stage of the Redis server, making conditional operations during initial loading of the module difficult."
+8a315fc285fc54c678b97107a02ee1627f2c1ebf,1670318751,"When converting a set to dict, presize for one more element to be added (#11559)
+
+In most cases when a listpack or intset is converted to a dict, the conversion
+is trigged when adding an element. The extra element is added after conversion
+to dict (in all cases except when the conversion is triggered by
+set-max-intset-entries being reached).
+
+If set-max-listpack-entries is set to a power of two, let's say 128, when
+adding the 129th element, the 128 element listpack is first converted to a dict
+with a hashtable presized for 128 elements. After converting to dict, the 129th
+element is added to the dict which immediately triggers incremental rehashing
+to size 256.
+
+This commit instead presizes the dict to one more element, with the assumption
+that conversion to dict is followed by adding another element, so the dict
+doesn't immediately need rehashing.
+
+Co-authored-by: sundb <sundbcn@gmail.com>
+Co-authored-by: Oran Agra <oran@redislabs.com>","['src/listpack.c', 'src/listpack.h', 'src/rdb.c', 'src/server.h', 'src/t_set.c']","After converting a set to a dictionary and adding another element, the dictionary immediately triggers an unnecessary incremental rehash, especially when `set-max-listpack-entries` is set to a power of two."
+9204a9b2c2f6eb59767ab0bddcde62c75e8c20b0,1598187810,"Fix LPOS command when RANK is greater than matches
+
+When calling to LPOS command when RANK is higher than matches,
+the return value is non valid response. For example:
+```
+LPUSH l a
+:1
+LPOS l b RANK 5 COUNT 10
+*-4
+```
+It may break client-side parser.
+
+Now, we count how many replies were replied in the array.
+```
+LPUSH l a
+:1
+LPOS l b RANK 5 COUNT 10
+*0
+```
+","['src/t_list.c', 'tests/unit/type/list.tcl']","When using the LPOS command with a RANK higher than the actual matches, it returns an invalid response which can potentially break the client-side parser."
+97dcf95cc8afd4847048ceaa21a081833728677b,1630236668,"redis-benchmark: improved help and warnings (#9419)
+
+1. The output of --help:
+
+  * On the Usage line, just write [OPTIONS] [COMMAND ARGS...] instead listing
+    only a few arbitrary options and no command.
+  * For --cluster, describe that if the command is supplied on the command line,
+    the key must contain ""{tag}"". Otherwise, the command will not be sent to the
+    right cluster node.
+  * For -r, add a note that if -r is omitted, all commands in a benchmark will
+    use the same key. Also align the description.
+  * For -t, describe that -t is ignored if a command is supplied on the command
+    line.
+
+2. Print a warning if -t is present when a specific command is supplied.
+
+3. Print all warnings and errors to stderr.
+
+4. Remove -e from calls in redis-benchmark test suite.","['src/redis-benchmark.c', 'tests/integration/redis-benchmark.tcl']","Redis-benchmark's --help command output is misleading or incomplete in some cases, and improper warnings/errors handling, resulting in undesired benchmarking behaviors and confusions."
+9958ab8b2cd17681962f5de83e6a94cf4189e9f3,1678195629,"Solve race in CLIENT NO-TOUCH lru test (#11883)
+
+I've seen it fail here (test-centos7-tls-module-no-tls and test-freebsd):
+```
+*** [err]: Operations in no-touch mode do not alter the last access time of a key in tests/unit/introspection-2.tcl
+Expected '244296' to be more than '244296' (context: type eval line 12 cmd {assert_morethan $newlru $oldlru} proc ::test)
+```
+
+Our LRU_CLOCK_RESOLUTION value is 1000ms, and default hz is 10, so if the
+test is really fast, or the timing is just right, newlru will be the same
+as oldlru. We fixed this by changing `after 1000` to `after 1100`.",['tests/unit/introspection-2.tcl'],"The CLIENT NO-TOUCH LRU test fails intermittently due to a race condition, where the test's timing or speed results in equal old and new LRU values."
+9a3dab0a2eeba881b56de62faacaf51875641035,1588065286,"hickup, re-fix dictEncObjKeyCompare
+
+come to think of it, in theory (not in practice), getDecodedObject can
+return the same original object with refcount incremented, so the
+pointer comparision in the previous commit was invalid.
+so now instead of checking the encoding, we explicitly check the
+refcount.
+",['src/server.c'],The previous dictionary encoded object key comparison is invalid due to potential same original object returns through getDecodedObject with incremented refcount.
+a17390853dfa294b26167eed59b81379dc833a52,1492860101,"Defrag: fix test false positive.
+
+Apparently 1.4 is too low compared to what you get in certain setups
+(including mine). I raised it to 1.55 that hopefully is still enough to
+test that the fragmentation went down from 1.7 but without incurring in
+issues, however the test setup may be still fragile so certain times this
+may lead to false positives again, it's hard to test for these things
+in a determinsitic way.
+
+Related to #3786.
+",['tests/unit/memefficiency.tcl'],"Fragmentation test setup causing false positives due to indeterminacy, with specific setups exceeding the threshold (1.4) for validation of decreased fragmentation from 1.7."
+a295770e32b4bd71ff560c5ec7bc5c0ad12bf068,1601210407,"ignore slaveof no one in redis.conf (#7842)
+
+when slaveof config is ""no one"", reset any pre-existing config and resume.
+
+also solve a memory leak if slaveof appears twice.
+and fail loading if port number is out of range or not an integer.
+
+Co-authored-by: caozhengbin <caozb@yidingyun.com>
+Co-authored-by: Oran Agra <oran@redislabs.com>",['src/config.c'],"Redis triggers memory leak with duplicate 'slaveof' directives, fails to reset pre-existing configs with 'slaveof no one', and does not handle out-of-range or non-integer port numbers correctly."
+a29aec9abb8b4ffd030be9e4c8875ddd8ec1357c,1611074966,"Add tests to make sure that relative EXPIRE is propagated to replicas (#8357)
+
+This commit adds tests to make sure that relative and absolute expire commands
+are propagated as is to replicas and stop any future attempt to change that without
+a proper discussion. see #8327 and #5171
+
+Additionally it slightly improve the AOF test that tests the opposite (always
+propagating absolute times), by covering more commands, and shaving 2
+seconds from the test time.",['tests/unit/expire.tcl'],"'Relative EXPIRE commands may not be properly propagated to replicas, causing discrepancies between the primary and the replicas.'"
+a2b0701d2cf64c62f9bb41c01ad44586f01c2c5b,1696752770,"Fix compile on macOS 13 (#12611)
+
+Use the __MAC_OS_X_VERSION_MIN_REQUIRED macro to detect the
+macOS system version instead of using MAC_OS_X_VERSION_10_6.
+
+From MacOSX14.0.sdk, the default definitions of MAC_OS_X_VERSION_xxx have
+been removed in usr/include/AvailabilityMacros.h. It includes AvailabilityVersions.h,
+where the following condition must be met:
+`#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || defined(_DARWIN_C_SOURCE)`
+Only then will MAC_OS_X_VERSION_xxx be defined.
+However, in the project, _DARWIN_C_SOURCE is not defined, which leads to the
+loss of the definition for MAC_OS_X_VERSION_10_6.","['src/config.h', 'src/debug.c']","The definition for MAC_OS_X_VERSION_10_6 is missing when compiling on macOS 13, due to _DARWIN_C_SOURCE not being defined in the project."
+a4bcdbcfd3a055eb6320f31e5c710931708a9501,1668525501,"Fix double negative nan test, ignoring sign (#11506)
+
+The test introduced in #11482 fail on ARM (extra CI):
+```
+*** [err]: RESP2: RM_ReplyWithDouble: NaN in tests/unit/moduleapi/reply.tcl
+Expected '-nan' to be equal to 'nan' (context: type eval line 3 cmd
+{assert_equal ""-nan"" [r rw.double 0 0]} proc ::test)
+
+*** [err]: RESP3: RM_ReplyWithDouble: NaN in tests/unit/moduleapi/reply.tcl
+Expected ',-nan' to be equal to ',nan' (context: type eval line 8 cmd
+{assert_equal "",-nan"" [r rw.double 0 0]} proc ::test)
+```
+
+It looks like there is no negative nan on ARM. ",['tests/unit/moduleapi/reply.tcl'],The test checking for nan fails on ARM architecture due to non-existence of negative nan values.
+a6bf509810c4efda607cbe3cc86557449828e7f1,1647159227,"Sentinel: fix no reconnect after auth-pass is changed (#10400)
+
+When updating SENTINEL with master’s new password (command:
+`SENTINEL SET mymaster auth-pass some-new-password`), 
+sentinel might still keep the old connection and avoid reconnecting 
+with the new password. This is because of wrong logic that traces 
+the last ping (pong) time to servers. In fact it worked fine until 8631e64 
+changed the condition to send ping. To resolve it with minimal risk, 
+let’s disconnect master and replicas once changing password/user. 
+
+Based on earlier work of yz1509.","['src/sentinel.c', 'tests/sentinel/tests/03-runtime-reconf.tcl', 'tests/sentinel/tests/includes/init-tests.tcl']","Changing the authentication password in Sentinel does not trigger a reconnection, causing sentinels to maintain old connections with outdated passwords."
+aa139e2f02292d668370afde8c91575363c2d611,1625148687,"Fix CLIENT UNBLOCK crashing modules. (#9167)
+
+Modules that use background threads with thread safe contexts are likely
+to use RM_BlockClient() without a timeout function, because they do not
+set up a timeout.
+
+Before this commit, `CLIENT UNBLOCK` would result with a crash as the
+`NULL` timeout callback is called. Beyond just crashing, this is also
+logically wrong as it may throw the module into an unexpected client
+state.
+
+This commits makes `CLIENT UNBLOCK` on such clients behave the same as
+any other client that is not in a blocked state and therefore cannot be
+unblocked.","['src/module.c', 'src/networking.c', 'src/server.h', 'tests/modules/blockonbackground.c', 'tests/unit/moduleapi/blockonbackground.tcl']",Using RM_BlockClient() without a timeout function in modules with background threads and thread-safe contexts leads to application crashes and unexpected client states when `CLIENT UNBLOCK` is initiated.
+addf47dcacec596eb7f6e1500846331d3e13fff4,1602512018,"Minor improvements to module blocked on keys (#7903)
+
+- Clarify some documentation comments
+- Make sure blocked-on-keys client privdata is accessible
+  from withing the timeout callback
+- Handle blocked clients in beforeSleep - In case a key
+  becomes ""ready"" outside of processCommand
+
+See #7879 #7880","['src/blocked.c', 'src/module.c', 'src/server.c']","Blocked-on-keys client privdata is inaccessible from within the timeout callback. Also, blocked clients are not handled if a key becomes ""ready"" outside of processCommand."
+b548ffabbecca073e241882c22192f682a086242,1611172644,"CONFIG REWRITE should honor umask settings. (#8371)
+
+Fixes a regression introduced due to a new (safer) way of rewriting configuration files. In the past the file was simply overwritten (same inode), but now Redis creates a new temporary file and later renames it over the old one.
+
+The temp file typically gets created with 0600 permissions so we later fchmod it to fix that. Unlike open with O_CREAT, fchmod doesn't consider umask so we have to do that explicitly.
+
+Fixes #8369
+","['src/config.c', 'src/server.c', 'src/server.h']","New method of rewriting configuration files does not respect umask settings, resulting in temporary file being created with wrong permissions."
+b5f3247ca55424d57d77efe51bedd1fb3861c8c0,1576132689,"Add module API for AvoidReplicaTraffic
+
+This is useful to tell redis and modules to try to avoid doing things that may
+increment the replication offset, and should be used when draining a master
+and waiting for replicas to be in perfect sync before a failover.
+","['src/module.c', 'src/redismodule.h']","Redis and module interactions may inadvertently increase replication offset, disrupting sync state during master draining and failover pre-conditions."
+b7289e912cbe1a011a5569cd67929e83731b9660,1598509164,"EXEC with only read commands should not be rejected when OOM (#7696)
+
+If the server gets MULTI command followed by only read
+commands, and right before it gets the EXEC it reaches OOM,
+the client will get OOM response.
+
+So, from now on, it will get OOM response only if there was
+at least one command that was tagged with `use-memory` flag","['src/server.c', 'tests/unit/multi.tcl']","When the server receives MULTIPLE read commands and reaches Out Of Memory (OOM) before EXEC command, the client incorrectly receives an OOM response."
+bb6513cbba972c4932c17ba8188030ec2cfc0aa5,1663827219,"ACL default newly created user set USER_FLAG_SANITIZE_PAYLOAD flag (#11279)
+
+Starting from 6.2, after ACL SETUSER user reset, the user
+will carry the sanitize-payload flag. It was added in #7807,
+and then ACL SETUSER reset is inconsistent with default
+newly created user which missing sanitize-payload flag.
+
+Same as `off` and `on` these two bits are mutually exclusive,
+the default created user needs to have sanitize-payload flag.
+Adds USER_FLAG_SANITIZE_PAYLOAD flag to ACLCreateUser.
+
+Note that the bug don't have any real implications,
+since the code in rdb.c (rdbLoadObject) checks for
+`USER_FLAG_SANITIZE_PAYLOAD_SKIP`, so the fact that
+`USER_FLAG_SANITIZE_PAYLOAD` is missing doesn't really matters.
+
+Added tests to make sure it won't be broken in the future,
+and updated the comment in ACLSetUser and redis.conf","['src/acl.c', 'tests/unit/acl.tcl']","ACL SETUSER reset is inconsistent with a newly created user, which lacks the sanitize-payload flag that was introduced from version 6.2 onwards."
+bc7fe41e5857a0854d524e2a63a028e9394d2a5c,1661675621,"fix hincrbyfloat not to create a key if the new value is invalid (#11149)
+
+Check the validity of the value before performing the create operation,
+prevents new data from being generated even if the request fails to execute.
+
+Co-authored-by: Oran Agra <oran@redislabs.com>
+Co-authored-by: chendianqiang <chendianqiang@meituan.com>
+Co-authored-by: Binbin <binloveplay1314@qq.com>","['src/t_hash.c', 'tests/unit/type/hash.tcl']",'HINCRBYFLOAT command in Redis erroneously creates a key even if the provided new value is invalid.'
+bfec2d700b8b0ccf6669e0408b5c5c75299ef47e,1681283489,"Add RM_ReplyWithErrorFormat that can support format (#11923)
+
+* Add RM_ReplyWithErrorFormat that can support format
+
+Reply with the error create from a printf format and arguments.
+
+If the error code is already passed in the string 'fmt', the error
+code provided is used, otherwise the string ""-ERR "" for the generic
+error code is automatically added.
+
+The usage is, for example:
+    RedisModule_ReplyWithErrorFormat(ctx, ""An error: %s"", ""foo"");
+    RedisModule_ReplyWithErrorFormat(ctx, ""-WRONGTYPE Wrong Type: %s"", ""foo"");
+
+The function always returns REDISMODULE_OK.","['src/module.c', 'src/networking.c', 'src/redismodule.h', 'src/server.h', 'tests/modules/reply.c', 'tests/unit/moduleapi/reply.tcl']","The Redis module does not have a function for replying with formatted error strings, causing problems in displaying complex or multiple errors."
+c0ce97faccb314f00cdda38a233508d38bd1b855,1662508464,"fix test Migrate the last slot away from a node using redis-cli (#11221)
+
+When using cli to add node, there can potentially be a race condition in
+which all nodes presenting cluster state o.k even though the added node
+did not yet meet all cluster nodes.
+this adds another utility function to wait until all cluster nodes see the same cluster size","['tests/support/cluster_helper.tcl', 'tests/unit/cluster/cli.tcl']",Race condition in node addition via Redis CLI causing all nodes to present cluster state as okay before newly added node gets to meet all cluster nodes.
+c0ea77f0e19441f54e7303641b9387d281c2c3db,1645333880,"Show publishshard_sent stat in cluster info (#10314)
+
+publishshard was added in #8621 (7.0 RC1), but the publishshard_sent
+stat is not shown in CLUSTER INFO command.
+
+Other changes:
+1. Remove useless `needhelp` statements, it was removed in 3dad819.
+2. Use `LL_WARNING` log level for some error logs (I/O error, Connection failed).
+3. Fix typos that saw by the way.
+","['src/cluster.c', 'src/cluster.h']","The publishshard_sent stat, despite being introduced, is not displayed in the CLUSTER INFO command. Also, certain error logs might not have the appropriate log level, LL_WARNING."
+c2a4b784918587e853a50211f7d5173097ecb22a,1695910760,"WAITAOF: Update fsynced_reploff_pending even if there's nothing to fsync (#12622)
+
+The problem is that WAITAOF could have hang in case commands were
+propagated only to replicas.
+This can happen if a module uses RM_Call with the REDISMODULE_ARGV_NO_AOF flag.
+In that case, master_repl_offset would increase, but there would be nothing to fsync, so
+in the absence of other traffic, fsynced_reploff_pending would stay the static, and WAITAOF can hang.
+
+This commit updates fsynced_reploff_pending to the latest offset in flushAppendOnlyFile in case
+there's nothing to fsync. i.e. in case it's behind because of the above mentions case it'll be refreshed
+and release the WAITAOF.
+
+Other changes:
+Fix a race in wait.tcl (client getting blocked vs. the fsync thread)","['src/aof.c', 'tests/unit/moduleapi/usercall.tcl', 'tests/unit/wait.tcl']","Use of RM_Call with REDISMODULE_ARGV_NO_AOF flag in any module can lead to a hang in WAITAOF due to discrepancies in updating fsynced_reploff_pending, causing traffic absence."
+c2d8d4e648faa172a65a88fcffaf4ccc10a1ad78,1652183709,"Replace float zero comparison to FP_ZERO comparison (#10675)
+
+I suggest to use ""[fpclassify](https://en.cppreference.com/w/cpp/numeric/math/fpclassify)"" for float
+comparison with zero, because of expression ""value == 0"" with value very close to zero can be
+considered as true with some performance compiler optimizations.
+
+Note: this code was introduced by 9d520a7f to accept zset scores that get ERANGE in conversion
+due to precision loss near 0.
+But with Intel compilers, ICC and ICX, where optimizations for 0 check are more aggressive, ""==0"" is
+true for mentioned functions, however should not be. Behavior is seen starting from O2.
+This leads to a failure in the ZSCAN test in scan.tcl",['src/util.c'],"Current zero float comparison is resulting in inaccuracies with certain compiler optimizations, leading to test failures in ZSCAN test in scan.tcl."
+c6a26519a1f001c3d9ac066b0822c33dfab8e0e0,1634032535,"fix a rare active defrag edge case bug leading to stagnation
+
+There's a rare case which leads to stagnation in the defragger, causing
+it to keep scanning the keyspace and do nothing (not moving any
+allocation), this happens when all the allocator slabs of a certain bin
+have the same % utilization, but the slab from which new allocations are
+made have a lower utilization.
+
+this commit fixes it by removing the current slab from the overall
+average utilization of the bin, and also eliminate any precision loss in
+the utilization calculation and move the decision about the defrag to
+reside inside jemalloc.
+
+and also add a test that consistently reproduce this issue.
+","['deps/jemalloc/include/jemalloc/internal/jemalloc_internal_inlines_c.h', 'deps/jemalloc/src/jemalloc.c']","A rare case in active defragger leads to stagnation, constantly scanning the keyspace without moving any allocations when allocator slabs have the same % utilization."
+c75512d89d1697cf782cdc826acffab5b6adc1c7,1595845562,"TLS: support cluster/replication without tls-port.
+
+Initialize and configure OpenSSL even when tls-port is not used, because
+we may still have tls-cluster or tls-replication.
+
+Also, make sure to reconfigure OpenSSL when these parameters are changed
+as TLS could have been enabled for the first time.
+","['src/config.c', 'src/server.c']","OpenSSL fails to initialize and configure when tls-port is not used, even though tls-cluster or tls-replication may still be required. Additionally, OpenSSL does not reconfigure when these parameters are changed."
+ca913a5de06bdcc323d0e109efbfa239496cc08d,1649873917,"Fix several document error and function comments (#10580)
+
+This PR fix the following minor errors before Redis 7 release:
+
+ZRANGEBYLEX command in deprecated in 6.2.0, and could be replaced by ZRANGE with the
+BYLEX argument, but in the document, the words is written incorrect in "" by ZRANGE with the BYSCORE argument""
+
+Fix function zpopmaxCommand incorrect comment
+
+The comments of function zmpopCommand and bzmpopCommand are not consistent with document description, fix them
+
+Co-authored-by: Ubuntu <lucas.guang.yang1@huawei.com>","['src/commands.c', 'src/t_zset.c']","Several minor errors exist in the current documentation including deprecated command references, incorrect function comments, and inconsistency in function and document descriptions."
+cd87b3c71f79062d9e95abada186e1cac03f5cc6,1525856607,"Fix rdb.c dictionary iterator release.
+
+Some times it was not released on error, sometimes it was released two
+times because the error path expected the ""di"" var to be NULL if the
+iterator was already released. Thanks to @oranagra for pinging me about
+potential problems of this kind inside rdb.c.
+",['src/rdb.c'],"In some cases, the dictionary iterator in rdb.c is not released on error or is mistakenly released twice, resulting in potential issues."
+ce5f4ea3a9f4afe1c43079c93d0ff6bf6b04597a,1683443599,"Delete empty key if fails after moduleCreateEmptyKey() in module (#12129)
+
+When `RM_ZsetAdd()`/`RM_ZsetIncrby()`/`RM_StreamAdd()` fails, if a new key happens to 
+be created using `moduleCreateEmptyKey()`, we should clean up the empty key.
+
+## Test
+1) Add new module commands(`zset.add` and `zset.incrby`) to cover  `RM_ZsetAdd()`/`RM_ZsetIncrby()`.
+2) Add a large-memory test to cover `RM_StreamAdd()`.","['src/module.c', 'tests/modules/zset.c', 'tests/unit/moduleapi/stream.tcl', 'tests/unit/moduleapi/zset.tcl']","Failure of `RM_ZsetAdd()`, `RM_ZsetIncrby()`, or `RM_StreamAdd()` operations leaves behind erratically created empty keys using `moduleCreateEmptyKey()`, needing clean up."
+d7b4c9175e89c68aadd8e4a0e1cfb8530e473533,1671135938,"Fixed small distance replies on GEODIST and GEO commands WITHDIST (#11631)
+
+Fixes a regression introduced by #11552 in 7.0.6.
+it causes replies in the GEO commands to contain garbage when the
+result is a very small distance (less than 1)
+Includes test to confirm indeed with junk in buffer now we properly reply","['src/util.c', 'tests/unit/geo.tcl']",Regression in GEODIST and GEO commands WITHDIST causes replies to include garbage data when the resultant distance is less than 1.
+dca5927ac868ad697f646bcf9efc6d9b79afb03f,1676996081,"Prevent Redis from crashing from key tracking invalidations (#11814)
+
+There is a built in limit to client side tracking keys, which when exceeded will invalidate keys. This occurs in two places, one in the server cron and other before executing a command. If it happens in the second scenario, the invalidations will be queued for later since current client is set. This queue is never drained if a command is not executed (through call) such as a multi-exec command getting queued. This results in a later server assert crashing.","['src/tracking.c', 'tests/unit/tracking.tcl']","Redis server crashes when key tracking invalidations surpass built-in limits, particularly when multi-exec commands are queued without execution, leading to undrained invalidation queues."
+de474186bdb1a595bb77ccec577754134884bb52,1509367198,"More robust object -> double conversion.
+
+Certain checks were useless, at the same time certain malformed inputs
+were accepted without problems (emtpy strings parsed as zero).
+Cases where strtod() returns ERANGE but we still want to parse the input
+where ok in getDoubleFromObject() but not in the long variant.
+
+As a side effect of these fixes, this commit fixes #4391.
+",['src/object.c'],"Malformed inputs are incorrectly accepted and parsed as zero in object-double conversion. Additionally, strtod() returning ERANGE is improperly handled in the long variant leading to inconsistent behavior."
+e5ef161374155bb84a5720387836415ef3217963,1697087725,"Fix crash when running rebalance command in a mixed cluster of 7.0 and 7.2 (#12604)
+
+In #10536, we introduced the assert, some older versions of servers
+(like 7.0) doesn't gossip shard_id, so we will not add the node to
+cluster->shards, and node->shard_id is filled in randomly and may not
+be found here.
+
+It causes that if we add a 7.2 node to a 7.0 cluster and allocate slots
+to the 7.2 node, the 7.2 node will crash when it hits this assert. Somehow
+like #12538.
+
+In this PR, we remove the assert and replace it with an unconditional removal.",['src/cluster.c'],Adding a 7.2 node to a 7.0 cluster and allocating slots to it results in a crash due to assertion failure caused by non-gossiped shard_id from older server versions.
+e875ff89ece5ec9d43273b19e3b88e4d36a48ba9,1649838816,"Add the deprecated_since field in command args of COMMAND DOCS (#10545)
+
+Apparently, some modules can afford deprecating command arguments
+(something that was never done in Redis, AFAIK), so in order to represent
+this piece of information, we added the `deprecated_since` field to redisCommandArg
+(in symmetry to the already existing `since` field).
+
+This commit adds `const char *deprecated_since` to `RedisModuleCommandArg`,
+which is technically a breaking change, but since 7.0 was not released yet, we decided to let it slide","['src/module.c', 'src/redismodule.h', 'src/server.c', 'src/server.h', 'utils/generate-command-code.py']",Lack of a 'deprecated_since' field in RedisModuleCommandArg fails to represent deprecation information for command arguments in some modules.
+e978bdf9ef62404083afed28d98e7a455bcecd3b,1572354185,"Module API for controlling LRU and LFU, and OpenKey without TOUCH
+
+Some commands would want to open a key without touching it's LRU/LFU
+similarly to the OBJECT or DEBUG command do.
+
+Other commands may want to implement logic similar to what RESTORE
+does (and in the future MIGRATE) and get/set the LRU or LFU.
+","['src/db.c', 'src/module.c', 'src/object.c', 'src/redismodule.h', 'src/server.h']","Commands that need to open a key without altering its LRU/LFU similar to OBJECT or DEBUG commands are unable to do so, and inability to implement logic akin to RESTORE for controlling LRU/LFU."
+edd70c1993b79d85bfc2812b0bf4bf4771ff40ed,1512120264,"Streams: RDB loading. RDB saving modified.
+
+After a few attempts it looked quite saner to just add the last item ID
+at the end of the serialized listpacks, instead of scanning the last
+listpack loaded from head to tail just to fetch it. It's a disk space VS
+CPU-and-simplicity tradeoff basically.
+",['src/rdb.c'],"The last item ID in serialized listpacks is unnecessarily scanned from head to tail during RDB loading, negatively affecting CPU performance and code simplicity."
+ee59dc1b5cdcc631438aba3904d6d3b520354c80,1608733697,"Tests: fix the problem that Darwin memory leak detection may fail (#8213)
+
+Apparently the ""leaks"" took reports a different error string about process
+that's not found in each version of MacOS.
+This cause the test suite to fail on some OS versions, since some tests terminate
+the process before looking for leaks.
+Instead of looking at the error string, we now look at the (documented) exit code.",['tests/support/server.tcl'],"Darwin memory leak detection test suite fails on certain MacOS versions due to variations in error string reported by ""leaks"" tool, particularly when tests terminate the process prior to leak search."
+f44c34329217a46a8918c476ba3690b6a102c696,1651562645,"Expose Lua error in case of string error. (#10677)
+
+In general, our error handler make sure the error
+object is always a table. In some rare cases (such
+as OOM error), the error handler will not be called
+and the error object will be a string. The PR expose
+the error even if its a string and not a table.
+
+Currently there is no way to test it but if it'll ever happen,
+it is better to propagate this string upwards than just
+generate a generic error without any specific info.",['src/script_lua.c'],"In rare cases like OOM errors, the error handler won't be called, causing the error object to remain a string, generating a generic error without specific info."
+f6b76e50adde73070a139a847191e1927fef9747,1643183993,"Change expression to look for at least one limit exceeded (#10173)
+
+This is an attempt to fix some of the issues with the cluster mode tests we are seeing in the daily run.
+
+The test is trying to incrementally adds a bunch of publish messages, expecting that eventually one
+of them will overflow. The tests stops one of the processes, so it expects that just that one Redis node
+will overflow. I think the test is flaky because under certain circumstances multiple links are getting
+disconnected, not just the one that is stalled.",['tests/cluster/tests/24-links.tcl'],"Cluster mode tests in daily run are flaky due to unexpected overflow of multiple Redis nodes, resulting from incremented publishing messages and process termination."
+f74af0e61d6104922325e2f38284ea66e4f3ccd4,1627883869,"Add NX/XX/GT/LT options to EXPIRE command group (#2795)
+
+Add NX, XX, GT, and LT flags to EXPIRE, PEXPIRE, EXPIREAT, PEXAPIREAT.
+- NX - only modify the TTL if no TTL is currently set 
+- XX - only modify the TTL if there is a TTL currently set 
+- GT - only increase the TTL (considering non-volatile keys as infinite expire time)
+- LT - only decrease the TTL (considering non-volatile keys as infinite expire time)
+return value of the command is 0 when the operation was skipped due to one of these flags.
+
+Signed-off-by: Ning Sun <sunng@protonmail.com>","['src/expire.c', 'src/server.c', 'tests/unit/expire.tcl']","EXPIRE command group (EXPIRE, PEXPIRE, EXPIREAT, PEXAPIREAT) does not allow for conditional modifications to the Time To Live (TTL) nor specify alterations based on current TTL set, affecting key volatility management."
+f8970fdbfa138f8576340ff0af73c3d2603c7e8e,1666625416,"Cleanup: Remove redundant arg from moduleCreateArgvFromUserFormat (#11426)
+
+We do not need to return the length of argv because it is equal to argc, which we return anyway.
+This change makes the code cleaner and adds a comment to explain something that might not be immediately clear.",['src/module.c'],The function moduleCreateArgvFromUserFormat returns unnecessary redundant argument - the length of argv despite it being equal to argc.
+fe1c096b1849b633f41f69f432c4236428035950,1650173517,"Add RM_MallocSizeString, RM_MallocSizeDict (#10542)
+
+Add APIs to allow modules to compute the memory consumption of opaque objects owned by redis.
+Without these, the mem_usage callbacks of module data types are useless in many cases.
+
+Other changes:
+Fix streamRadixTreeMemoryUsage to include the size of the rax structure itself","['src/module.c', 'src/object.c', 'src/redismodule.h', 'tests/modules/mallocsize.c', 'tests/unit/moduleapi/mallocsize.tcl']","There's currently no method to compute the memory consumption of opaque objects owned by redis from within modules, rendering the mem_usage callbacks of module data types ineffectual in several scenarios."
+fea9bbbe0f5d9f9fd123cd9775473c0c1b33d800,1667394912,"Fix command BITFIELD_RO and BITFIELD argument json file, add some test cases for them (#11445)
+
+According to the source code, the commands can be executed with only key name,
+and no GET/SET/INCR operation arguments.
+change the docs to reflect that by marking these arguments as optional.
+also add tests.","['src/commands.c', 'tests/unit/bitfield.tcl']",BITFIELD_RO and BITFIELD commands incorrectly require only key name without GET/SET/INCR operation arguments leading to potential command execution issues.

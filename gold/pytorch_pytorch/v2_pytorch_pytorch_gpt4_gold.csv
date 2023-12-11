@@ -1,0 +1,2352 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
+0809553cf0caaac6744a5d2561512bd6b433bfa5,1637354236,"refactor assert_close to be more modular (#67794)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/67794
+
+This change is needed to conveniently use the same comparison mechanism for our internal testsuite (see #67796). The reworked version is on par with the previous version except for the ability to pass a custom message as callable. Before we converted everything to a tensor so it was fairly easy to provide consistent mismatch diagnostics to the callable. Now, with arbitrary `Pair`'s that are used for comparison that is no longer viable.
+
+Test Plan: Imported from OSS
+
+Reviewed By: ngimel
+
+Differential Revision: D32532206
+
+Pulled By: mruberry
+
+fbshipit-source-id: dc847fba6a795c1766e01bc3e88b680a68287b1e
+","['test/test_testing.py', 'torch/jit/_trace.py', 'torch/testing/__init__.py', 'torch/testing/_asserts.py', 'torch/testing/_comparison.py']","Refactor of assert_close hampered the ability to pass a custom message as callable due to the use of arbitrary comparison `Pair`s, causing inconsistencies with mismatch diagnostics."
+091177516ec664024d95810f46feca82b686a27b,1680306352,"Rearrange the fields in at::OperandInfo to reduce padding. (#98037)
+
+Summary:
+Rearrange the fields in at::OperandInfo to reduce padding.
+
+The current class layout is {64,3,1,1,8,1,1,1,16,16,8,8}. Moving the 5th
+element in the class allows the small bytes/bools to be packed together.
+
+This class is frequently read from places like the stack trace below, so
+compacting the class could speed things up.
+
+c10/util/MaybeOwned.h:198 operator*
+aten/src/ATen/TensorIterator.h:187 tensor_base
+aten/src/ATen/TensorIterator.h:322 tensor_base
+aten/src/ATen/TensorIterator.cpp:1194 compute_mem_overlaps
+aten/src/ATen/TensorIterator.cpp:1475 build
+
+Test Plan: Rely on unit tests.
+
+Differential Revision: D44559604
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/98037
+Approved by: https://github.com/swolchok
+",['aten/src/ATen/TensorIterator.h'],"The current arrangement of fields in 'at::OperandInfo' class is causing extra padding, which could potentially slow down operations involving frequent reads from this class."
+096089abcb79fad91630a748c4c223194bd4a581,1619027889,"[quant][graphmode][fx] Produce torch.cat instead of torch.ops.quantized.cat (#54924)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/54924
+
+Previously we are producing torch.ops.quantize.cat which takes inputs, dequantize them
+and requantize with new qparams. This PR changes that to produce torch.cat directly, torch.cat
+will assume all inputs are sharing the same qparam, and it will produce a quantized Tensor with
+the same qparam as all inputs (because previous PR makes sure all inputs and output of cat are sharing
+the same observer/fakequant instance).
+
+Using torch.cat is expected to be more efficient since it does not introduce extra quant/dequant.
+
+Test Plan:
+python test/test_quantization.py TestQuantizeFx.test_cat
+
+Imported from OSS
+
+Reviewed By: vkuzo
+
+Differential Revision: D27416528
+
+fbshipit-source-id: 896c280abec2903c29d597c655729666583ff0dd
+","['aten/src/ATen/native/quantized/cpu/qconcat.cpp', 'test/quantization/test_numeric_suite_fx.py', 'test/quantization/test_quantize_fx.py', 'torch/quantization/fx/quantization_patterns.py', 'torch/quantization/ns/graph_passes.py', 'torch/quantization/ns/mappings.py']",Quantized tensors using torch.ops.quantized.cat leads to unnecessary dequantization and requantization with new parameters. Efficiency could be impacted due to these extra operations.
+11759491b9c57d5374c716414fdc281a2f0bf611,1647299913,"[Kineto] Manual Submodule Update (#73858)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/73858
+
+The newer version of Kineto has changes to handle generic activities (such as RocTracer generic activities), so we can remove the older USE_KINETO_UPDATED macro and implementation of flow.linkedActivity.
+
+This patch should bring Kineto back in sync on PyTorch CI.
+
+Test Plan: PyTorch OSS CI needs to pass for this submodule update of third_party/kineto repo. With ciflow/cuda enabled.
+
+Reviewed By: chaekit
+
+Differential Revision: D34689078
+
+Pulled By: aaronenyeshi
+
+fbshipit-source-id: 305431cbce95ecd57c23b0485e4bb921ea2c7c0a
+(cherry picked from commit aef46a287f4cee92ab96650b6a0ab81648bca374)
+",['torch/csrc/autograd/profiler_kineto.cpp'],"Outdated Kineto submodule causes inconsistency with Pytorch CI, and the older USE_KINETO_UPDATED macro and implementation is no longer needed due to feature updates in latest Kineto."
+11a40ad915d4d3d8551588e303204810887fcf8d,1629405352,"[Pytorch] Fix callstack pointer serialization bug (#63576)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/63576
+
+We serialize function name associated with InlinedCallStackPtr. This is derived
+via querying Function* stored in InlinedCallStack. However this is a raw
+pointer that is not gauranteed to be valid when we serialization happens. On
+the other hand we also store function name separately when constructing
+InlinedCallStack anyways. So this change just uniformly relies on function_name
+instead of Function*
+
+Test Plan: Internal build's asan failure + CI
+
+Reviewed By: larryliu0820
+
+Differential Revision: D30427029
+
+fbshipit-source-id: de9617482404785920ed2e67b72f38461590fba3
+","['torch/csrc/jit/mobile/debug_info.cpp', 'torch/csrc/jit/serialization/callstack_debug_info_serialization.cpp']",The serialization of function names associated with InlinedCallStackPtr is unreliable due to potential invalidity of raw pointers during serialization process.
+11d4d91bdccab35928fd56a4fc5eac781f9fb71e,1660719865,"[torchgen] Add logic in annotation parser to accept alias set (#83501)
+
+Extending the current regex in `model.py` to support annotation alias set. See issue #83214.
+
+Ideally we should have a full fledged lexer similar to `schema_type_parser.cpp`, since regex can be more and more difficult to read if we add more support to it.
+
+Adding this to unblock this issue for now.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/83501
+Approved by: https://github.com/SherlockNoMad
+","['tools/test/test_codegen_model.py', 'torchgen/model.py']","Current regex in `model.py` does not support annotation alias set, causing issues with parsing and reading."
+159a2404bdc7fc54918c78d4bd290e5fa830dca7,1620376232,"fft: Increase tolerance for nd-fft tests (#57576)
+
+Summary:
+Fixes https://github.com/pytorch/pytorch/issues/56820
+
+The test only fails for inverse n-dim functions with `norm=""forward""`. The relative error for isn't actually any bigger than other norm modes though. It's just that the magnitude of the result is bigger, so the absolute tolerance is less relative each element. So, I just increase the relative tolerance  to compensate.
+
+This `precisionOverride` is already applied to `fftn` and `rfftn` for exactly the same reason.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/57576
+
+Reviewed By: albanD
+
+Differential Revision: D28249222
+
+Pulled By: mruberry
+
+fbshipit-source-id: 734c7c1ae8236b253d6e3cd2218c05d21901c567
+",['torch/testing/_internal/common_methods_invocations.py'],"Inverse n-dim functions with `norm=""forward""` in nd-fft tests are failing due to a higher result magnitude leading to lower absolute tolerance per element."
+1a9efbbc92057d494217f3ace0f87c319495d577,1621279538,"generate inplace/out kernels for xla (#57510)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/57510
+
+This is a re-write of https://github.com/pytorch/pytorch/pull/56835, which is significantly shorter thanks to the data model change in the PR below this one in the stack. See the original description in the linked PR for details.
+
+The functional changes in this PR are the same as in the above linked one, so the description is the same with a few small changes:
+- I don't bother generating `at::xla::{op}` entries for CPU fallbacks. After looking around, I see precedent for that. For example, we don't have `at::cpu::{op}` entries for composite ops- if you really want to bypass the dispatcher you need to call `at::compositeimplicitautograd::{op}`. Maybe we should revisit that later if we find an important use case for having full namespace coverage, but that doesn't seem worth half-fixing for external backends in this PR.
+
+Test Plan: Imported from OSS
+
+Reviewed By: navahgar
+
+Differential Revision: D28474364
+
+Pulled By: bdhirsh
+
+fbshipit-source-id: 4d58b60e5debad6f1ff06420597d8df8505b2876
+","['aten/src/ATen/templates/RegisterDispatchKey.cpp', 'aten/src/ATen/templates/aten_xla_type_default.cpp', 'tools/codegen/api/types.py', 'tools/codegen/dest/gen_external_aten_fallbacks.py', 'tools/codegen/dest/register_dispatch_key.py', 'tools/codegen/gen.py', 'tools/codegen/gen_backend_stubs.py', 'tools/codegen/model.py']","XLA kernels lack in-place/out functionality, resulting in the inability to bypass the dispatcher for composite ops, thus requiring full namespace coverage."
+1d0416397a5fc5d8ac414f182be6ce2450d70819,1638232536,"[PyTorch] Change from unique_ptr to optional for RecordFunction state (#68397)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/68397
+
+Now that hot paths can avoid instantiating RecordFunction by using shouldRunRecordFunction, we can improve efficiency for profiling cases by avoiding a large heap allocation.
+ghstack-source-id: 144235785
+
+Test Plan:
+1) Run //caffe2/caffe2/fb/high_perf_models/pytorch/benchmark_framework_overheads:cpp_benchmark before/after this diff with arguemnts --stressTestRecordFunction --op empty.
+
+Before: P467891381
+
+After: P467902339
+
+2) Run without --stressTestRecordFunction to verify no regression in the regular dispatcher path.
+
+Before: P467902381
+
+After: P467902403
+
+Reviewed By: chaekit
+
+Differential Revision: D32448365
+
+fbshipit-source-id: 2d32a3bd82c60d2bb11fc57bb88bf3f02aa3fa25
+","['aten/src/ATen/record_function.cpp', 'aten/src/ATen/record_function.h']",Memory efficiency issues and a large heap allocation occur during profiling cases when using unique_ptr for RecordFunction state.
+27a3204982c3985f2d9639dbfed174da267bcd47,1623801286,"generate C++ API for meta functions using at::meta:: (#58570)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/58570
+
+**What the PR does**
+Generate a fast-path `at::meta::{op}` API for calling meta functions without having to go through the dispatcher. This will be important for perf for external backends that want to use meta functions for shape checking (which seems likely to be what we end up doing for LazyTensorCore).
+
+**Details**
+In order to avoid naming collisions I had to make two small changes:
+- rename `MetaFunctions.h` template -> `NativeMetaFunctions.h` (this is the file that declares the impl() function for every structured operator).
+- rename the meta class: `at::meta::{op}::meta()` -> `at::meta::structured_{op}::meta()`
+
+I also deleted a few unnecessary includes, since any file that includes NativeFunctions.h will automatically include NativeMetaFunctions.h.
+
+**Why I made the change**
+This change isn't actually immediately used anywhere; I already started writing it because I thought it would be useful for structured composite ops, but that isn't actually true (see [comment](https://github.com/pytorch/pytorch/pull/58266#issuecomment-843213147)). The change feels useful and unambiguous though so I think it's safe to add. I added explicit tests for C++ meta function calls just to ensure that I wrote it correctly - which is actually how I hit the internal linkage issue in the PR below this in the stack.
+
+Test Plan: Imported from OSS
+
+Reviewed By: pbelevich
+
+Differential Revision: D28711299
+
+Pulled By: bdhirsh
+
+fbshipit-source-id: d410d17358c2b406f0191398093f17308b3c6b9e
+","['aten/src/ATen/TensorMeta.h', 'aten/src/ATen/native/Normalization.cpp', 'aten/src/ATen/native/UpSampleNearest1d.cpp', 'aten/src/ATen/templates/NativeFunctions.h', 'aten/src/ATen/templates/NativeMetaFunctions.h', 'aten/src/ATen/templates/RegisterDispatchKey.cpp', 'test/cpp/api/meta_tensor.cpp', 'tools/codegen/dest/native_functions.py', 'tools/codegen/dest/register_dispatch_key.py', 'tools/codegen/gen.py']","Meta functions need to go through the dispatcher for execution which is affecting performance. Additionally, there are naming collisions in `MetaFunctions.h` and the meta class `at::meta::{op}::meta()`."
+2bca280a317f82088faf35e0ac978ff5b913ad8c,1670097244,"Revert D41683102: Multisect successfully blamed D41683102 for test or build failures (#90117)
+
+Summary:
+This diff is reverting D41683102
+D41683102 has been identified to be causing the following test or build failures:
+Tests affected:
+- https://www.internalfb.com/intern/test/281475051072735/
+
+Here's the Multisect link:
+https://www.internalfb.com/intern/testinfra/multisect/1444960
+Here are the tasks that are relevant to this breakage:
+T124964606: 41 tests started failing for oncall ads_trainer_release in the last 2 weeks
+We're generating a revert to back out the changes in this diff, please note the backout may land if someone accepts it.
+
+Test Plan: NA
+
+Reviewed By: jspark1105
+
+Differential Revision: D41710842
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/90117
+Approved by: https://github.com/soumith
+","['test/quantization/ao_migration/test_quantization_fx.py', 'test/test_fx.py', 'torch/ao/quantization/fx/tracer.py', 'torch/ao/quantization/quantize_fx.py', 'torch/fx/_symbolic_trace.py', 'torch/fx/proxy.py', 'torch/quantization/quantize_fx.py']","The commit D41683102 appears to be causing multiple test and build failures, affecting a significant number of tests, including ads_trainer_release in the last two weeks."
+2ce21b2e615668ab3718de99f8fa3b282a431dbb,1623431760,"[Pytorch backend delegation] Preprocess to accept (#58873)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/58873
+
+BackenDebugInforRecorder
+
+Prior to this PR:
+In order to generate debug handles corresponding to the graph being
+lowered, backend's preprocess will call generate_debug_handles and will
+get map of Node*-to-debug_handles.
+In order to facilitate this, to_backend will own
+BackendDebugInfoRecorder and initialize thread local pointer to it.
+generate_debug_handle function will query thread local pointer to see if
+there is a valid BackendDebugInforRecorder for the context. If there is
+it will generate debug handles.
+
+After this PR:
+Signature of preprocess is changed such that backends have to register
+preprocess that accepts instance of BackendDebugInfoRecorder by
+reference. generate_debug_handles is no more a free function but becomes
+part of the API of BackendDebugInfoRecorder. Now backend's preprocess
+function will call generate_debug_handles on BackendDebugInfoRecorder
+instead of free function.
+
+Reason for this change:
+With RAII that initializes thread local pointer, results in a lose
+contract with backends, which may result in backends not storing
+debug information. Making it part of API results in
+backends having to be aware of BackendDebugInfoRecorder and explicitly
+chosing not to generate/store debug information if they chose to do so.
+
+Test Plan:
+backend tests
+
+Imported from OSS
+
+Reviewed By: jbschlosser, raziel
+
+Differential Revision: D28648613
+
+fbshipit-source-id: c9b7e7bf0f78e87023ea7bc08612cf893b08cb98
+","['test/cpp/jit/test_backend_compiler_preprocess.cpp', 'test/cpp/jit/test_backend_lib.cpp', 'test/custom_backend/custom_backend.h', 'tools/build_variables.bzl', 'torch/csrc/jit/backends/backend_debug_handler.cpp', 'torch/csrc/jit/backends/backend_debug_handler.h', 'torch/csrc/jit/backends/backend_detail.cpp', 'torch/csrc/jit/backends/backend_detail.h', 'torch/csrc/jit/backends/backend_init.cpp', 'torch/csrc/jit/backends/generate_debug_handles.cpp', 'torch/csrc/jit/backends/generate_debug_handles.h']","Before preprocessing, backend's debug handles are not consistently generated due to a loose contract with backends in thread local pointer. Backend debug information may be lost or not stored properly."
+3279f06410032e9798e380cedf552f5b706ac6c1,1689034050,"Merge and improve torch optim optimizer type stubs (#102593)
+
+Fixes #102428
+
+Also improves hook registration type hints:
+
+```python
+from typing import Any, Dict, Tuple
+
+from torch import nn
+from torch.optim import Adam, Adagrad, Optimizer
+
+linear = nn.Linear(2,2)
+optimizer = Adam(linear.parameters(), lr=0.001)
+
+def pre_hook_fn_return_none(optimizer: Adam, inputs: Tuple[Any, ...], kwargs: Dict[str, Any]) -> None:
+    return None
+
+def pre_hook_fn_return_modified(
+    optimizer: Optimizer, inputs: Tuple[Any, ...], kwargs: Dict[str, Any]
+) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+    return inputs, kwargs
+
+def hook_fn(optimizer: Optimizer, inputs: Tuple[Any, ...], kwargs: Dict[str, Any]) -> None:
+    return None
+
+def hook_fn_other_optimizer(optimizer: Adagrad, inputs: Tuple[Any, ...], kwargs: Dict[str, Any]) -> None:
+    return None
+
+optimizer.register_step_post_hook(hook_fn)  # OK
+
+optimizer.register_step_pre_hook(pre_hook_fn_return_none)  # OK
+optimizer.register_step_pre_hook(pre_hook_fn_return_modified)  # OK
+
+optimizer.register_step_post_hook(hook_fn_other_optimizer)  # Parameter 1: type ""Adam"" cannot be assigned to type ""Adagrad""
+
+```
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/102593
+Approved by: https://github.com/janeyx99
+","['torch/distributed/_spmd/api.py', 'torch/distributed/optim/named_optimizer.py', 'torch/optim/optimizer.py', 'torch/utils/_foreach_utils.py']","The type hints for hook registration in Torch Optim optimizer are not accurate, leading to type assignment issues when different optimizer types are used interchangeably."
+3868eeb75f72dc9cfbdf0e388f43db176064e3bd,1674022451,"fix biasadd OMP perf issue for the packed MKL SGEMM (#92300)
+
+Currently the biasadd of MKL SGEMM was executed using OpenMP macro, this will lead to a performance issue if the SGEMM size is very small (e.g., M = 1, K = 80, N = 256) when we are using many threads.
+The reason is that in such case `num_task < num_thread`, and the task cost is too small (e.g., ~1-2 cycles for memcpy), the thread synchronization cost would be very large. Thus it is better to use `at::parallel_for` to run on the main thread directly.
+Packed MKL SGEMM (1x80x256) | OpenMP biasadd | `at::parallel_for` biasadd
+-- | -- | --
+Latency | 2000 us | 21 us
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/92300
+Approved by: https://github.com/XiaobingSuper, https://github.com/jgong5
+",['aten/src/ATen/native/mkldnn/Linear.cpp'],"Bias addition in MKL SGEMM using OpenMP macro results in performance issues with smaller sizes (example, M = 1, K = 80, N = 256) and high thread count due to thread synchronization overhead."
+3900509b7da866c22e08120e73a0b54cc30e4de7,1632968941,"(torchelastic) make --max_restarts explicit in the quickstart and runner docs (#65838)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/65838
+
+closes https://github.com/pytorch/pytorch/pull/65675
+
+The default `--max_restarts` for `torch.distributed.run` was changed to `0` from `3` to make things backwards compatible with `torch.distributed.launch`. Since the default `--max_restarts` used to be greater than `0` we never documented passing `--max_restarts` explicitly in any of our example code.
+
+Test Plan: N/A doc change only
+
+Reviewed By: d4l3k
+
+Differential Revision: D31279544
+
+fbshipit-source-id: 98b31e6a158371bc56907552c5c13958446716f9
+",['torch/distributed/run.py'],"The change in default `--max_restarts` value for `torch.distributed.run` is not reflected or documented in the example code, leading to possible backward compatibility issues."
+391eb1dbe36309c43fc41ef8c4f9ddb6962fca6c,1634923353,"[JIT] UseVariadicOp handles multiple lists (#66288)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/66288
+
+This change makes it so `UseVariadicOp` can transform ops with many Tensor list inputs.
+
+Input pattern:
+```
+%output : Type = op(%list_1, %arg_1, %list_2, %list_3)
+```
+Output pattern:
+```
+%output : Type = variadic_op(%list_11, ..., %list_1N, %arg_1, %list_21, ..., %list_2M, %list_31, ..., %list_3K, N, M, K)
+```
+The length of each list is passed at the end of the variadic op so that the op implementation can process the inputs appropriately. This also frees us from needing to update `hasVarArgs` in static runtime each time we add a variadic op.
+
+This diff also makes `UseVariadicOp` more robust. Before, `list_idx` was passed as an argument. Now, `VariadicUpdater` determines `list_idx` from the node's schema.
+
+Test Plan:
+Existing variadic ops do not break:
+`buck test caffe2/benchmarks/static_runtime:static_runtime_cpptest`
+
+Reviewed By: d1jang
+
+Differential Revision: D31450811
+
+fbshipit-source-id: 808fcc3ae8940b9e602586f38f8cf9154c9a6462
+","['torch/csrc/jit/passes/variadic_ops.cpp', 'torch/csrc/jit/passes/variadic_ops.h', 'torch/csrc/jit/runtime/static/impl.cpp']","The `UseVariadicOp` is unable to transform operations with multiple Tensor list inputs, causing issues with static runtime varArgs and inadequate input processing in variadic operations."
+3b30c8da8893074c1a34d30071756204035ca868,1646761542,"Add logging for ProcessGroup backends. (#73702)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/73702
+
+This PR adds logging to track usage of ProcessGroup backends. The
+change involves adding an `init()` method to the ProcessGroup base class and
+modifying all the subclasses to call it.
+
+We can't add logging directly in the ProcessGroup constructor since
+`getBackendName()` is pure virtual and can't be called from the base class
+constructor. See
+https://isocpp.org/wiki/faq/strange-inheritance#calling-virtuals-from-ctors for
+more details.
+ghstack-source-id: 150381852
+
+Test Plan: check logging
+
+Reviewed By: cbalioglu
+
+Differential Revision: D34596295
+
+fbshipit-source-id: 5baa7bfb53bdcd1b4032292c4e7715467f983288
+(cherry picked from commit b2344144fe0c25db02c2e958f2acd772e9cd4dc8)
+","['torch/csrc/distributed/c10d/ProcessGroup.cpp', 'torch/csrc/distributed/c10d/ProcessGroup.hpp', 'torch/csrc/distributed/c10d/ProcessGroupGloo.cpp', 'torch/csrc/distributed/c10d/ProcessGroupMPI.cpp', 'torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp']",There's no mechanism for tracking usage and debugging in ProcessGroup backends as logging is not currently implemented.
+3c34a00d1b94aa4ceeede498ab878f1c5a25afb1,1687762788,"Preserve all submodules/parameters/buffers when unpickle graph module (#104115)
+
+Summary:
+When we pickle/unpickle graph module in multipy, we would lost modules/attributes that are not referred in the graph. This is because when unpickle fx graph module, we use the stored `__dict__` and the fx graph to create a new graph module. In GraphModule init, we drop any attribute that is not referred in the graph.
+
+This behavior is not ideal because we actually expect a graph module that's exactly the same after unpickling.
+
+Test Plan:
+```
+buck test mode/opt caffe2/test:fx -- test_preserve_unused_attr_after_unpickle
+
+Tests finished: Pass 1. Fail 0. Fatal 0. Skip 0. Build failure 0
+```
+
+Differential Revision: D46976230
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/104115
+Approved by: https://github.com/houseroad
+","['test/test_fx.py', 'torch/fx/graph_module.py']","Unpickling a graph module in multipy leads to loss of modules/attributes not referred in the graph, diverging from expectations of equivalent graph module post-unpickling.
+"
+3e55fc91fd5f9846bfe78d9e2441cf2d9f7f0bed,1619029929,"[pet] Remove additional @record in elastic_launch to fix file existing error
+
+Summary:
+Since `launch_agent()` in api.py is already decorated with record, we can remove the usage in elastic_launch.
+It also fix the bug for FileExistError on MAST
+
+We run an experiment to count how many times record is invoked in D27901961 to ensure the assumption.
+
+Test Plan:
+```
+fbpkg build -E torchelastic_distributed_sum
+
+buck run mode/dev-nosan //pytorch/elastic/torchelastic/tsm/fb/cli:tsm -- run_ddp --scheduler mast --fbpkg torchelastic_distributed_sum:fde7879   --nnodes 1 --nproc_per_node 1 --resource T1 --run_cfg hpcIdentity=oncall_dai_pet,hpcClusterUuid=MastNaoTestCluster main.par
+```
+
+https://www.internalfb.com/mast/job/tsm_wilsonhong-torchelastic_distributed_sum_a92f97e7
+
+Reviewed By: borovsky-d
+
+Differential Revision: D27902034
+
+fbshipit-source-id: e08b02d4b9c7a7c70fbb0dbcb24b95af55d2ea95
+",['torch/distributed/elastic_launch.py'],The `@record` decorator is applied multiple times in `launch_agent()` causing FileExistError on MAST in TorchElastic Distributed Sum operations.
+3e5a52cedd2d586fc6cb40a73a098252b9edc2a1,1690526748,"[memory snapshot] track context for segments (#106113)
+
+We want to display the stack for the original cudaMalloc that created a segment.
+Previously we could only report the last time the segment memory was used,
+or the record of the segment_alloc could appear in the list of allocator actions.
+This PR ensure regardless of whether we still have the segment_alloc action,
+the context for a segment is still available. The visualizer is updated to
+be able to incorporate this information.
+
+This PR adds a new field to Block. However the previous stacked cleanup PR
+ removed a field of the same size, making the change to Block size-neutral.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/106113
+Approved by: https://github.com/aaronenyeshi
+","['c10/cuda/CUDACachingAllocator.cpp', 'c10/cuda/CUDACachingAllocator.h', 'test/test_cuda.py', 'torch/csrc/cuda/Module.cpp', 'torch/csrc/cuda/memory_snapshot.cpp', 'torch/utils/viz/MemoryViz.js']","Unable to display the stack for the original cudaMalloc that created a segment, showing only the last usage or segment_alloc action record of the segment memory."
+48463f687a77744a66ab521984f26483923a82ed,1681866000,"refactor macro with AMP (#99285)
+
+Fixes #ISSUE_NUMBER
+as the tiltle, optimize the macro with AMP and put the macro in `.hpp` file, so that we can use it for custom device.  @bdhirsh  @albanD
+as we talked at this discuss, optimize the macros so that we can add a new macro for other devide, and move these macros to `.hpp` so that we can include these macros with custom device to configure the ops.
+https://dev-discuss.pytorch.org/t/improve-the-extension-with-privateuse1-for-custom-device/1196/7
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/99285
+Approved by: https://github.com/albanD, https://github.com/bdhirsh
+","['aten/src/ATen/autocast_mode.cpp', 'aten/src/ATen/autocast_mode.h', 'torch/amp/autocast_mode.py']","The current macro optimization is not AMP compatible and is needed for custom device use, plus it's unable to configure the operations since it is not placed in the `.hpp` file."
+48ea7c808d59d44afd8fbb014781a897fe428d48,1623303311,"[C10d] Support subgroups (#59111)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/59111
+
+Create a util function for initializing subgroups. By default, each subgroup contains all the ranks within a machine. This util function can be used by both local SGD and SyncBatchNorm optimization.
+
+Additionally, clang format `distributed/__init__.py` after importing `_rank_not_in_group` which is used by the unit test, and also clang format `distributed_c10d.py`.
+
+Note that this API does not accept another overall main group. Like APEX API `create_syncbn_process_group` [here](https://nvidia.github.io/apex/_modules/apex/parallel.html), always uses the global world size and should only be applied when CUDA is available.
+
+#Closes: https://github.com/pytorch/pytorch/issues/53962
+ghstack-source-id: 130975027
+
+Test Plan:
+buck test mode/dev-nosan caffe2/test/distributed:distributed_nccl_fork -- test_new_subgroups
+buck test mode/dev-nosan caffe2/test/distributed:distributed_nccl_fork -- test_new_subgroups_group_size_exceeds_world_size
+buck test mode/dev-nosan caffe2/test/distributed:distributed_nccl_fork -- test_new_subgroups_world_size_not_divisible_by_group_size
+
+buck test mode/dev-nosan caffe2/test/distributed:distributed_nccl_fork -- test_new_subgroups_by_enumeration
+buck test mode/dev-nosan caffe2/test/distributed:distributed_nccl_fork -- test_new_subgroups_by_enumeration_input_rank_exceeds_world_size
+buck test mode/dev-nosan caffe2/test/distributed:distributed_nccl_fork -- test_new_subgroups_overlap_not_allowed
+
+Reviewed By: rohan-varma
+
+Differential Revision: D28495672
+
+fbshipit-source-id: fdcc405411dd409634eb51806ee0a320d1ecd4e0
+","['torch/distributed/__init__.py', 'torch/distributed/distributed_c10d.py', 'torch/testing/_internal/distributed/distributed_test.py']","PyTorch lacks support for initializing subgroups in distributed environments, which hampers optimizations like local SGD and SyncBatchNorm."
+4ea6a3aa7429e89d0ad8ab562f4811ff86b18393,1628700041,"Fix issues with printing certain torch modules (#62447)
+
+Summary:
+Fixes https://github.com/pytorch/pytorch/issues/54420
+
+When I tested on master, with the testing code, there were multiple objects on the garbage collector that cannot be printed.
+
+Testing code:
+```
+import torch
+import gc
+import os
+import sys
+
+print(torch.__version__)
+
+a = torch.rand(10)
+
+print(a)
+
+objects = gc.get_objects()
+
+for i in range(len(objects)):
+   print(objects[i])
+```
+
+### 1
+```
+print(torch.classes)
+```
+
+Like SplitInfinity has mentioned in the GitHub issue, the solution here is to set `__file__` for `torch.classes` to something. Similar to [_ops.py](https://github.com/pytorch/pytorch/blob/master/torch/_ops.py#L69), where `__file__` is set to `_ops.py`, we could set `__file__` for torch.classes to `_classes.py`.
+
+### 2
+```
+print(torch._ops.ops.quantized)
+print(torch._ops.ops.atan)
+```
+
+When we try to print these two modules, it will call `_OpNamespace::__getattr__`, but the `op_name` is `__file__`. This becomes a problem when `torch._C._jit_get_operation(qualified_op_name)` [(link)](https://github.com/pytorch/pytorch/blob/master/torch/_ops.py#L60) tries to look for an actual op on the native C++ side.
+
+Only when we get the attribute for an actual op, e.g. `print(torch._ops.ops.quantized.elu)`, the `op_name` becomes proper (e.g. `elu`).
+
+My current solution is to return a hardcoded string (i.e. “torch.ops”) if `op_name` is `""__file__""`.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/62447
+
+Reviewed By: saketh-are
+
+Differential Revision: D30234654
+
+Pulled By: yidawang-oss
+
+fbshipit-source-id: de43a8f599739c749fb3307eea015cc61f1da60e
+","['test/test_jit.py', 'torch/_classes.py', 'torch/_ops.py']","Printing certain torch modules triggers calls to the garbage collector for objects that cannot be printed, including issues with `torch.classes`, `torch._ops.ops.quantized`, and `torch._ops.ops.atan`."
+524cb0a5146894a9641c1b8e9e7f30c55619200a,1615933487,"[PyTorch Mobile] Dedup method names in bytecode serialization (#53677)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/53677
+
+When serializing bytecode, we serialize it based on methods. It may happen that there are multiple instances of a class. In such a case, the methods inside the class may be serialized multiple times.
+
+To reduce the duplication, we cache the qualified name of the methods, so that one method is serialized only once.
+
+Test Plan: existing unittests and CI
+
+Reviewed By: dhruvbird, raziel
+
+Differential Revision: D26933945
+
+Pulled By: iseeyuan
+
+fbshipit-source-id: 8a9833949fa18f7103a5a0be19e2028040dc7717
+","['test/cpp/jit/test_lite_interpreter.cpp', 'torch/csrc/jit/serialization/export_module.cpp']",Duplicate serialization of methods occur when there are multiple instances of a class during bytecode serialization.
+528ee0fa75a53686c555a03c46975e73aa94798f,1657564670,"Fix composite compliance testing to check for .item() calls (#81060)
+
+Composite compliance is supposed to check if a composite function
+calls .item()
+([ref](https://github.com/pytorch/pytorch/blob/39db8b3823b8db82396cb979105a83e5e137a02f/torch/testing/_internal/composite_compliance.py#L135-L138)).
+This PR fixes that and adds some more documentation.
+
+Why do we need this check? The original motivations are that Tensor subclasses
+may not support .item calls (e.g. vmap and ProxyTensor).
+There is no way for these subclasses to meaningfully override the .item() calls
+in composite functions that exist inside the PyTorch framework without raising
+an error* so we should aim to rewrite composite operations to not call .item().
+
+*We're open to other solutions, this is just the one we decided on when we
+wrote composite compliance testing and these tests help us keep track of the
+failing functionality.
+
+Test Plan:
+- wait for tests
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/81060
+Approved by: https://github.com/ezyang
+","['torch/testing/_internal/common_methods_invocations.py', 'torch/testing/_internal/composite_compliance.py']","Composite compliance testing is not verifying if .item() calls are made, causing potential issues with Tensor subclasses like vmap and ProxyTensor which may not support .item calls."
+58391aeaf1f859625cf9356a2f05597864fd2e9d,1694532180,"[export] Lift constant tensors as buffes (reland) (#109040)
+
+Summary:
+When we retrace the graph containing constant tensors, they get lifted as buffer inputs.
+AotInductor also wants to lift all the constants as inputs.
+If we separate the constants as a separate thing, then it adds an additional complexity where we now have to keep track of 3 inputs (params, buffers, constants).
+
+Cons: People might care about specifically what buffers are/are not buffers?
+
+If people want to know specifically which buffers are constants, we can add an additional field in the graph signature to mark this.
+
+Test Plan: CI
+
+Differential Revision: D49153367
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/109040
+Approved by: https://github.com/zhxchen17
+","['test/export/test_export.py', 'torch/_export/__init__.py', 'torch/_export/passes/lift_constant_tensor_pass.py']","Retracing the graph with constant tensors lifts them as buffer inputs, adding complexity to tracking different inputs (params, buffers, constants), and ambiguity about which buffers are constants."
+5abe454d6c02ac16e2e1fc87500aa46697385501,1669671361,"[Vulkan][TCC] Fix conv2d pack biases (#89568)
+
+Summary: Fixed bug on pack_biases, where the weight scale and zero point were being assigned to the bias.
+
+Test Plan:
+On Mac
+```
+cd ~/fbsource
+buck1 run -c pt.vulkan_full_precision=1 //xplat/caffe2:pt_vulkan_quantized_api_test_binAppleMac\#macosx-arm64
+```
+
+On Android
+```
+cd ~/fbsource
+buck1 build -c ndk.custom_libcxx=false -c pt.enable_qpl=0 -c pt.vulkan_full_precision=1 //xplat/caffe2:pt_vulkan_quantized_api_test_binAndroid\#android-arm64 --show-output
+adb push buck-out/gen/xplat/caffe2/pt_vulkan_quantized_api_test_binAndroid\#android-arm64 /data/local/tmp/vulkan_quantized_api_test
+adb shell ""/data/local/tmp/vulkan_quantized_api_test""
+```
+
+Reviewed By: SS-JIA
+
+Differential Revision: D41350358
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/89568
+Approved by: https://github.com/salilsdesai
+",['aten/src/ATen/native/vulkan/ops/Convolution.cpp'],The conv2d pack biases function has a bug where the weight scale and zero point are wrongly assigned to the bias in Vulkan backend.
+5b13c779d43e809d453da1d23dded4abed383d04,1691163323,"[AOTInductor] Remove call to aot_autograd when receiving ExportedProgram (#105977)
+
+https://github.com/pytorch/pytorch/issues/105555
+
+Existing flow first exports and then calls torch._inductor.aot_compile. However, export calls aot_autograd with the core aten decomposition table, and then torch._inductor.aot_compile calls aot_autograd again with the inductor decomposition table. The 2nd calling of aot_autograd is supposedly causing some problems, and seems excessive, so instead we will create a new function, torch._export.aot_compiler which will export using the inductor decomposition table, pass it to inductor's compile_fx_aot, and because it has already been exported, avoid recalling aot_autograd.
+
+```
+def aot_compile(
+    f: Callable,
+    args: Tuple[Any],
+    kwargs: Optional[Dict[str, Any]] = None,
+    constraints: Optional[List[Constraint]] = None,
+) -> Tuple[str, ExportedProgram]:
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/105977
+Approved by: https://github.com/desertfire, https://github.com/zhxchen17, https://github.com/eellison
+","['benchmarks/dynamo/common.py', 'test/cpp/aot_inductor/test.py', 'test/inductor/test_aot_inductor.py', 'torch/_export/__init__.py', 'torch/_inductor/codecache.py', 'torch/_inductor/compile_fx.py', 'torch/_inductor/graph.py']",The export function's call to aot_autograd using the core aten decomposition table and subsequent call to aot_autograd within torch._inductor.aot_compile using the inductor decomposition table is causing issues and redundancy.
+5bcbb9bca714ebf105c407390d5fe293876d8634,1681157080,"Skip testing distributed backend if the backend (UCC, NCCL, Gloo) is not available (#98576)
+
+After the recent change on https://github.com/pytorch/pytorch/pull/88110 to add a new c10d test for UCC backend, the test starts to fail on ROCm distributed job.  I guess ROCm doesn't support that backend yet, so I go ahead and disable the test there.  Please let me know if the support on ROCm is coming, I will close this PR accordingly.  But it's now failing in ROCm trunk with `AssertionError: Unknown c10d backend type UCC`, for example https://hud.pytorch.org/pytorch/pytorch/commit/4adba70cc6fa273f210a94a82b337bbddffc3c1d
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/98576
+Approved by: https://github.com/Fuzzkatt, https://github.com/jithunnair-amd, https://github.com/malfet, https://github.com/ZainRizvi
+","['test/distributed/test_c10d_gloo.py', 'test/distributed/test_c10d_nccl.py', 'test/distributed/test_c10d_ucc.py']","The new c10d test for UCC backend fails on ROCm distributed job due to lack of support, causing ""Unknown c10d backend type UCC"" assertion errors."
+5c38c4cfa4ee35a486be4494aab8cd7de9255f3d,1681336739,"Improve symbolic shapes guard logging (#98941)
+
+Billing of changes:
+* Get rid of `print_guards`; instead, you control this with `TORCH_LOGS=torch.fx.experimental.symbolic_shapes`, debug logging toggles stack traces
+* Don't incorrectly report the tracing context frame when we're compiling; we just don't have this info anymore! (TODO: use the saved frames instead). This is via a new TracingContext.clear_frame context manager
+* Add TracingContext.extract_stack() which gives you the tracing context stack.
+* Add ShapeEnvLoggingAdapter to report which ShapeEnv any given operation is from (this is helpful for debugging situations when there are too many ShapeEnvs floating around)
+* Tweak create_symbol log message to also report Source
+* Add a debug log whenever duck sizing occurs
+* Report an excerpt of both the user and system backtrace whenever a guard is added in INFO mode. I found this is a good balance of ""where did the guard come from"" without full backtrace verbosity.
+
+Example log output with the new output:
+
+```
+[2023-04-12 08:25:49,003] torch.fx.experimental.symbolic_shapes: [INFO] 0: create_env
+[2023-04-12 08:25:49,021] torch.fx.experimental.symbolic_shapes: [INFO] 0: create_symbol s0 = 32 for L['x'].size()[0]
+[2023-04-12 08:25:50,154] torch.fx.experimental.symbolic_shapes: [INFO] 0: evaluate_expr s0 < 128 [guard added] at w.py:11 in forward2 (_dynamo/variables/tensor.py:476 in evaluate_expr)
+[2023-04-12 08:25:52,057] torch.fx.experimental.symbolic_shapes: [INFO] 0: evaluate_expr Eq(Mod(s0, 16), 0) [guard added] (_inductor/codegen/triton.py:77 in is_aligned)
+```
+
+from running
+
+```
+import torch
+import torch._dynamo
+
+def f(x, y):
+    return x + y
+
+def forward(x, y):
+    return forward2(x, y)
+
+def forward2(x, y):
+    if x.size(0) < 128:
+        x = x * 2
+    else:
+        x = x * 3
+    r = f(x, y)
+    r = r * y
+    return r
+
+def woof():
+    fn_compiled = torch.compile(forward, dynamic=True)
+    x = torch.randn(32, device='cuda')
+    y = torch.randn(32, device='cuda')
+    print(fn_compiled(x, y))
+
+woof()
+```
+
+(To induce the Triton guard, I synthetically reverted https://github.com/pytorch/pytorch/pull/98471)
+
+Signed-off-by: Edward Z. Yang <ezyang@meta.com>
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/98941
+Approved by: https://github.com/wconstab
+","['torch/_dynamo/config.py', 'torch/_dynamo/output_graph.py', 'torch/_dynamo/symbolic_convert.py', 'torch/_guards.py', 'torch/fx/experimental/symbolic_shapes.py']","Torch's symbolic shapes logging functionality is providing unclear and incorrect information, making it hard for debug situations and causing over verbosity in backtrace when a guard is added."
+5eec908700df141b49f9fcca173e13f099def7d5,1657743697,"[ao] Update ModelReport class with class usage in description. (#81251)
+
+Summary: This adds a example usage description to the ModelReport class
+so that people can see how it can be used right in the class
+documentation without having to consult external sources. The example
+usage depicts how it can be used using the QuantizationTracer, which was
+a decision taken to illustrate how there is no strict requirement on
+using this tool with only Fx Graph Mode workflow.
+
+Test Plan: python test/test_quantization.py TestFxModelReportClass
+
+Reviewers:
+
+Subscribers:
+
+Tasks:
+
+Tags:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/81251
+Approved by: https://github.com/jerryzh168
+",['torch/ao/quantization/fx/_model_report/model_report.py'],"The `ModelReport` class lacks usage documentation within class documentation, making it unclear how it can be used without consulting external sources."
+61461f39d18758f7bbab7ea65b8c9185274f3824,1697948745,"[dtensor] handle negative dim and fix TP regression (#111750)
+
+TP style still have some regression due to negative dim specifications,
+fix it by allow DTensor API to handle negative dims and normalize them.
+
+i.e. TP uses `Shard(-1)`, and then try to redistribute `Shard(1) -> Shard(-1)`, this should ideally be no-op but current it runs a decompose sharding phrase and it would turn this transformation to `Shard(1) -> Replicate -> Shard(-1)`, which is wrong and triggers unnecessary allgathers
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/111750
+Approved by: https://github.com/rohan-varma
+","['test/distributed/_tensor/test_api.py', 'test/distributed/_tensor/test_dtensor.py', 'test/distributed/_tensor/test_math_ops.py', 'test/distributed/_tensor/test_redistribute.py', 'torch/distributed/_tensor/_utils.py', 'torch/distributed/_tensor/api.py']",Negative dim specifications in TensorPipe's style leading to regression problems in DTensor API. The redistribution of `Shard(1) -> Shard(-1)` results in incorrect transformation and triggers unnecessary allgathers.
+61736679cd3d944ebabb61fe8a9fd5d5bcf08883,1686088877,"[Dynamo] No graph break for super(MyConv{1/2/3}d, self).forward and super(MyConvTranspose, self).forward (#102509)
+
+before the PR, running super(MyConv1d, self).forward or super(MyConvTranspose, self).foward, dynamo will create a graph break when executing NNModuleVariable.call_method and raise unimplemented error for name=_conv_forward / _output_padding. see issue for full detail: https://github.com/pytorch/pytorch/issues/101155
+
+after the PR, for torch.nn.conv module with function name _conv_forward / _output_padding, we inline the function with tx.inline_user_function_return
+
+code refactor: added NNModuleVariable._inline_user_function_return_helper to consolidaste tx.inline_user_function_return into 1 place to keep code dry. after factor, there are 2 uncolidated inline_user_function_return with different ```fn``` and ```source``` logic. the code is still dry. For local testing, they are covered by test_modulelist, test_moduledict, test_conv_call_super_forward_directly and test_conv_transpose_call_super_forward_directly in test_modules.py
+
+Differential Revision: [D46494460](https://our.internmc.facebook.com/intern/diff/D46494460)
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/102509
+Approved by: https://github.com/yanboliang
+","['test/dynamo/test_modules.py', 'torch/_dynamo/variables/nn_module.py']","Running super(MyConv1d, self).forward or super(MyConvTranspose, self).forward in Dynamo results in a graph break and triggers an unimplemented error for _conv_forward / _output_padding."
+62f01e2b26abe3bc0c5f4157ad2f8204d3c446e6,1669842921,"[FIX][QAT] Switch to use `kwargs` when `args` is empty (#89778)
+
+Summary:
+When `ref_node.args` is empty, the QAT will throw index out of range. Here is an example, line 574 is using `tensors = ....` in torch.cat func, which will be treated as `kwargs`
+{F800357376}
+
+f388506954
+
+To fix the issue, we will use the value of the first kwarg if args is empty
+
+Test Plan: f388545532
+
+Reviewed By: bigning, lyoka
+
+Differential Revision: D41396771
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/89778
+Approved by: https://github.com/lyoka, https://github.com/houseroad
+",['torch/ao/quantization/fx/_lower_to_native_backend.py'],Quantization Aware Training (QAT) throws an 'index out of range' error when `ref_node.args` is empty during the use of the torch.cat function.
+63891227d106299ebd5c86c84904b7b940df39b5,1658885521,"[MPS] Handle int inputs of matmul ops by returning error for unsupported data types (#82183)
+
+This is in-continuation of fixes for TestConsistency for MPS backend.
+
+* Add error messages for unsupported matmul ops
+
+* Add error handling for int inputs for linear op
+
+### Description
+<!-- What did you change and why was it needed? -->
+
+### Issue
+<!-- Link to Issue ticket or RFP -->
+
+### Testing
+<!-- How did you test your change? -->
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/82183
+Approved by: https://github.com/razarmehr
+","['aten/src/ATen/native/mps/operations/Linear.mm', 'aten/src/ATen/native/mps/operations/LinearAlgebra.mm']","MatMul operations with integer inputs on MPS backend are unsupported, causing consistency test failures."
+6401658b08519a883317f36a7a81891c2337a161,1634146429,"fix type error in hipify_python.py (#66164)
+
+Summary:
+- [x] Fixed the Pyre type checking errors in `torch/utils/hipify/hipify_python.py`:
+```
+torch/utils/hipify/hipify_python.py:196:8 Incompatible variable type [9]: clean_ctx is declared to have type `GeneratedFileCleaner` but is used as type `None`.
+torch/utils/hipify/hipify_python.py:944:4 Incompatible variable type [9]: clean_ctx is declared to have type `GeneratedFileCleaner` but is used as type `None`.
+```
+
+Fixing the issue: https://github.com/MLH-Fellowship/pyre-check/issues/78
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/66164
+
+Reviewed By: onionymous
+
+Differential Revision: D31411443
+
+Pulled By: 0xedward
+
+fbshipit-source-id: c69f8fb839ad1d5ba5e4a223e1322ae7207e1574
+",['torch/utils/hipify/hipify_python.py'],Variable `clean_ctx` in `torch/utils/hipify/hipify_python.py` is declared as `GeneratedFileCleaner` type but is getting used as `None` type leading to Pyre type checking errors.
+64a3738fcd4af3f8817d1ab50d5c425b99be8d7b,1672879283,"[vulkan] Remove external dependencies in core API and introduce torch_vulkan_api target (#91021)
+
+This diff isolates the core components of the Pytorch Vulkan backend into its own target (`//xplat/caffe2:torch_vulkan_api`). The main motivation for this is to create a library that does not have a dependency on the ATen library which can then be used to build a graph mode runtime for Vulkan for Executorch.
+
+In addition to introducing the new target, this diff also removes some references to external dependencies in the `api/` folder so that files in that folder are completely self contained.
+
+Differential Revision: [D42038817](https://our.internmc.facebook.com/intern/diff/D42038817/)
+
+**NOTE FOR REVIEWERS**: This PR has internal Meta-specific changes or comments, please review them on [Phabricator](https://our.internmc.facebook.com/intern/diff/D42038817/)!
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/91021
+Approved by: https://github.com/kirklandsign
+","['aten/src/ATen/native/vulkan/api/Common.h', 'aten/src/ATen/native/vulkan/api/Context.cpp', 'aten/src/ATen/native/vulkan/api/Context.h', 'aten/src/ATen/native/vulkan/api/QueryPool.cpp', 'aten/src/ATen/native/vulkan/ops/Common.h', 'aten/src/ATen/native/vulkan/ops/Copy.cpp', 'buckbuild.bzl']",The PyTorch Vulkan backend is not isolated from the ATen library creating dependency issues. There are also references to external dependencies within the 'api/' folder.
+656d2a7bf60309632934eac97e141a5a56a71d3a,1640236719,"[quant][fx][graphmode] Add backend_config_dict for standalone module (#70150)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/70150
+
+This PR allows user to specify backend_config_dict for standalone modules, both in prepare and convert step
+adding this now to allow prototype for some of our customer use cases, test for the codepath will be added in
+a separate PR
+
+Test Plan:
+regression tests
+```
+python test/test_quantization.py TestQuantizeFx
+```
+test that specifies backend_config for some module will be added in a separate PR for the use case we have in mind
+since it requires other features
+
+Imported from OSS
+
+**Static Docs Preview: classyvision**
+|[Full Site](https://our.intern.facebook.com/intern/staticdocs/eph/D33205162/V9/classyvision/)|
+
+|**Modified Pages**|
+
+Reviewed By: vkuzo
+
+Differential Revision: D33205162
+
+fbshipit-source-id: a657cef8e49d99b6a43653141521dc87c33bfd89
+","['test/quantization/fx/test_quantize_fx.py', 'torch/ao/quantization/fx/prepare.py', 'torch/ao/quantization/fx/qconfig_utils.py', 'torch/ao/quantization/quantize_fx.py']","Standalone modules are lacking a way of specifying backend_config_dict in both the prepare and convert steps, limiting usability for certain user cases."
+658f958bc4bb314d9c6030eeaf3e1784792b5d15,1661216017,"fix upsample bf16 issue for channels last path by using high pricsion to compute index (#83847)
+
+Given the following case:
+```
+import torch
+a = torch.ones(1, 3, 320, 480).bfloat16().to(memory_format=torch.channels_last)
+out_bf16 = torch.nn.functional.interpolate(a, size = (640, 960), scale_factor = None, mode = 'bilinear', align_corners = False, recompute_scale_factor= None, antialias = False)
+out_fp32= torch.nn.functional.interpolate(a.float(), size = (640, 960), scale_factor = None, mode = 'bilinear', align_corners = False, recompute_scale_factor= None, antialias = False)
+print(out_bf16[0, 2, :, :])
+print(out_fp32[0, 2, :, :])
+```
+the boundary of bfloat16 output gets a wrong value:
+```
+tensor([[1.0000e+00, 1.0000e+00, 1.0000e+00,  ..., 1.0000e+00, 1.0000e+00,
+         1.0000e+00],
+        [1.0000e+00, 1.0000e+00, 1.0000e+00,  ..., 1.0000e+00, 1.0000e+00,
+         1.0000e+00],
+        [1.0000e+00, 1.0000e+00, 1.0000e+00,  ..., 1.0000e+00, 1.0000e+00,
+         1.0000e+00],
+        ...,
+        [1.0000e+00, 1.0000e+00, 1.0000e+00,  ..., 1.0000e+00, 1.0000e+00,
+         1.0000e+00],
+        [1.0000e+00, 1.0000e+00, 1.0000e+00,  ..., 1.0000e+00, 1.0000e+00,
+         1.0000e+00],
+        [0.0000e+00, 0.0000e+00, 1.8367e-40,  ..., 0.0000e+00, 0.0000e+00,
+         0.0000e+00]], dtype=torch.bfloat16)
+tensor([[1., 1., 1.,  ..., 1., 1., 1.],
+        [1., 1., 1.,  ..., 1., 1., 1.],
+        [1., 1., 1.,  ..., 1., 1., 1.],
+        ...,
+        [1., 1., 1.,  ..., 1., 1., 1.],
+        [1., 1., 1.,  ..., 1., 1., 1.],
+        [1., 1., 1.,  ..., 1., 1., 1.]])
+
+```
+
+the expected behavior is that the bfloat16 output value should also be one. The main reason is that we use low precision to compute the index,  see
+https://github.com/pytorch/pytorch/blob/fcb124406bdf86bc2d15e999d5a3e09b86238bba/aten/src/ATen/native/UpSample.h#L448, we should use a high precison to do the computation as GPU path:
+https://github.com/pytorch/pytorch/blob/fcb124406bdf86bc2d15e999d5a3e09b86238bba/aten/src/ATen/native/cuda/UpSample.cuh#L123
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/83847
+Approved by: https://github.com/frank-wei
+","['aten/src/ATen/native/UpSample.h', 'aten/src/ATen/native/cpu/UpSampleKernel.cpp', 'test/test_nn.py']","When using the 'bilinear' mode for the upsampling operation in PyTorch's interpolate function with bfloat16 input and 'channels_last' memory format, the boundary output values are incorrect due to low precision in index computation."
+659dcc5e71899dabf8a5611f5b0f10f38f4fb763,1682608250,"[inductor] Fix argmin/max with duplicate values (#99920)
+
+Fixes #99879
+
+This adds `minimum_with_index` helper functions to compute the minimum
+value and index simultaneously, with a preference for the smaller
+index which is required to match eager in case of duplicates.
+
+I also remove the mask-and-sum hack with a `tl.reduce` using
+the previously mentioned helper. This additionally fixes the indices
+being added together in the case of duplicates.
+
+As an example, this is the kernel generated for `torch.argmin(x, 1)`:
+```python
+def triton_(in_ptr0, out_ptr0, xnumel, rnumel, XBLOCK : tl.constexpr, RBLOCK : tl.constexpr):
+    xnumel = 1028 # dynamic_shapes=False
+    rnumel = 1028 # dynamic_shapes=False
+    xoffset = tl.program_id(0) * XBLOCK
+    xindex = xoffset + tl.arange(0, XBLOCK)[:, None]
+    xmask = xindex < xnumel
+    rbase = tl.arange(0, RBLOCK)[None, :]
+    x0 = xindex
+    _tmp1 = tl.full([XBLOCK, RBLOCK], float(""inf""), tl.float32)
+    _tmp1_index = tl.full([XBLOCK, RBLOCK], 9223372036854775807, tl.int64)
+    for roffset in range(0, rnumel, RBLOCK):
+        rindex = roffset + rbase
+        rmask = rindex < rnumel
+        r1 = rindex
+        tmp0 = tl.load(in_ptr0 + (r1 + (1028*x0)), rmask & xmask, eviction_policy='evict_last', other=0)
+        _tmp1_next, _tmp1_index_next = triton_helpers.minimum_with_index(
+            _tmp1, _tmp1_index, tmp0, rindex
+        )
+        _tmp1 = tl.where(rmask & xmask, _tmp1_next, _tmp1)
+        _tmp1_index = tl.where(rmask & xmask, _tmp1_index_next, _tmp1_index)
+    _, tmp1_tmp = triton_helpers.min_with_index(_tmp1, _tmp1_index, 1)
+    tmp1 = tmp1_tmp[:, None]
+    tl.store(out_ptr0 + x0, tmp1, xmask)
+```
+
+Or for a persistent reduction, it generates:
+```python
+    tmp0 = tl.load(in_ptr0 + (r1 + (1024*x0)), rmask & xmask, other=0)
+    tmp2 = tl.where(rmask & xmask, tmp0, float(""inf""))
+    tmp3 = tl.broadcast_to(rindex, tmp2.shape)
+    _, tmp4_tmp = triton_helpers.min_with_index(tmp2, tmp3, 1)
+    tmp4 = tmp4_tmp[:, None]
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/99920
+Approved by: https://github.com/ngimel
+","['test/inductor/test_torchinductor.py', 'torch/_inductor/codegen/triton.py', 'torch/_inductor/ir.py', 'torch/_inductor/triton_helpers.py']","'Duplicate values in argmin/max lead to incorrect computation of minimum value and index, resulting in indices being incorrectly added together.'"
+6bfb4f7c4bc9ac4adee2c87874d0a50a79fcd12e,1692220515,"[CUDA][Linalg} Patch crash of `linalg.eigh` when input matrix is ill-conditioned, in some cusolver version (#107082)
+
+Related: https://github.com/pytorch/pytorch/issues/94772, https://github.com/pytorch/pytorch/issues/105359
+
+I can locally reproduce this crash with pytorch 2.0.1 stable pip binary. The test already passes with the latest cuda 12.2 release.
+
+Re: https://github.com/pytorch/pytorch/issues/94772#issuecomment-1658909998
+> From discussion in triage review:
+
+- [x] we should add a test to prevent regressions
+- [x] properly document support wrt different CUDA versions
+- [x] possibly add support using MAGMA
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/107082
+Approved by: https://github.com/lezcano
+","['aten/src/ATen/cuda/Exceptions.h', 'test/test_linalg.py', 'torch/linalg/__init__.py']","When using certain versions of cusolver, the `linalg.eigh` function crashes if the input matrix is ill-conditioned. This has been reproduced in PyTorch 2.0.1 stable pip binary."
+701cdbb6a5baa65cfbd90b91aff70dc262dcf31f,1679410097,"FIX make sure we import the correct object from multiprocessing (#81862)
+
+Fixes #44687.
+
+The issue was that the Process object is not the one from the `_default_context` which should be `loky` when nesting `loky` calls.
+
+This is a revamp of #53282 that was reverted because it broke some other tests.
+How can I run the failing tests so I can see why this breaks?
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/81862
+Approved by: https://github.com/VitalyFedyunin, https://github.com/janeyx99
+",['torch/multiprocessing/__init__.py'],"When nesting `loky` calls in multiprocessing, the Process object imported isn't from the `_default_context`, leading to incompatible behavior."
+726d04069285277f36cf5ccea6d83d6f8ff9ec75,1660065695,"annotated allocator snapshots (#82146)
+
+Record stack trace information for each allocated segment in the allocator.
+It takes around 1.5us to record 50 stack frames of context.
+Since invoking a Pytorch operator is around 8us, this adds minimal overhead but we still leave it disabled by default so that we can test it more on real workloads first.
+
+Stack information is kept both for allocated blocks and the last allocation used inactive blocks. We could potential keep around the _first_ allocation that caused the block to get allocated from cuda as well.
+
+Potential Followups:
+* stack frame entries are small (16 bytes), but the list of Frames is not compressed eventhough most frames will share some entries. So far this doesn't produce huge dumps (7MB for one real workload that uses all memory on the GPU), but it can be much smaller through compression.
+* Code to format the information is slow (a few seconds) because it uses python and FlameGraph.pl
+* Things allocated during the backward pass have no stack frames because they are run on another C++ thread.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/82146
+Approved by: https://github.com/albanD
+","['c10/cuda/CUDACachingAllocator.cpp', 'c10/cuda/CUDACachingAllocator.h', 'test/test_cuda.py', 'test/test_public_bindings.py', 'torch/csrc/cuda/Module.cpp', 'torch/cuda/_memory_viz.py', 'torch/cuda/memory.py']","The current allocator does not track stack trace information for each allocated segment, making it difficult to debug memory allocation issues, and certain allocations during the backward pass lack stack frames because they run on a different C++ thread."
+766eba60f7c0b169e8a4879430b65a309c429237,1646960634,"(torchx/elastic) honor NCCL_ASYNC_ERROR_HANDLING set from the env var (#73982)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/73982
+
+Currently there is no way for users using torchelastic to override NCCL_ASYNC_ERROR_HANDLING=0. This PR enables this.
+
+Test Plan:
+Added unittests
+
+Manual testing
+```
+$ torchx run fb.dist.ddp -- --img torchx_examples -m print_env_vars.py --env NCCL_ASYNC_ERROR_HANDLING=0
+```
+
+Validated the NCCL_ASYNC_ERROR_HANDLING in the process running `print_env_vars.py` is indeed `0`.
+
+Reviewed By: mannatsingh, aivanou
+
+Differential Revision: D34765786
+
+fbshipit-source-id: 3f9f6d3b61e7d265adf689d387e020ab534c9259
+(cherry picked from commit 2b787b46c6d37f049fe39eb64eecedf68799e75c)
+","['test/distributed/elastic/agent/server/test/local_elastic_agent_test.py', 'torch/distributed/elastic/agent/server/local_elastic_agent.py']","Users using torchelastic cannot override NCCL_ASYNC_ERROR_HANDLING=0, limiting environment variable customization ability."
+7860fcc245980cc7feb78433ed4696ae6a9bb0cd,1669699626,"Enable DDPOptimizer by default in dynamo (#88523)
+
+Performance benchmarks on 6 popular models from 1-64 GPUs compiled with
+torchinductor show performance gains or parity with eager, and showed
+regressions without DDPOptimizer.  *Note: resnet50 with small batch size shows a regression with optimizer, in part due to failing to compile one subgraph due to input mutation, which will be fixed.
+(hf_Bert, hf_T5_large, hf_T5, hf_GPT2_large, timm_vision_transformer, resnet50)
+
+Correctness checks are implemented in CI (test_dynamo_distributed.py),
+via single-gpu benchmark scripts iterating over many models
+(benchmarks/dynamo/torchbench.py/timm_models.py/huggingface.py),
+and via (multi-gpu benchmark scripts in torchbench)[https://github.com/pytorch/benchmark/tree/main/userbenchmark/ddp_experiments].
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/88523
+Approved by: https://github.com/davidberard98
+","['benchmarks/dynamo/distributed.py', 'torch/_dynamo/config.py']","Performance benchmarks on multiple models show regressions when DDPOptimizer is not enabled in Dynamo, including compilation issues with subgraphs due to input mutation."
+80790ecee4f04de4bf1675fec8a2593d7a2b32c0,1666134088,"[einsum] Call view instead of sum to remediate MPS regression (#87135)
+
+Fixes #87010.
+
+It turns out that squeeze is much faster than sum, and view is faster than squeeze, so we should default to that whenever possible.
+
+Benchmarking results show that, on MPS, we would be going from the following code taking **29.89ms instead of the current 1466ms, almost a 50x speedup**.
+```
+q = torch.rand(16, 4096, 40, device='mps', dtype=torch.float)
+k = torch.rand(16, 4096, 40, device='mps', dtype=torch.float)
+torch.einsum('b i d, b j d -> b i j', q, k).max().item()
+```
+And a regular einsum will now take **.506ms instead of 2.76ms.**
+```
+q = torch.rand(16, 4096, 40, device='mps', dtype=torch.float)
+k = torch.rand(16, 4096, 40, device='mps', dtype=torch.float)
+torch.einsum('b i d, b j d -> b i j', q, k)
+```
+
+Special thanks to @soulitzer for helping me experiment + figure out how to squash the remaining 5x regression due to squeeze being slower than view!!
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/87135
+Approved by: https://github.com/soulitzer, https://github.com/malfet, https://github.com/albanD
+",['aten/src/ATen/native/Linear.cpp'],"'einsum' method performance severely degraded for MPS device due to usage of 'sum' operation, which is significantly slower compared to 'view' or 'squeeze'."
+826b4a9c2dd856c11ca7d73bc0d617758bff6a5a,1667505953,"[coreml] delegate multiple outputs (#88345)
+
+Summary:
+https://www.internalfb.com/code/fbsource/[c0e4da0b5c7fff3b4e31e4611033c30cabdc6aef]/fbcode/caffe2/torch/csrc/jit/backends/backend_detail.cpp?lines=268-276
+
+seems like the torchscript addition of
+`$unpack, = self.__backend.execute( ... `
+
+the comma after unpack forces the result of execute to have only one item. So for this fix now when the size of the outputs > 1, execute returns a List List of outputs (basically put the outputs in another list before putting it into the list we return)
+```
+[[output1, output2, output3, ...]]
+```
+instead of
+```
+[output1, output2, output3, ...]
+```
+
+Do we want to fix this in backend_detail? Or should we make the change in our delegate to accomadate the torchscript? Proposing this q here. Requesting cccclai, kimishpatel for approval here
+
+Test Plan: unblocked models for chengxiangyin and models in pytorch playground all passing unit tests
+
+Reviewed By: kimishpatel, cccclai
+
+Differential Revision: D40328684
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/88345
+Approved by: https://github.com/jmdetloff, https://github.com/Skylion007
+",['torch/csrc/jit/backends/coreml/objc/PTMCoreMLBackend.mm'],"The `execute` method in the TorchScript backend forces single item outputs, causing issues when there are multiple outputs. It currently cannot return multiple outputs properly."
+840fb74ec8c5bcba5c4a1b0293884e31f0c4767e,1676330350,"86990 range mps support (#91075)
+
+Fixes #86990
+
+- Added range_mps_out to RangeFactories.mm
+- Updated native_functions.yaml
+- Added tests in test_mps.py
+
+I did observe that despite [the documentation for torch.range](https://pytorch.org/docs/stable/generated/torch.range.html), the existing implementations do not adjust their return type based off the arguments passed to them. The MPS implementation provided here behaves the same way as the existing CPU and CUDA implementations in this regard, hence the conversion to float32 in the test cases.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/91075
+Approved by: https://github.com/kulinseth, https://github.com/DenisVieriu97
+","['aten/src/ATen/native/mps/operations/RangeFactories.mm', 'test/test_mps.py']","The torch.range function in PyTorch lacks range_mps_out support, causing it not to adjust its return type based on the function's passed arguments."
+84b6c629d3ed0aff3dea7d3e0c2fdb50fc46d8ab,1621646620,"[lint] Move shellcheck to its own step (#58623)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/58623
+
+This splits out everything shellcheck related into its own job that generates and checks GHA workflows, then shellchecks those + jenkins scripts. This PR also integrates shellcheck into the changed-only stuff in `actions_local_runner.py` so that shellcheck won't do anything unless someone edits a shell script in their local checkout. This is the final piece to clean up the output of `make quicklint` and speeds it up by a good bit (before it was shellchecking everything which took a few seconds):
+
+```
+$ make quicklint -j $(nproc)
+✓ quick-checks: Ensure no unqualified noqa
+✓ quick-checks: Ensure canonical include
+✓ quick-checks: Ensure no unqualified type ignore
+✓ quick-checks: Ensure no direct cub include
+✓ quick-checks: Ensure no tabs
+✓ quick-checks: Ensure no non-breaking spaces
+✓ shellcheck: Regenerate workflows
+✓ quick-checks: Ensure no versionless Python shebangs
+✓ quick-checks: Ensure correct trailing newlines
+✓ shellcheck: Assert that regenerating the workflows didn't change them
+✓ mypy (skipped typestub generation)
+✓ cmakelint: Run cmakelint
+✓ quick-checks: Ensure no trailing spaces
+✓ flake8
+✓ shellcheck: Extract scripts from GitHub Actions workflows
+✓ shellcheck: Run Shellcheck
+real 0.92
+user 6.12
+sys 2.45
+```
+
+Test Plan: Imported from OSS
+
+Reviewed By: nikithamalgifb
+
+Differential Revision: D28617293
+
+Pulled By: driazati
+
+fbshipit-source-id: af960ed441db797d07697bfb8292aff5010ca45b
+","['.github/scripts/report_git_status.sh', 'tools/actions_local_runner.py', 'tools/test/test_actions_local_runner.py']","The Shellcheck linting process in the make quicklint command is checking all files and scripts unnecessarily, taking up time and resources."
+8ff1a8fdcac79356e4abdb5e0b1bea3a0c5f6237,1643308710,"Implement forward AD for linalg.svd and improve svd_backward (#70253)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/70253
+
+I included a derivation of the formula in the complex case, as it is
+particularly tricky. As far as I know, this is the first time this formula
+is derived in the literature.
+
+I also implemented a more efficient and more accurate version of svd_backward.
+More importantly, I also added a lax check in the complex case making sure the loss
+function just depends on the subspaces spanned by the pairs of singular
+vectors, and not their joint phase.
+
+cc jianyuh nikitaved pearu mruberry walterddr IvanYashchuk xwang233 Lezcano
+
+Test Plan: Imported from OSS
+
+Reviewed By: mikaylagawarecki
+
+Differential Revision: D33751982
+
+Pulled By: mruberry
+
+fbshipit-source-id: c2a4a92a921a732357e99c01ccb563813b1af512
+(cherry picked from commit 391319ed8f2e0ecc1e034d8eaecfb38f5ea4615f)
+","['aten/src/ATen/native/LinearAlgebra.cpp', 'test/test_linalg.py', 'test/test_ops.py', 'torch/csrc/autograd/FunctionsManual.cpp', 'torch/csrc/autograd/FunctionsManual.h', 'torch/linalg/__init__.py', 'torch/testing/_internal/common_methods_invocations.py', 'torch/testing/_internal/common_utils.py']","The forward autodifferentiation implementation for linalg.svd is missing and there are issues with efficiency and accuracy in svd_backward, specifically in complex cases involving the loss function and singular vector subspaces."
+92ee5cc2e23a6bec2c256bece69b35c3c79b59e9,1632863689,"[sparsity] Fix for accumulation bug in WeightNormSparsifier (#65293)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/65293
+
+This fixes a bug in the WeightNormSparsifier, where the mask is being multiplied by the newly computed mask.
+Because the mask elements are binary 0/1, this accumulates the mask over every iteration, eventually collapsing the mask to zero.
+This bug accidentally bled through from old versions.
+
+Test Plan: Imported from OSS
+
+Reviewed By: gchanan
+
+Differential Revision: D31186829
+
+Pulled By: z-a-f
+
+fbshipit-source-id: 3f5b2c833148ab0bd8084e7410ce398f1252e65e
+","['test/ao/sparsity/test_sparsifier.py', 'torch/ao/sparsity/sparsifier/weight_norm_sparsifier.py']","WeightNormSparsifier is incorrectly multiplying and accumulating the mask over multiple iterations, resulting in the mask eventually collapsing to zero."
+948cd61afc90e1b9067b35d4aec4ec74deeb73f6,1676069092,"add fallthrough kernel for AutogradMeta key (#94603)
+
+The other `Autograd[Backend]` keys all have fallthrough kernels registered to them, but `AutogradMeta` was missing the fallthrough kernel.
+
+This is a problem for custom ops that don't have autograd support, if you try to run them with meta tensors. If you have a custom op, and register a CPU and a Meta kernel, then:
+
+(1) if you run the op with cpu tensors, it will dispatch straight to the CPU kernel (as expected)
+
+(2) if you run the op with meta tensors, you will error - because we don't have a fallthrough registered to the AutogradMeta key, we will try to dispatch to the AutogradMeta key and error, since the op author hasn't provided an autograd implementation.
+
+Here's a repro that I confirmed now works:
+
+```
+import torch
+from torch._dispatch.python import enable_python_dispatcher
+from torch._subclasses.fake_tensor import FakeTensorMode
+
+lib = torch.library.Library(""test"", ""DEF"")
+impl_cpu = torch.library.Library(""test"", ""IMPL"", ""CPU"")
+impl_meta = torch.library.Library(""test"", ""IMPL"", ""Meta"")
+
+def foo_impl(x):
+    return x + 1
+
+lib.define(""foo(Tensor a) -> Tensor"")
+impl_meta.impl(""foo"", foo_impl)
+impl_cpu.impl(""foo"", foo_impl)
+
+with enable_python_dispatcher():
+    a = torch.ones(2, device='meta')
+    print(""@@@@@"")
+    b = torch.ops.test.foo.default(a)
+    print(b)
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/94603
+Approved by: https://github.com/ezyang, https://github.com/albanD
+","['aten/src/ATen/core/VariableFallbackKernel.cpp', 'c10/core/DispatchKey.h', 'test/test_meta.py']","The `AutogradMeta` key is missing a fallthrough kernel, causing custom operations without autograd support to result in errors when run with meta tensors."
+95257e8a62fdb0016859b691ef2b01241f905fb4,1623810998,"[fx-acc] Fix wrong device assignment in find_single_partition (#60056)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/60056
+
+Previously we put the whole graph as a single partition onto a device with maximum memory if possible, but the code assumed that the first logical device always has the maximum memory.
+
+This diff fixes this issue and updates the unittest to reflect such a corner case.
+
+Test Plan:
+```
+buck test mode/opt //caffe2/test:test_fx_experimental -- --exact 'caffe2/test:test_fx_experimental - test_find_single_partition (test_fx_experimental.TestFXExperimental)'
+
+Started reporting to test run: https://www.internalfb.com/intern/testinfra/testrun/6473924507772744
+    ✓ ListingSuccess: caffe2/test:test_fx_experimental - main (1.357)
+    ✓ Pass: caffe2/test:test_fx_experimental - test_find_single_partition (test_fx_experimental.TestFXExperimental) (1.206)
+Summary
+  Pass: 1
+  ListingSuccess: 1
+
+```
+
+Reviewed By: gcatron
+
+Differential Revision: D29118715
+
+fbshipit-source-id: cac6a1f0d2f47717446dcc80093bbcf362663859
+","['test/test_fx_experimental.py', 'torch/fx/experimental/accelerator_partitioner.py']","Graph placement onto a device with maximum memory not accurate, with assumptions that the first logical device always has maximum memory leading to errors."
+95d71ed2124718219fee8448fa1a143e2928e039,1643651059,"Run the pr-label check on PR closed action and validate closed_by (#71917)
+
+Summary:
+Fixes https://github.com/pytorch/pytorch/issues/68459
+This PR implements reminder to assign the release notes and topic labels to each PR when merged. Here is an example of the message that set on the issue related to PR:
+
+> Hey atalman. You merged this PR, but no release notes category and topic labels were added. >
+> The list of valid release and topic labels is available https://github.com/pytorch/pytorch/labels?q=release+notes+or+topic
+
+Tested by manually running process_commit.py script in standalone mode passing following  commit_hash = ""e020414cb25cd763103f77a10c6225ce27cbbb6e"" which should resolve to this PR
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/71917
+
+Reviewed By: malfet
+
+Differential Revision: D33847058
+
+Pulled By: atalman
+
+fbshipit-source-id: 370e0928b792df721b216a8e08b22253f03abda3
+(cherry picked from commit dfa86f440f155a3328ad4149a92ea48fcd72f158)
+",['.github/scripts/process_commit.py'],"PRs are being merged without necessary release notes or topic labels, leading to incomplete data about the changes introduced."
+97b20b9b50b5b1460c7284438184901c6eecaa3c,1646787357,"[SR][easy] Stack/concat out variants do not segfault on empty inputs (#73704)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/73704
+
+Empty inputs are invalid for these ops. But while looking for optimizations, I noticed that these ops just segfault when that happens, which is not helpful for users. Added a check/error message.
+ghstack-source-id: 150812721
+
+Test Plan: New unit tests
+
+Reviewed By: hlu1
+
+Differential Revision: D34596954
+
+fbshipit-source-id: 6b22a3a255273920210dcd41f54a9d238bbbcc14
+(cherry picked from commit 9e950bfffef36c320638662bdb72f19eb805a228)
+","['benchmarks/static_runtime/test_static_runtime.cc', 'torch/csrc/jit/runtime/static/ops.cpp']","Stack/concat operations are causing a segmentation fault when receiving empty inputs, instead of providing a useful error message."
+97d2e1df5565b7f3a5358178b8f3a2a039c7f976,1664986157,"[MPS] Fix GELU for `torch.half` (#86218)
+
+Also, make sure it raises catcheable errors if invoked with integral types
+
+Otherwise, it used to fail with following fatal error  invoked for `torch.half` and with similar signatures if invoked for integral types
+```
+loc(""mps_multiply""(""(mpsFileLoc): /AppleInternal/Library/BuildRoots/4883e71d-37bd-11ed-b0ef-b25c5e9b9057/Library/Caches/com.apple.xbs/Sources/MetalPerformanceShadersGraph/mpsgraph/MetalPerformanceShadersGraph/Core/Files/MPSGraphUtilities.mm"":228:0)): error: input types 'tensor<2xf16>' and 'tensor<1xf32>' are not broadcast compatible
+LLVM ERROR: Failed to infer result type(s).
+```
+
+Modified `test_gelu_simple` to check both fwd and backward gradients for gelu
+","['aten/src/ATen/native/mps/operations/Activation.mm', 'test/test_mps.py']","When the GELU function is invoked with `torch.half` or integral types, it fails with a fatal error indicating incompatible broadcast types."
+9ad940d98254084f29cb3a2daea164f7cab4760d,1639766180,"Codegen: ADInplaceOrViewType only include operators registered (#68692)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/68692
+
+ADInplaceOrViewType is a sharded file, so by only including specific
+operator headers, we ensure that changing one (non-method) operator
+only needs one shard to be re-compiled.
+
+This also ports the generated code over to the `at::_ops` interface,
+and the code generator itself to using `write_sharded` instead of
+re-implementing its own version of sharding.
+
+Test Plan: Imported from OSS
+
+Reviewed By: jbschlosser, malfet
+
+Differential Revision: D32596274
+
+Pulled By: albanD
+
+fbshipit-source-id: 400cad0237829720f94d60f9db7acd0e918e202e
+","['tools/autograd/gen_inplace_or_view_type.py', 'tools/autograd/templates/ADInplaceOrViewType.cpp']",ADInplaceOrViewType includes unnecessary operator headers leading to excessive shard re-compilations when modifying non-method operators.
+9b4dc56c83ca28df3d34b650f4c0249de45d7601,1660069923,"[ONNX] Fix quantization outputs' dtype (#79690)
+
+Part of #79263
+
+Previously, all quantized PyTorch tensors are all casted to the dtypes which comply with ONNX's definition, i.e. `scale` is casted to `double`, and `zero_point` is casted to `int64`. These casts lead to inconsistent dtypes when comparing PyTorch's outputs and ONNX runtime's outputs.
+
+Now, `cast_onnx_accepted` argument is added to `unpack_quantized_tensor` function. When making example inputs for ONNX, we cast them to the ONNX compliant dtypes; otherwise, they are casted to PyTorch default types for quantization.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/79690
+Approved by: https://github.com/justinchuby, https://github.com/BowenBao
+","['torch/onnx/utils.py', 'torch/onnx/verification.py']",Quantized PyTorch tensors being cast to dtypes per ONNX's definition causes inconsistency when comparing outputs from PyTorch and ONNX runtime.
+9ca367d48b6253279f7e021ba6e89e3dbeeb4f98,1642031357,"[nnc] Use given kernel function name while emitting code (#67781)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/67781
+
+Update `LLVMCodeGen` in NNC to use the given kernel function name while emitting code.
+
+This was earlier committed as D31445799 (https://github.com/pytorch/pytorch/commit/c30dc52739c083d8b10f36ed3e84f765f349fe9b) and got reverted as part of a stack of diffs that included a cache for `PyTorchLLVMJIT`, which was the likely culprit.
+
+Test Plan:
+```
+buck test mode/opt //caffe2/test/cpp/tensorexpr:tensorexpr -- --exact 'caffe2/test/cpp/tensorexpr:tensorexpr - LLVM.CodeGenKernelFuncName'
+```
+
+Reviewed By: ZolotukhinM, bdhirsh
+
+Differential Revision: D32145958
+
+fbshipit-source-id: 5f4e0400c4fa7cabce5b91e6de2a294fa0cad88e
+","['test/cpp/tensorexpr/test_llvm.cpp', 'torch/csrc/jit/tensorexpr/llvm_codegen.cpp']","NNC's `LLVMCodeGen` is not using the provided kernel function name during code emission, causing potential naming conflicts and unexpected behavior."
+9ef1c6490723ccb91e249fe5e9b46910be4b81fd,1625766008,"[PyTorch][Edge] Tests for QuantizationFx API on lite modules (#60476)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/60476
+
+# Context
+Add tests for Lite modules that are quantized using fx API
+
+Read this posts for details about why we need a test bench for quantized lite modules
+https://fb.workplace.com/groups/2322282031156145/permalink/4289792691071726/
+
+https://github.com/pytorch/pytorch/pull/60226#discussion_r654615851
+
+moved common code to `caffe2/torch/testing/_internal/common_quantization.py`
+
+ghstack-source-id: 133144292
+
+Test Plan:
+```
+~/fbsource/fbcode] buck test caffe2/test:fx_quantization_lite
+Downloaded 0/2 artifacts, 0.00 bytes, 100.0% cache miss
+Building: finished in 8.3 sec (100%) 11892/11892 jobs, 2 updated
+  Total time: 8.6 sec
+More details at https://www.internalfb.com/intern/buck/build/ffb7d517-d85e-4c8f-9531-5e5d9ca1d34c
+Tpx test run coordinator for Facebook. See https://fburl.com/tpx for details.
+Running with tpx session id: d79a5713-bd29-4bbf-ae76-33a413869a09
+Trace available for this run at /tmp/tpx-20210630-105547.675980/trace.log
+Started reporting to test run: https://www.internalfb.com/intern/testinfra/testrun/3096224749578707
+    ✓ ListingSuccess: caffe2/test:fx_quantization_lite - main (9.423)
+    ✓ Pass: caffe2/test:fx_quantization_lite - test_embedding (mobile.test_quantize_fx_lite_script_module.TestFuseFx) (10.630)
+    ✓ Pass: caffe2/test:fx_quantization_lite - test_submodule (mobile.test_quantize_fx_lite_script_module.TestFuseFx) (12.464)
+    ✓ Pass: caffe2/test:fx_quantization_lite - test_conv2d (mobile.test_quantize_fx_lite_script_module.TestFuseFx) (12.728)
+Summary
+  Pass: 3
+  ListingSuccess: 1
+If you need help understanding your runs, please follow the wiki: https://fburl.com/posting_in_tpx_users
+Finished test run: https://www.internalfb.com/intern/testinfra/testrun/3096224749578707
+```
+
+Reviewed By: iseeyuan
+
+Differential Revision: D29306402
+
+fbshipit-source-id: aa481e0f696b7e9b04b9dcc6516e8a390f7dc1be
+","['test/mobile/test_lite_script_module.py', 'test/mobile/test_quantize_fx_lite_script_module.py', 'torch/testing/_internal/common_quantization.py']","Lack of tests for Lite modules that are quantized using fx API in PyTorch, creating uncertainty in the functionality of quantization with fx API."
+a2ca89331f97aadcdc85a0893991fac2c0d5da09,1660176710,"[ao] Create framework for ModelReport Qconfig Generation (#83091)
+
+Summary: This creates the framework in the ModelReport API for the
+generation of QConfigs by the ModelReport instance based on suggestions.
+This functionality will eventually be added into the report generation
+or be something that complements it, but for now it will be an
+independent call for API stability and to be able to better modularize
+the features as it stabilizes.
+
+This also adds the framework for the relavent test function and a note
+in the README at what future changes are planned for this new method in
+the ModelReport API.
+
+Test Plan: python test/test_quantization.py TestFxModelReportClass.test_qconfig_generation
+
+Reviewers:
+
+Subscribers:
+
+Tasks:
+
+Tags:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/83091
+Approved by: https://github.com/HDCharles
+","['test/quantization/fx/test_model_report_fx.py', 'torch/ao/quantization/fx/_model_report/model_report.py']","The ModelReport API lacks a framework for the generation of QConfigs based on suggestions, inhibiting modular feature development and API stability."
+a31aea8eaa99a5ff72b5d002c206cd68d5467a5e,1637645704,"[quant][graphmode][fx] Add support for specifying reference quantized module mapping in backend_config_dict (#68227)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/68227
+
+This PR adds two keys to backend_config_dict:
+""root_module"": the root module for the pattern (since we may have patterns for fused ops)
+""reference_quantized_module_for_root"": the corresponding reference quantized module for the root
+
+Test Plan:
+```
+python test/test_quant_trt.py TestQuantizeFxTRTOps
+python test/test_quant_trt.py TestConvertFxDoNotUse
+```
+
+Imported from OSS
+
+Reviewed By: vkuzo
+
+Differential Revision: D32537711
+
+fbshipit-source-id: 6b8f36a219db7bb6633dac53072b748ede8dfa78
+","['test/fx2trt/test_quant_trt.py', 'torch/ao/quantization/_quantize_fx_do_not_use.py', 'torch/ao/quantization/fx/_convert_do_not_use.py', 'torch/ao/quantization/fx/backend_config_dict/tensorrt.py', 'torch/ao/quantization/fx/backend_config_dict/utils.py']",The backend_config_dict lacks keys for specifying the root module and its corresponding reference quantized module for the pattern in fused ops.
+a5923ab3f38cc320d61c231c5fa8363fb8b6a5c7,1679116038,"Revert ""[inductor] do benchmark in sub processes for max autotuning (#96410)"" (#97075)
+
+This reverts commit 34256bc73080d7898138c821273b9f31fab777f8.
+
+@kit1980: I'm not sure how best to revert a co-dev PR like https://github.com/pytorch/pytorch/pull/96410#issuecomment-1474704337.  IIRC, Ivan and Eli did a revert PR like this before, so I create one here just in case we need to use it.  If that's the case, please feel free to get this merge to fix trunk.  Otherwise, this can be closed.
+
+@shunting314 If you can do a forward fix faster than this, please help do so.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/97075
+Approved by: https://github.com/kit1980
+","['test/inductor/test_max_autotune.py', 'torch/_inductor/autotune_process.py', 'torch/_inductor/codecache.py', 'torch/_inductor/config.py', 'torch/_inductor/select_algorithm.py']","Benchmarking in sub-processes during max autotuning is breaking functionality, potentially causing problems with the trunk."
+af1a772876ca52ad75f3b33e83c4314db81d6a48,1618256974,"Disable overloading of std::max & std::min for inputs of distinct types (#55638)
+
+Summary:
+Fixes https://github.com/pytorch/pytorch/issues/55613
+
+### Problem
+By default, `std::max` and `std::min` only operate on inputs of the same type.
+In [`c10/util/BFloat16-math.h`](https://github.com/pytorch/pytorch/blob/master/c10/util/BFloat16-math.h), `std::max` & `std::min` have been overloaded:
+https://github.com/pytorch/pytorch/blob/305abde976d232494c6b5252111ce15523511ffe/c10/util/BFloat16-math.h#L32-L33
+ezyang [observed](https://github.com/pytorch/pytorch/pull/55586#issuecomment-815862373) &  [illustrated](https://godbolt.org/z/bjTjPMMco) that calls to `std::max` & `std::min` for distinct input types (eg. `std::max(int, float)`) are being handled via `BFloat16`'s aforementioned overloads via implicit conversion to `BFloat16`. (I haven't looked into why yet).
+
+### Solution implemented
+1. Disabled overloading of `std::max` & `std::min` for inputs of distinct types by removing these overloads for `BFloat16`.
+2. Instead, `<` and `>` operators are now being overloaded for `BFloat16` now (for comparison with another `BFloat16`), since `std::max` and `std::min` use these operators.
+3. Calls to `std::max` and `std::min` with inputs of distinct types are only present at 3 places in the codebase, where they can either be handled by a `static_cast`, or by changing the type:
+a. [`aten/src/ATen/native/quantized/fake_quant_per_tensor_affine.cpp`](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/quantized/fake_quant_per_tensor_affine.cpp#L111)
+b. [`aten/src/ATen/native/cpu/BinaryOpsKernel.cpp`](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/cpu/BinaryOpsKernel.cpp#L74)
+c. [`aten/src/ATen/native/quantized/cpu/kernels/QuantizedOpKernels.cpp`](https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/native/quantized/cpu/kernels/QuantizedOpKernels.cpp#L2998-L2999)
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/55638
+
+Reviewed By: albanD
+
+Differential Revision: D27669702
+
+Pulled By: ezyang
+
+fbshipit-source-id: 790a67b76f86c25fad2c7ed0345b7f35ab5eca68
+","['aten/src/ATen/native/cpu/BinaryOpsKernel.cpp', 'aten/src/ATen/native/quantized/cpu/kernels/QuantizedOpKernels.cpp', 'aten/src/ATen/native/quantized/fake_quant_per_tensor_affine.cpp', 'c10/util/BFloat16-inl.h', 'c10/util/BFloat16-math.h']",Overloading of `std::max` and `std::min` in the `c10/util/BFloat16-math.h` causing unnecessary implicit conversion to `BFloat16` when called for different input types.
+af65634d1cea1b8d7ddc710d49ae06dca36673d2,1643512292,"Move generated keyword out of gen_mobile_upgraders.py (#71938)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/71938
+
+`generated` will trigger the generated changes and hide the file changes. It's also misleading, because `gen_mobile_upgraders.py` itself is not autogen. Separate the keyword out from `gen_mobile_upgraders.py` so it's easier to see the changes from `gen_mobile_upgraders.py`.
+ghstack-source-id: 147957825
+
+Test Plan:
+```
+buck run mode/opt //caffe2/torch/fb/mobile/upgrader_codegen:upgrader_codegen
+```
+
+Reviewed By: tugsbayasgalan
+
+Differential Revision: D33826982
+
+fbshipit-source-id: 593c19f8ef4c9da776b11650863dc43c0b171cd5
+(cherry picked from commit 43038d5bc7a41312a005d62f432c5ca19ed79f21)
+","['tools/codegen/operator_versions/gen_mobile_upgraders.py', 'tools/codegen/operator_versions/gen_mobile_upgraders_constant.py']","The keyword `generated` in `gen_mobile_upgraders.py` triggers unnecessary changes and obscures file changes, besides being misleading as the file itself is not autogenerated."
+af80329ca9159a730c474364e5a82a6cf5af4e14,1652325930,"[quant][core][gpu][feature] Implemented quantized conv1d cudnn op
+
+Summary:
+Previously, only quantized conv2d cudnn op has been implemented. This PR
+implements the 1d variant. Because cuDNN does not have direct support
+for conv1d, we have cast the 1d case to a 2d case by adding a dummy
+weight dimension of 1 for the input and weight tensors. This is
+analogous to how it was done for quantized cpu conv1d (e.g., see
+`quantized/cpu/qconv.cpp`)
+
+A corresponding test case was added in `test_quantized_op.py`. This
+function should ideally be merged with `test_qconv1d` when cuDNN flags are
+enabled and available in pytorch.
+
+Test Plan:
+```
+python test/test_quantization.py -k test_qconv1d_cudnn
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/77175
+
+Approved by: https://github.com/jerryzh168
+","['aten/src/ATen/native/quantized/cudnn/Conv.cpp', 'aten/src/ATen/native/quantized/cudnn/conv_prepack.cpp', 'test/quantization/core/test_quantized_op.py']","The codebase is missing implementation of a 1d variant of the quantized convolution cudnn operation, leading to inability to perform quantized conv1d operations."
+b2a55076546021fd059794676e9066f361b3a091,1646858535,"Fix deadlock in some edge case in autograd (#73961)
+
+Summary:
+Minimal example that deadlocks before but not after:
+```python
+import torch
+from torch.autograd import Function
+
+class Foo(Function):
+    staticmethod
+    def forward(ctx, x):
+        return x.clone()
+
+    staticmethod
+    def forward(ctx, gO):
+        return gO.clone()
+
+def get_out():
+    inp = torch.rand(2, requires_grad=True)
+
+    # The python function is first so that it runs
+    # last in the backward pass
+    right = Foo.apply(inp)
+
+    # An op that creates new memory
+    left1 = inp.clone()
+    # An op that saves its input
+    left2 = left1 ** 2
+
+    # Inplace modify so that the backward for
+    # left2 always raises an error
+    left1 += 1
+
+    # An op that takes both side as input.
+    # After running, both side's last op will be in
+    # the ready queue
+    # And the op for left will run first as it was
+    # executed last during the forward
+    out = left2 + right
+
+    return out
+
+# Nothing should be global variables here as, from what
+# I can see, python leaks all the global objects
+get_out().sum().backward()
+
+```
+
+Since this requires the python interpreter to die, it is hard to test in CI.
+Let me know if you have an idea how to do it though.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/73961
+
+Reviewed By: malfet
+
+Differential Revision: D34752747
+
+Pulled By: albanD
+
+fbshipit-source-id: 1a537b1f733e161e8d3ff053cd432b37b34d432a
+(cherry picked from commit 17943e4c04c782d81deab439e010195f04e75bbd)
+","['test/test_autograd.py', 'torch/csrc/autograd/python_function.cpp']","Backward passes in autograd can cause deadlock with Python interpreter in specific edge cases involving operations with new memory creation, input saves, and inplace modifications."
+b3071e2eb61fbbad9b36d7022855111efc6c37f4,1666195168,"functionalization: skip meta reference compute for aot autograd (#87108)
+
+The context is that historically, XLA/LTC tensors haven't had accurate stride information, and functionalization would run ""reference"" meta kernels for view ops on the side to properly compute strides.
+
+This is more complicated in symint tracing world - we have a `FunctionalTensorWrapper()` that wraps the underlying tensor and has its own set of sizes/strides metadata, but we never create proxy objects for the sizes/strides of the wrapper.
+
+In symint tracing world with aot autograd, we're guaranteed that our underlying strides are accurate anyway, since aot autograd uses fake tensors to perform tracing. We encountered a few bugs with symint's from the `FunctionalTensorWrapper` making their way into `__torch_dispatch__`. To side-step that area of bugs completely (and marginally improve perf), this PR disables the meta tensor tracing for non XLA/LTC use cases.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/87108
+Approved by: https://github.com/ezyang, https://github.com/wconstab
+","['aten/src/ATen/FunctionalTensorWrapper.cpp', 'aten/src/ATen/FunctionalTensorWrapper.h', 'torchgen/gen_functionalization_type.py']","SymInt tracing with AOT autograd is experiencing bugs, likely due to `FunctionalTensorWrapper` miscommunication with `__torch_dispatch__`, while the underlying strides are confirmed to be accurate."
+b469ed72d0ce791edbc124cd2c4504c37278e30d,1685060666,"Integrating new API usage metadata logger (#101762)
+
+Summary: The new logger allows passing metadata into the api usage logger. The immediate use case is to pass the serialization_id to the save and load events to be enable tracking serialized models in API events. It could be extended to add more metadata in the future.
+
+Test Plan:
+```
+buck2 test @//mode/dev //caffe2/caffe2/serialize:inline_container_test
+```
+
+Reviewed By: davidberard98
+
+Differential Revision: D45683697
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/101762
+Approved by: https://github.com/davidberard98
+","['c10/util/Logging.cpp', 'c10/util/Logging.h', 'caffe2/serialize/inline_container.cc', 'caffe2/serialize/inline_container_test.cc', 'torch/csrc/Module.cpp', 'torch/csrc/jit/serialization/import.cpp', 'torch/package/package_importer.py', 'torch/serialization.py']",Currently there is no mechanism for tracking serialized models in API events as api usage logger lacks an option to pass metadata such as serialization_id.
+b4e342928b85aa53a62fd3194c9aa761e7352c8a,1657566786,"[JIT] Add mutability checks in FunctionSchema and create SchemaInfo subclass (#80734)
+
+- Added overloads to is_mutable method in FunctionSchema to tell whether an argument at index is mutable or an argument with name is mutable.
+- Created SchemaInfo subclass of FunctionSchema with constructors from FunctionSchema and from const char* signature.
+- Tested is_mutable method overloads in new test_schema_info.cpp file.
+
+**Note that this pr is used to set up SchemaInfo. Implementation for SchemaInfo will be addressed in later commits**
+
+Differential Revision: [D37651384](https://our.internmc.facebook.com/intern/diff/D37651384)
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/80734
+Approved by: https://github.com/davidberard98
+","['aten/src/ATen/core/function_schema.h', 'build_variables.bzl', 'test/cpp/jit/test_schema_info.cpp', 'torch/csrc/utils/schema_info.cpp', 'torch/csrc/utils/schema_info.h']","FunctionSchema does not currently support mutability checks for arguments either at index or with name, and also lacks an efficient method sub-classing system."
+b52849b58901dca34e873bdced47e17cd5a07228,1624901865,"Port silu_backward to structured (#58661)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/58661
+
+I removed dispatch: CompositeImplicitAutograd: math_silu_backward
+Definitely not right, but I don't know how it works with structured core.
+Keeping it will trigger an assertion failure
+
+```
+assert dispatch.keys() != {DispatchKey.CompositeImplicitAutograd}, \
+    f""unexpected name for singleton CompositeImplicitAutograd dispatch entry: expected {cpp.name(func)} "" \
+    f""but got {dispatch[DispatchKey.CompositeImplicitAutograd]}.  Rename your implementation to the expected "" \
+    ""name, then delete the dispatch table""
+```
+
+Test Plan: Imported from OSS
+
+Reviewed By: soulitzer
+
+Differential Revision: D28572530
+
+Pulled By: ezyang
+
+fbshipit-source-id: 410f03bddf79cda7c9f0fd66f697383ee2925d32
+","['aten/src/ATen/native/Activation.cpp', 'aten/src/ATen/native/Activation.h', 'aten/src/ATen/native/cpu/Activation.cpp', 'aten/src/ATen/native/cuda/Activation.cu', 'aten/src/ATen/test/math_kernel_test.cpp', 'tools/codegen/model.py']",Removal of 'CompositeImplicitAutograd: math_silu_backward' dispatch leads to an assertion failure with structured core.
+b62827b81a1a1ba618b57e924c09947f482c6990,1643903559,"[Quant][devs] Separated implementations for quantized & non-quantized tensors in fill_ (#71939)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/71939
+
+This PR is part of a series of PRs addressing https://github.com/pytorch/pytorch/issues/54150,
+related to using dispatcher for calls to quantized backends as opposed to if/else conditionals.
+This particular PR separates the calls to quantized & non-quantized backends for fill_
+using a dispatcher.
+
+Differential Revision:
+D33827371
+D33827371
+
+Test Plan: Imported from OSS
+
+Reviewed By: jerryzh168
+
+Pulled By: dzdang
+
+fbshipit-source-id: d034f83de844ef777a2d71e5464f582cba634550
+(cherry picked from commit 9f38385051e41a32ccc631dc3354caa03188649b)
+",['aten/src/ATen/native/Fill.cpp'],"The implementation for `fill_` operator combines both quantized and non-quantized tensor operations, making the codebase difficult to maintain and optimize based on tensor type."
+b8d3afd88665de5f01f696333d0ff291bd94a57b,1669243179,"Skip upload test stats for test reports from rerun disabled tests workflow (#89548)
+
+I have found the reason why uploading tests stats fails for rerun disabled workflow, for example https://github.com/pytorch/pytorch/actions/runs/3522896778/jobs/5917765699.  The problem is that the pytest XML file is now too big to be processed quickly (x50 bigger). Unlike unittest, `pytest-flakefinder` used by rerun disabled tests for test_ops includes skipped messages multiple times (50 times by default, retrying and skipping).  This slows down the upload test stats script too much (O(n)) because it tries to gather all the stats. On the other hand, `check_disabled_tests` doesn't suffer from the same issue because it ignores all these skipped messages.
+
+This is a quick fix to skip test reports from rerun disabled tests workflow when trying to upload test stats.
+
+I'll try to fix this properly later in the way we use pytest-flakefinder. From what I see, a zipped test report from rerun disabled test is only few MB ([example](https://gha-artifacts.s3.amazonaws.com/pytorch/pytorch/3521687954/1/artifact/test-reports-test-default-1-2-linux.2xlarge_9636028803.zip)), but will balloon up to a much bigger XML file after extracting from a dozen to a few hundred MB (text).  The size of the zipped file is not a big immediate problem
+
+### Testing
+
+[3521687954](https://github.com/pytorch/pytorch/actions/runs/3521687954) is an example workflow with rerun disabled tests and mem leak check.  The script can now finish when running locally:
+
+* `upload_test_stats` finishes around 3+ minutes
+```
+time python -m tools.stats.upload_test_stats --workflow-run-id 3521687954 --workflow-run-attempt 1 --head-branch master
+...
+Writing 8925 documents to S3
+Done!
+Writing 1760 documents to S3
+Done!
+Writing 1675249 documents to S3
+Done!
+python3 -m tools.stats.upload_test_stats --workflow-run-id 3521687954  1    185.69s user 12.89s system 75% cpu 4:22.82 total
+```
+
+* `check_disabled_tests` finishes within 3 minutes
+```
+time python -m tools.stats.check_disabled_tests --workflow-run-id 3521687954 --workflow-run-attempt 1 --repo pytorch/pytorch
+...
+python -m tools.stats.check_disabled_tests --workflow-run-id 3521687954  1    154.19s user 4.17s system 97% cpu 2:42.50 total
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/89548
+Approved by: https://github.com/clee2000
+","['tools/stats/check_disabled_tests.py', 'tools/stats/upload_stats_lib.py', 'tools/stats/upload_test_stats.py']","Uploading test stats from rerun disabled workflow results in failure as pytest XML file size is too large, causing prolonged script runtime due to retries/ignores on skipped messages."
+bb6b157458a34d8b3499932035381fdb12683703,1691692367,"Fix IndexKernel.cu build (#104423)
+
+Fixes `signed-unsigned comparison` warnings introduced by https://github.com/pytorch/pytorch/pull/106809 (previously by  <s> https://github.com/pytorch/pytorch/pull/104054 </s> ) that changed type of `num_indices` to unsigned.
+
+Before the change warnings looks as follows:
+```
+/tmp/tmpxft_00194ca7_00000000-6_IndexKernel.cudafe1.stub.c:31:580:   required from here
+/home/nshulga/git/pytorch/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:58:63: warning: comparison of integer expressions of different signedness: ‘const long unsigned int’ and ‘int’ [-Wsign-compare]
+   58 |   AT_ASSERT(num_indices == iter.ntensors() - 2);
+      |                                                               ^
+/home/nshulga/git/pytorch/pytorch/aten/src/ATen/native/cuda/IndexKernel.cu:74:19: warning: comparison of integer expressions of different signedness: ‘int’ and ‘const long unsigned int’ [-Wsign-compare]
+   74 |   for (int i = 0; i < num_indices; i++) {
+      |                 ~~^~~~~~~~~~~~~
+```
+TODO: Turn those warning into errors
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/104423
+Approved by: https://github.com/Skylion007
+",['aten/src/ATen/native/cuda/IndexKernel.cu'],"Signed-unsigned comparison warnings in IndexKernel.cu due to recent change in 'num_indices' type from signed to unsigned, causing build issues."
+bbc3cc6718d841665ab2677477d458ed97b75609,1619812985,"[CUDA graphs] [BC-breaking] Makes torch.cuda.amp.GradScaler scale updates in-place for better composability with graph capture (#55562)
+
+Summary:
+I'd like the following pattern (a natural composition of Amp with full fwd+bwd capture) to work:
+```python
+# Create ""static_input"" with dummy data, run warmup iterations,
+# call optimizer.zero_grad(set_to_none=True), then
+g = torch.cuda._Graph()
+s.wait_stream(torch.cuda.current_stream())
+with torch.cuda.stream(s):
+    optimizer.zero_grad(set_to_none=True)
+    g.capture_begin()
+    with autocast():
+        out = model(static_input)
+        loss = loss_fn(out)
+    scaler.scale(loss).backward()
+    g.capture_end()
+torch.cuda.current_stream().wait_stream(s)
+
+# Training loop:
+for b in data:
+    # optimizer.zero_grad() deliberately omitted, replay()'s baked-in backward will refill statically held .grads
+    static_input.copy_(b)
+    g.replay()
+    scaler.step(optimizer)
+    scaler.update()
+```
+
+Right now `GradScaler` can't work with this pattern because `update()` creates the scale tensor for the next iteration out of place. This PR changes `update()` to act in place on a long-lived scale tensor that stays static across iterations.
+
+I'm not sure how this change affects XLA (see https://github.com/pytorch/pytorch/pull/48570), so we shouldn't merge without approval from ailzhang yaochengji.
+
+Tagged bc-breaking because it's a change to the amp update utility function in native_functions.yaml. The function was never meant to be user-facing though.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/55562
+
+Reviewed By: zou3519
+
+Differential Revision: D28046159
+
+Pulled By: ngimel
+
+fbshipit-source-id: 02018c221609974546c562f691e20ab6ac611910
+","['aten/src/ATen/core/aten_interned_strings.h', 'aten/src/ATen/native/cuda/AmpKernels.cu', 'test/backward_compatibility/check_backward_compatibility.py', 'test/test_cuda.py', 'torch/cuda/amp/grad_scaler.py']","The current implementation of `GradScaler` is not compatible with certain use patterns, such as full forward and backward capture, as `update()` creates the scale tensor for the next iteration out of place."
+bd032cd8d65e36b9d16af42520f5d63e861cb9d4,1648916514,"[quant][fx] Remove is_output_quantized from QuantizeHandler (#74843)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/74843
+
+is_output_quantized is used to check if we should quantize the op based on the dtype configuration in qconfig and what
+is supported by the backend, we'll skip inserting observer if the dtype configuration is not supported by the backend,
+this is now supported by backend_config_dict, and we can remove this function now.
+
+Also we previously supported fp16 static quantization for some ops for one of our internal use case, and now it is not required, so
+we can remove them
+
+Test Plan:
+python test/test_quantization.py TestQuantizeFx
+python test/test_quantization.py TestQuantizeFxOps
+
+Imported from OSS
+
+Reviewed By: andrewor14
+
+Differential Revision: D35190541
+
+fbshipit-source-id: 623d961810737ec01e1f8b269ec48a6a99bb284a
+(cherry picked from commit a405998c60c0146dbd5feef60e2d5cb3b0aa289c)
+","['test/quantization/fx/test_quantize_fx.py', 'torch/ao/quantization/fx/backend_config/native.py', 'torch/ao/quantization/fx/prepare.py', 'torch/ao/quantization/fx/quantization_patterns.py']","QuantizeHandler's function `is_output_quantized` is redundant due to the support provided by `backend_config_dict`. Additionally, unrequired support for fp16 static quantization in some operations exists."
+bfe5ad28e6a509e08c0afd785c32019f8a05a7fb,1638587190,"[Linalg] Add a runtime switch to let pytorch prefer a backend impl in linalg functions on GPU (#67980)
+
+Summary:
+Per title.
+
+This PR introduces a global flag that lets pytorch prefer one of the many backend implementations while calling linear algebra functions on GPU.
+
+Usage:
+```python
+torch.backends.cuda.preferred_linalg_library('cusolver')
+```
+
+Available options (str): `'default'`, `'cusolver'`, `'magma'`.
+
+Issue https://github.com/pytorch/pytorch/issues/63992 inspired me to write this PR. No heuristic is perfect on all devices, library versions, matrix shapes, workloads, etc. We can obtain better performance if we can conveniently switch linear algebra backends at runtime.
+
+Performance of linear algebra operators after this PR should be no worse than before. The flag is set to **`'default'`** by default, which makes everything the same as before this PR.
+
+The implementation of this PR is basically following that of https://github.com/pytorch/pytorch/pull/67790.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/67980
+
+Reviewed By: mruberry
+
+Differential Revision: D32849457
+
+Pulled By: ngimel
+
+fbshipit-source-id: 679fee7744a03af057995aef06316306073010a6
+","['aten/src/ATen/Context.cpp', 'aten/src/ATen/Context.h', 'aten/src/ATen/LinalgBackend.h', 'aten/src/ATen/native/cuda/BatchLinearAlgebra.cpp', 'test/test_linalg.py', 'torch/__init__.py', 'torch/backends/cuda/__init__.py', 'torch/csrc/Module.cpp']","There isn't a way to toggle between different backend implementations while making calls to linear algebra functions on the GPU, affecting overall performance flexibility."
+c08cbfccd9e2a9b2e6006773d04aafa74977684f,1665607422,"Let retried jobs advance viable/strict (#86821)
+
+Today, even if we retry a failed workflow it succeeds on the retry, viable/strict doesn't advance forward.
+
+Success on retry is proof that the error wasn't with the current commit and that we should in fact promote viable/strict. This PR points to an updated rockset query which will only look at the success status of the most recent job in each workflow
+
+Here's the query edited:
+
+Original query:
+https://console.rockset.com/lambdas/details/commons.commit_jobs_batch_query/versions/15aba20837ae9d75?tab=sql
+
+Updated query: https://console.rockset.com/lambdas/details/commons.commit_jobs_batch_query/versions/8003fdfd18b64696?tab=sql
+
+Testing:
+Tested the old and new query against commits known to have succeeded on retry
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/86821
+Approved by: https://github.com/huydhn, https://github.com/malfet
+",['.github/scripts/fetch_latest_green_commit.py'],"Viable/strict is not advancing forward despite subsequent successful retries following an initial workflow failure, indicating current commit error."
+c7f9da5752baf2280ebeef0a078b9d3e8eb41efc,1648520241,"Add C++ implementation of histogramdd
+
+This creates a `histogramdd` operator with overloads matching the `Union`
+behaviour used in the functional variant. Moving into C++ is preferred because
+it can handle torch function automatically instead of needing to differentiate
+between the overloads manually.
+
+This also adds a new return type: `std::tuple<Tensor, std::vector<Tensor>>`. For
+which I've updated `wrap` to be completely generic for tuples and removed the
+old manual definitions.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/74200
+
+Approved by: https://github.com/ezyang
+","['aten/src/ATen/native/Histogram.cpp', 'test/test_namedtuple_return_api.py', 'tools/codegen/api/python.py', 'tools/pyi/gen_pyi.py', 'torch/csrc/autograd/utils/wrap_outputs.h', 'torch/csrc/utils/python_arg_parser.cpp', 'torch/functional.py']","The `histogramdd` operator lacks a C++ implementation, resulting in manual differentiation between overloads. Additionally, the `wrap` function cannot handle the return type `std::tuple<Tensor, std::vector<Tensor>>` in a generic way."
+c81c217a2fffc30ef6ca334c70c27c3d240d7510,1692777717,"Make ExportedProgram valid tracing callable (#107657)
+
+In this PR, we make ExportedProgram valid callable to export for re-exporting. Note that we don't allow any new constraints specified from user as we don't have any way of handling it right now. There are some caveats that is worth mentioning in this PR.
+Today, graph_module.meta is not preserved (note that this is different from node level meta which we preserve). Our export logic relies on this meta to process the constraints. But if we skip dynamo, we will have to preserve the constraints stored in graph_module.meta. Once dynamo supports retracibility, we don't have to do this anymore. I currently manually save graph_module.meta at following places:
+1. After ExportedProgram.module()
+2. After ExportedProgram.transform()
+3. At construction site of ExportedProgram.
+
+Jerry will add the update on the quantization side as well.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/107657
+Approved by: https://github.com/gmagogsfm
+","['test/export/test_export.py', 'torch/_export/__init__.py', 'torch/_export/exported_program.py']","Constraints specified by user in ExportedProgram are not being handled properly, and graph_module.meta information is not preserved impacting the export logic that processes these constraints."
+ca429fedd3d6cae692ec9c53c4a911ebc2780cd6,1616036282,"[StaticRuntime] Fuse SigridTransforms + ListUnpack (#53920)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/53920
+
+Fusing SigridTransforms + ListUnpack allows for enabling out variant for SigridTransforms so that the output tensors can be managed by the MemoryPlanner in Static Runtime.
+
+The speedup comes from three parts 1) get rid of memory allocation inside SigridTransforms itself, 2) memory deallocation cost (outside SigridTransforms, inside MemoryPlanner), 3) get rid of ListUnpack. However, in 3) we still need to pay the cost of constructing `vector<Tensor>` for outputs and a round of refcount bumps for all the output TensorImpls.
+
+Reviewed By: ajyu
+
+Differential Revision: D26220546
+
+fbshipit-source-id: 651bdfb850225511c43b8f50083b13e8dec46bcc
+","['torch/csrc/jit/runtime/static/impl.cpp', 'torch/csrc/jit/runtime/static/passes.cpp', 'torch/csrc/jit/runtime/static/passes.h']","The fusion of SigridTransforms + ListUnpack is currently not enabled causing inefficient memory management in Static Runtime and ineffective dealing with output tensor memory allocation, deallocation, and unnecessary ListUnpack procedure."
+d01302431c41691ee29ccf2b710cc5738128993e,1619145997,"Enable fast gradcheck for real inputs and outputs (#55237)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/55237
+
+In this PR, we reenable fast-gradcheck and resolve misc issues that arise:
+Before landing this PR, land #55182 so that slow tests are still being run periodically.
+
+Bolded indicates the issue is handled in this PR, otherwise it is handled in a previous PR.
+
+**Non-determinism issues**:
+- ops that do not have deterministic implementation (as documented https://pytorch.org/docs/stable/generated/torch.use_deterministic_algorithms.html#torch.use_deterministic_algorithms)
+  - test_pad_cuda (replication_pad2d) (test_nn)
+  - interpolate (test_nn)
+  - cummin, cummax (scatter_add_cuda_kernel) (test_ops)
+  - test_fn_gradgrad_prod_cpu_float64 (test_ops)
+
+Randomness:
+  - RRelu (new module tests) - we fix by using our own generator as to avoid messing with user RNG state (handled in #54480)
+
+Numerical precision issues:
+- jacobian mismatch: test_gelu (test_nn, float32, not able to replicate locally) - we fixed this by disabling for float32 (handled in previous  PR)
+- cholesky_solve (test_linalg): #56235 handled in previous PR
+- **cumprod** (test_ops) - #56275 disabled fast gradcheck
+
+Not yet replicated:
+ - test_relaxed_one_hot_categorical_2d (test_distributions)
+
+Test Plan: Imported from OSS
+
+Reviewed By: albanD
+
+Differential Revision: D27920906
+
+fbshipit-source-id: 894dd7bf20b74f1a91a5bc24fe56794b4ee24656
+","['test/test_nn.py', 'test/test_ops.py', 'torch/autograd/gradcheck.py', 'torch/testing/_internal/common_methods_invocations.py', 'torch/testing/_internal/common_utils.py']",Fast gradcheck functionality is disabled causing non-determinism issues in certain operations. Multiple operations also demonstrate numerical precision issues.
+d3e338935a3bc0a9c535b29eac0be3a15fc7465c,1651756793,"ns for fx: skip shadowing for torch.cat, and also for nodes with only kwargs (#76561)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/76561
+
+User model had syntax like `torch.cat(tensors=[x])`. This PR fixes two errors
+to unbreak this in NS shadow model:
+1. skip nodes which only have kwargs (instead of throwing an exception)
+2. explicitly skip shadowing of `torch.cat` (since it's not supported anyways)
+
+Test Plan:
+```
+python test/test_quantization.py -k test_op_with_only_kwargs_skips_shadowing
+python test/test_quantization.py -k test_op_mul_add_cat_skips_shadowing
+```
+
+Reviewed By: hx89
+
+Differential Revision: D36017356
+
+Pulled By: vkuzo
+
+fbshipit-source-id: 0da4840a62c2dac183f8294c2cec4fce262474b3
+(cherry picked from commit 88409c1576e7f690708957b2baa285fc7961e9d6)
+","['test/quantization/fx/test_numeric_suite_fx.py', 'torch/ao/ns/fx/graph_passes.py', 'torch/ao/ns/fx/utils.py']","Model syntax like `torch.cat(tensors=[x])` generates exceptions, also shadowing of `torch.cat` is not correctly handled causing errors."
+d5f99581b508df04edecbd0be10312b4b6d5ae03,1653485921,"Pass WITH_BLAS option from environment to CMake (#78037)
+
+Allows to choose the BLAS backend with Eigen. Previously this was a CMake option only and the env variable was ignored.
+
+Related to https://github.com/pytorch/pytorch/commit/f1f3c8b0fad9d647454a4d0507a2db4381563c8e
+
+The claimed options BLAS=BLIS WITH_BLAS=blis are misleading: When BLAS=BLIS is set the WITH_BLAS option does not matter at all, it would only matter for BLAS=Eigen hence this issue went undetected so far.
+
+Supersedes #59220
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/78037
+Approved by: https://github.com/adamjstewart, https://github.com/janeyx99
+",['tools/setup_helpers/cmake.py'],"Setting the environment variable WITH_BLAS is unsupported, which misleads users and leads to confusion when trying to select the BLAS backend with Eigen."
+d7b31fe95da98a2798376044dc84e5f9b7a3e486,1626899529,"Add ciflow config and change jinja2 templates (#61886)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/61886
+
+This PR is rolling out at the `1. Manual Phase`.
+
+```
+#       Rollout Strategy:
+#       1. Manual Phase
+#          step 1. Add 'ciflow/default' label to the PR
+#          step 2. Once there's an [unassigned] event from PR, it should rerun
+#          step 3. Remove 'ciflow/default' label
+#          step 4. Trigger the [unassigned] event again, it should not rerun
+#       2. Probot Phase 1 (manual on 1 workflow)
+#          step 1. Probot automatically add labels based on the context
+#          step 2. Manually let probot trigger [unassigned] event
+#       4. Probot Phase 3 (auto on 1 workflows)
+#          step 1. Modify the workflows so that they only listen on [unassigned] events
+#          step 2. Probot automatically adds labels automatically based on the context
+#          step 3. Probot automatically triggers [unassigned] event
+#       4. Probot Phase 3 (auto on many workflows)
+#          step 1. Enable it for all workflows
+```
+
+Test Plan: Imported from OSS
+
+Reviewed By: seemethere
+
+Differential Revision: D29808366
+
+Pulled By: zhouzhuojie
+
+fbshipit-source-id: c7e5009d839239df58825dec093ff0f1fd281697
+",['.github/scripts/generate_ci_workflows.py'],Ciflow config and jinja2 templates are not existing in the project currently. Lack of these result in sub-optimal handling of workflow events like PR unassignment.
+da5272ef3b4d10eceae718e3c19ac9e47fac8f07,1659753415,"[ao] Fix per-channel histogram visualization in ModelReportVisualizer (#82917)
+
+Summary: There was an issue with per-channel visualizations in the
+ModelReportVisualizer that in specific scenarios in which there were
+only per-channel features for a module, it would fail to specifically
+get the channel by channel info.
+
+After digging through the code, the core reason was a for loop that was
+enumerating on the `tensor_table` (tensor level info) even in the
+scenario in which we only had per-channel info.
+
+This was fixed, and tested in a Bento to ensure expected functionality.
+
+Test Plan: Tested visually
+
+Reviewers:
+
+Subscribers:
+
+Tasks:
+
+Tags:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/82917
+Approved by: https://github.com/jerryzh168
+",['torch/ao/quantization/fx/_model_report/model_report_visualizer.py'],ModelReportVisualizer fails to generate per-channel visualizations for scenarios where only per-channel features are available for a module.
+df47fa5bdc3e1349279b7f2f8b905b9a8c0eb374,1625001416,"Using meta checks for unary `torch.all` and `torch.any`. (#60362)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/60362
+
+This PR makes use of the newly implemented unified `at::meta::check_reduction` for
+validating the inputs and configuring its `TensorIterator`.
+
+This PR was openned so as to solve the CI failures in main when merging: #59371 #59372 #59373 #59937 #59938.
+
+Test Plan: Imported from OSS
+
+Reviewed By: albanD
+
+Differential Revision: D29265858
+
+Pulled By: ezyang
+
+fbshipit-source-id: e8961b7da65a31acfed5ac3f5c1f5985ae81ec37
+",['aten/src/ATen/native/ReduceOps.cpp'],"Meta checks for torch.all and torch.any are not being used for input validation and TensorIterator configuration, causing CI failures."
+df83fe5bf715449f4629eecbe633922efa6c7169,1686588116,"[dynamo] graph break on nn.Parameter construction (#103262)
+
+Fixes #99569
+
+nn.Parameter construction appears to run into FakeTensor / tracing issues during AOT Autograd. We could try to fix this; but nn.Parameter construction _inside_ the compiled region isn't a common scenario, so it's reasonable to just graph break on nn.Parameter construction.
+
+For reference, see #99569 for the errors/issues that appear from tracing through nn.Parameter construction with AOT Autograd.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/103262
+Approved by: https://github.com/williamwen42
+","['test/dynamo/test_aot_autograd.py', 'torch/_dynamo/variables/torch.py']","Issues encountered with nn.Parameter construction during AOT Autograd due to FakeTensor / Tracing conflicts, specifically when construction occurs within the compiled region."
+e1cfac42b2b3ea96d3783c66c8d2e44244a40524,1656692913,"[jiterator] De-template launch_jitted_reduce_kernel (#80138)
+
+As with `jitted_gpu_kernel_impl`, this
+1. Hoists static variables out and into a parent funciton
+2. Moves template arguments into the `jit::KernelDescriptor` struct,
+   as well as changing `vt0` to just be a runtime argument
+3. Changes the types of pass-through arguments to `void*`
+
+On my build I see a 0.5 MB decrease in binary size for `libtorch_cuda.so`.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/80138
+Approved by: https://github.com/ngimel
+","['aten/src/ATen/native/cuda/CUDAJitLoops.cuh', 'aten/src/ATen/native/cuda/Reduce.cuh', 'aten/src/ATen/native/cuda/jit_utils.cpp', 'aten/src/ATen/native/cuda/jit_utils.h']",Template arguments in `jitted_gpu_kernel_impl` cause an increase in the binary size of `libtorch_cuda.so`.
+e341bab8aee3e2b6f3704a1f000b1c799aa905e2,1623801202,"bugfix: ensure that at::{dispatch_key}:: API gets external linkage (#58569)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/58569
+
+This should allow external C++ files that aren't compiled into `libtorch.so`/`libtorch_cpu.so` (including all of fbcode) to use fast path functions like `at::cpu::add()`, which skip the dispatcher.
+
+So, after spending way too much time trying to figure out why I was getting linker errors when calling `at::meta::{op}` and `at::cpu::{op}` from C++ test files, I realized that we're not including the header files for C++ for the namespaced operator definitions. I.e. `RegisterCPU.cpp`, which provides definitions for the `at::cpu::{op}` fast path functions, wasn't including the `CPUFunctions.h` header.
+
+Why that breaks stuff: the `CPUFunctions.h` header file is what marks each function with the `TORCH_API` macro, so without including it, when we build `libtorch.so` and `libtorch_cpu.so`, the compiler will look at the definition in `RegisterCPU.cpp`, not see a `TORCH_API`, and decide that the function should get internal linkage.
+
+An alternative would be to directly mark the function definitions in `RegisterCPU.cpp` with `TORCH_API`, but this seemed cleaner.
+
+Test Plan: Imported from OSS
+
+Reviewed By: pbelevich
+
+Differential Revision: D28711300
+
+Pulled By: bdhirsh
+
+fbshipit-source-id: 535f245c20e977ff566d6da0757b3cefa137040b
+","['aten/src/ATen/templates/RegisterDispatchKey.cpp', 'tools/codegen/gen.py', 'tools/codegen/gen_backend_stubs.py']","Linker errors are occurring when calling `at::meta::{op}` and `at::cpu::{op}` from C++ test files due to missing inclusion of `CPUFunctions.h` header file in `RegisterCPU.cpp`, causing internal linkage of functions instead of external."
+ea56b9d92dda2fe89d4c69c684d336099dbe895a,1647974207,"Passing explicit pretrained_backbone (#74372)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/74372
+
+In preparation to the multi-weight support porting, we pass explicitly the pretrained_blackbone value. We use the default value `True` for most cases, except for when the use-case is clearly a test and thus should avoid downloading the weights of the backbone.
+
+Test Plan: running project unit-tests
+
+Reviewed By: jdsgomes
+
+Differential Revision: D34961147
+
+fbshipit-source-id: cf29e42545302716a7cd3f3eb0d69e44d5fb6c73
+(cherry picked from commit c4613b7abacd106d097de1b73b13af92132e1739)
+","['test/onnx/test_models.py', 'test/onnx/test_pytorch_onnx_onnxruntime.py']","The project is implicitly using a pretrained backbone model, however, in test use-cases, this results in unnecessary downloading of backbone weights."
+ea5d01e6292620271b43627547ddb26f58f03e0a,1653328821,"[Primtorch] Tried porting leaky_relu into a ref (#78041)
+
+Feels good to delete it from `torch._decomps`. This is mainly to clarify the process for me -
+
+Seems like there's still some components missing of the `torch <-> refs` mapping? For example, seems like methods don't work yet for mapping from torch <-> refs, and neither do the meta tests? (cc: @ezyang).
+
+If I replace the `torch` with `refs`, then the tests seem to pass.
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/78041
+Approved by: https://github.com/mruberry
+","['torch/_decomp/decompositions.py', 'torch/_refs/nn/functional/__init__.py', 'torch/testing/_internal/common_methods_invocations.py']","The porting of `leaky_relu` into a `ref` is not functioning correctly due to absent components in the `torch <-> refs` mapping, especially in terms of methods and meta tests."
+eb9b1560195a89df6a14ded05b3e76d97346a1f2,1668014112,"[fix] MathBits: serialization (#88182)
+
+Fixes #81690
+
+TODO:
+
+* [x] C++ Unpickler Fix (locally tested pickled in Python and unpickled in C++)
+* [x] C++ Pickler Fix (locally tested pickled in C++ and unpickled in Python)
+* [x] Do quant_tensor, sparse_tensor, etc require similar changes? (Sparse and Quant don't need this)
+* [x] Add Comments
+* [x] How to make sure C++ and Python are in sync? (Functions in `pickler.h` help in getting and setting Tensor Metadata (math-bits for now) on a tensor. They are the only place which should handle this.)
+
+Notes:
+Quant Tensor don't support complex dtypes and for float they segfault with `_neg_view` : https://github.com/pytorch/pytorch/issues/88484
+
+Sparse Tensor:
+```python
+>>> a = torch.tensor([[0, 2.], [3j, 0]]).to_sparse()
+>>> a.conj().is_conj()
+False
+>>> a._neg_view()
+Traceback (most recent call last):
+  File ""<stdin>"", line 1, in <module>
+NotImplementedError: Cannot access storage of SparseTensorImpl
+```
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/88182
+Approved by: https://github.com/ezyang, https://github.com/anjali411
+","['test/cpp/api/serialize.cpp', 'test/test_serialization.py', 'torch/_tensor.py', 'torch/_utils.py', 'torch/csrc/Module.cpp', 'torch/csrc/jit/serialization/pickler.cpp', 'torch/csrc/jit/serialization/pickler.h', 'torch/csrc/jit/serialization/unpickler.cpp', 'torch/utils/model_dump/__init__.py']",There are inconsistencies in the serialization of MathBits between C++ and Python leading to potential errors. This is evident when pickling in one language and unpickling in the other.
+ecf3ca00d85567a81b8bee29982803945a581a4c,1614116883,"[fx] Separate globals assignment from code generation (#51974)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/51974
+
+Right now, when an FX `Graph` references an external object, we will emit
+code like:
+
+    import foo
+    def forward(input: foo.bar.baz):
+        ...
+
+This is problematic in a world with `torch.package`, since then name
+`foo.bar.baz` may reference a name from any number of packages.
+
+This PR lays the groundwork for FX-package integration by separating the
+resolution of external references from the genration of the function
+code.
+
+When generating a Graph's Python source, we keep track of all external
+references and assign them unique names. At the end, we have a
+dictionary mapping names -> actual objects. This becomes the `globals`
+namespace we pass to `exec` when installing the forward function in a
+`GraphModule`. This is nice because we can always be sure that `exec` is
+seeing the same objects that were referenced from the `Graph`, no import
+statements needed.
+
+At serialization time, we use a `ModuleEnv` to resolve the globals dict
+to a set of import statements that can be run to reprodce the `global`
+namespace. This is only used on serialiation/deserialization, and those
+functions are expected to check that the import statements are producing
+the correct results.
+
+Concretely, the code above will now look like:
+
+    from foo.bar import baz as foo_bar_baz
+    def forward(input: foo_bar_baz):
+        ...
+
+Test Plan: Imported from OSS
+
+Reviewed By: jamesr66a
+
+Differential Revision: D26340593
+
+Pulled By: suo
+
+fbshipit-source-id: fe247f75205d0a03fd067bdd0f95491e8edf1436
+","['test/quantization/test_numeric_suite_fx.py', 'test/test_fx.py', 'test/test_fx_experimental.py', 'torch/fx/graph.py', 'torch/fx/graph_module.py', 'torch/fx/node.py']","FX `Graph` emissions for referencing external objects result in errors when using `torch.package`, due to name ambiguity across packages. This issue also affects the serialization and deserialization process."
+efb1895f815f20694e3de28de26c4d1e9bcef59e,1615323255,"[caffe2] use snprintf() instead of sprintf() in the Checkpoint operator (#53434)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/53434
+
+Use `snprintf()` to avoid buffer overflows.
+Also only throw an exception on error, instead of crashing the entire
+application.  A failure can occur if the caller supplies an invalid format
+string.
+ghstack-source-id: 123401582
+
+Test Plan:
+Ran the checkpoint tests:
+
+  buck test caffe2/caffe2/python/operator_test:checkpoint_test
+
+Verified that the checkpoint file names logged in the output are the same
+before and after this change.
+
+I also tested manually changed the initial buffer size to 1 to confirm that
+the code works when the initial buffer size is too small.  I considered
+updating the checkpoint_test.py code to test using long db names that would
+exceed this limit, but I figured that long filenames was likely to cause
+other problems on some platforms (Windows has a maximum path length of 260
+characters up until pretty recent releases).
+
+Differential Revision: D26863355
+
+fbshipit-source-id: 8fc24faa2a8dd145471067718d323fdc8ce055d6
+",['caffe2/operators/load_save_op.h'],The Checkpoint operator uses sprintf() which can cause buffer overflows and application crashes when an invalid format string is provided.
+f2c26420f2da9aa4e83dd3ea4db761e6d89b57a6,1676488517,"[pytorch] Add support for ""height"" and ""width"" dimension for the ""select"" operator on pytorch vulkan backend (#94612)
+
+Summary: Add support for ""height"" and ""width"" dimension for the ""select"" operator on pytorch vulkan backend.
+
+Test Plan:
+```
+yipjustin@yipjustin-mbp fbsource % buck run  -c pt.vulkan_full_precision=1  --target-platforms ovr_config//platform/macos:arm64-fbsource //xplat/caffe2:pt_vulkan_api_test_binAppleMac\#macosx-arm64 -- --gtest_filter=""*select_3d*""
+Downloaded 1/2 artifacts, 1.29 Mbytes, 0.0% cache miss (for updated rules)
+Building: finished in 3.7 sec (100%) 450/450 jobs, 2/450 updated
+  Total time: 3.8 sec
+BUILD SUCCEEDED
+Running main() from xplat/third-party/gmock/googletest-1.12.1/googletest/src/gtest_main.cc
+Note: Google Test filter = *select_3d*
+[==========] Running 9 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 9 tests from VulkanAPITest
+[ RUN      ] VulkanAPITest.select_3d_depth_small
+[       OK ] VulkanAPITest.select_3d_depth_small (30 ms)
+[ RUN      ] VulkanAPITest.select_3d_depth_medium
+[       OK ] VulkanAPITest.select_3d_depth_medium (0 ms)
+[ RUN      ] VulkanAPITest.select_3d_depth_large
+[       OK ] VulkanAPITest.select_3d_depth_large (1 ms)
+[ RUN      ] VulkanAPITest.select_3d_height_small
+[       OK ] VulkanAPITest.select_3d_height_small (0 ms)
+[ RUN      ] VulkanAPITest.select_3d_height_medium
+[       OK ] VulkanAPITest.select_3d_height_medium (0 ms)
+[ RUN      ] VulkanAPITest.select_3d_height_large
+[       OK ] VulkanAPITest.select_3d_height_large (3 ms)
+[ RUN      ] VulkanAPITest.select_3d_width_small
+[       OK ] VulkanAPITest.select_3d_width_small (0 ms)
+[ RUN      ] VulkanAPITest.select_3d_width_medium
+[       OK ] VulkanAPITest.select_3d_width_medium (0 ms)
+[ RUN      ] VulkanAPITest.select_3d_width_large
+[       OK ] VulkanAPITest.select_3d_width_large (1 ms)
+[----------] 9 tests from VulkanAPITest (40 ms total)
+
+[----------] Global test environment tear-down
+[==========] 9 tests from 1 test suite ran. (40 ms total)
+[  PASSED  ] 9 tests.
+```
+
+Reviewed By: SS-JIA
+
+Differential Revision: D43020796
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/94612
+Approved by: https://github.com/SS-JIA
+","['aten/src/ATen/native/vulkan/glsl/select_height.glsl', 'aten/src/ATen/native/vulkan/glsl/select_width.glsl', 'aten/src/ATen/native/vulkan/ops/Select.cpp', 'aten/src/ATen/test/vulkan_api_test.cpp']",The 'select' operator in PyTorch's Vulkan backend lacks support for 'height' and 'width' dimensions.
+f388bec98583a31407526050900873ebe7463483,1680064283,"[Dynamo] torch.Generator state should have a source and be reconstructed properly (#97403)
+
+Fixes #97077 partially.
+
+During FX graph propagation, we request every tensor should have source:
+https://github.com/pytorch/pytorch/blob/a524123c91ab399c9dd6882c1189596dd77e7734/torch/_dynamo/variables/builder.py#L929
+However, the output of ```torch.Generator.get_state()``` is a tensor but without source, since it's generated inside of the FX graph. My change is following what we did for [Python random functions](https://github.com/pytorch/pytorch/blob/master/torch/_dynamo/variables/user_defined.py#L260), to have a dedicated ```GeneratorStateSource```. We have to also update the reconstruction logics, since we will reuse the ```TensorVariable``` reconstruction.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/97403
+Approved by: https://github.com/jansel, https://github.com/mlazos
+","['test/dynamo/test_misc.py', 'test/export/test_export.py', 'torch/_dynamo/codegen.py', 'torch/_dynamo/source.py', 'torch/_dynamo/variables/torch.py']","During FX graph propagation in torch.Generator, the output tensor produced by get_state() function lacks a source causing issues with tensor variable reconstruction."
+f786b03f98965e4a8559ff989a7ea816ded0f7ea,1638486417,"ci: Migrate docs push to GHA (#69172)
+
+Summary:
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/69172
+
+Migrates the docs push jobs to Github Actions by implementing a simple
+WITH_PUSH switch to do the actual push.
+
+Adds 2 new workflows for GHA:
+* linux-docs (on trunk)
+* linux-docs-push (on schedule)
+
+linux-docs-push is the only workflow that actually gets access to
+credentials so it should be relatively safe.
+
+Signed-off-by: Eli Uriegas <eliuriegas@fb.com>
+
+Test Plan: Imported from OSS
+
+Reviewed By: malfet
+
+Differential Revision: D32767239
+
+Pulled By: seemethere
+
+fbshipit-source-id: 5b100f986cf4023c323f4f96f0fe7942fec49ad2
+","['.circleci/cimodel/data/pytorch_build_data.py', '.circleci/generate_config_yml.py', '.circleci/scripts/cpp_doc_push_script.sh', '.circleci/scripts/python_doc_push_script.sh', '.github/scripts/generate_ci_workflows.py']","Issues with docs push jobs on the current platform; there is a need for safer, schedule-based implementation with proper authentication."
+fc95eda285aed184e48fe9657b8c9c3bdb60f283,1651617990,"Added proxy tensor
+
+This is the `__torch_dispatch__` subclass used for tracing by AOTAutograd (https://github.com/pytorch/functorch/blob/main/functorch/_src/python_key.py).
+
+Given that a couple of folks are now interested in using this infra, it seems like a good idea to put it in core, and focus our efforts on a single implementation.
+
+I put this up as a WIP, just for discussion, but some questions off the top of my head.
+
+1. What should be the intended way of extending this tracer? Should we define extension points, or should folks simply copy paste and modify? If we do define extension points, what are the extension points we should define?
+2. There are some open questions about the way we're overriding FX to resolve some lingering issues (i.e. dealing with `nn.Parameter` and `call_module` calls). @ezyang implemented an alternate version of this tensor in https://github.com/albanD/subclass_zoo/blob/main/tracer_tensor.py, but it appears he ran into some issues with it that led to me submitting this implementation. That being said, I think some of the things over there should still be ported.
+3. Given that this is going to be shared infra, what other features should we put in here? One that comes to mind is to allow for meta-tensor tracing (perhaps by default?), with a more solid fallback.
+
+Some of the other implementations (for reference on requirements).
+
+1. FX2TRT: D34868356 (internal only)
+2. Edge's? @gmagogsfm
+
+cc: @ezyang , @jamesr66a , @zou3519 , @gmagogsfm, @842974287
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/74360
+Approved by: https://github.com/ezyang
+","['test/test_fx_experimental.py', 'torch/fx/experimental/proxy_tensor.py']","Need for a unified `__torch_dispatch__` subclass for multiple users of AOTAutograd tracing infrastructure, with clear extension points, improved handling with `nn.Parameter` and `call_module` calls, and possibly support for meta-tensor tracing."
+feb9ec42827cd1d8b84a25408e972a0581e6b45e,1680675136,"Account for forwards which whose corresponding backwards are not invoked (#98112)
+
+Previously, when we would run a forward graph whose backward we never invoked it would prevent us from switching from warmup to recording. Now, refine the heuristic to allow incrementing the generation as soon as we invoke a backward graph. This still handles the
+```
+mod1 = torch.compile(...)
+
+mod2 = torch.compile(...)
+
+mod2(mod1(x)).sum().backward()
+```
+case while accounting for graphs which we may not run backward of.
+
+It also now handles the case where we skip cudagraphify the backward of a forward.
+
+Pull Request resolved: https://github.com/pytorch/pytorch/pull/98112
+Approved by: https://github.com/jansel
+","['test/inductor/test_cudagraph_trees.py', 'torch/_inductor/compile_fx.py', 'torch/_inductor/cudagraph_trees.py']",Running a forward graph without invoking its corresponding backward prevents the switch from warmup to recording mode. This issue also affects cases where the backward of a forward is skipped during cudagraphify.

@@ -1,0 +1,964 @@
+commit_id,commit_date,commit_message,actual_files_modified,transformed_message_gpt4
+00a47cf6787af8fe89f55f721a54cbfef5b7d4a4,1451055734,"setup.mak: split release date
+
+* win32/setup.mak (verconf.mk): split release date into year,
+  month, and day.
+
+* common.mk (RUBY_RELEASE_DATE): move from Makefile.in to share
+  with win32/setup.mak.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@53312 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['common.mk', 'win32/setup.mak']","The release date in setup.mak is not split into year, month, and day causing potential confusion and inconsistency across platforms."
+033e58cf2c6829e14fa38e0a364911361090aa83,1652100324,"Fix gc_page_sweep when last bitmap plane is not used
+
+Depending on alignment, the last bitmap plane may not used. Then it will
+appear as if all of the objects on that plane is unmarked, which will
+cause a buffer overrun when we try to free the object. This commit
+changes the loop to calculate the number of planes used
+(bitmap_plane_count).
+",['gc.c'],Unmarked objects on the last unused bitmap plane result in buffer overrun when attempting to free the object.
+043e1fd559f0675b242cd50fe82256083e3257db,1515486403,"thread_pthread: remove checks for pthread_cond*_init
+
+These were added for NaCL support in r36022, and we dropped NaCL
+in r60374.
+
+IMHO, any pthreads implementation without these basic functions
+is not worth the time to support.
+
+[ruby-core:84758] [Misc #14342]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@61720 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['thread_pthread.c'],"The current Ruby implementation includes unnecessary checks for pthread_cond*_init functions, these checks were introduced for NaCL support which has been subsequently dropped."
+0a2f04e156cb717dcf78f2ea9bfe26f864a24616,1570471050,"Eliminate second GC pass for eliminating T_MOVED
+
+`T_MOVED` is a linked list, so we can just iterate through the `T_MOVED`
+objects, clearing them out and adding them to respective free lists.
+",['gc.c'],"Multiple GC passes are necessary for handling `T_MOVED` objects, causing potential inefficiencies in garbage collection."
+0dd0971ee7b1ea66aea7ba83f08d8b9976bf625d,1518009969,"mjit.c: fix buffer overflow
+
+* mjit.c (sprint_uniq_filename): get rid of silent buffer
+  overflow.
+
+* mjit.c (get_uniq_filename, convert_unit_to_func): allocate
+  enough buffer before formatting.
+
+* mjit.c (convert_unit_to_func): use DLEXT instead of hard coded
+  extension.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@62281 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['mjit.c'],The mjit.c file is encountering a silent buffer overflow when trying to allocate a buffer before formatting.
+0ee24acb5a9f3007f3b62f04c69427f61d57e04e,1509808938,"Introduce `rb_code_location_t`
+
+`rb_code_location_t` has two integers, lineno and column, which point to
+one location on a code.  Now `rb_code_location_t` is used instead of
+`VALUE nd_location`.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@60652 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['node.c', 'node.h']","The use of `VALUE nd_location` for pinpointing a location in the code can be ambiguous, needing a more explicit structure with line number and column details.
+"
+16ea9d948fe2ad51ac8d8a08562633b236cf28c5,1438237838,"common.mk: PHONY should be phony [ci skip]
+
+* common.mk (PHONY): should not depend on any real files, not to
+  make those dependencies inadvertently.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@51447 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['common.mk'],"In common.mk, the PHONY target inadvertently depends on actual files, resulting in unintentional dependencies."
+2091bf94931bddcf23b196fc8fe108ebd7ec1648,1692968481,"Expose stats about weak references
+
+[Feature #19783]
+
+This commit adds stats about weak references to `GC.latest_gc_info`.
+It adds the following two keys:
+
+- `weak_references_count`: number of weak references registered during
+  the last GC.
+- `retained_weak_references_count`: number of weak references that
+  survived the last GC.
+","['gc.c', 'test/ruby/test_gc.rb']",No current method does exist to retrieve statistics about the number of weak references registered and those that survived the last GC.
+258843106f343d05732499dd1832958eb1bf64f0,1567804822,"Fix SortedSet subclasses that override initialize
+
+The first time SortedSet#initialize is called, it overwrites
+itself, then recalls #initialize, which results in calling the
+subclass's initialize, not the current initialize.
+
+Just inline the default initialize behavior to avoid this issue.
+
+No test for this as it can only be triggered the very first time
+that SortedSet#initialize is called.
+
+Fixes [Bug #15830]
+",['lib/set.rb'],First invocation of SortedSet#initialize results in incorrect call to subclass's initialize instead of its current one.
+27f9556de9593483f713f622054e8fd648737438,1461990056,"{Fixnum,Bignum}#fdiv is unified into Integer.
+
+* numeric.c (int_fdiv): {Fixnum,Bignum}#fdiv is unified into
+  Integer.
+
+* bignum.c (rb_big_fdiv): Don't define Bignum#fdiv.
+
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@54832 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['bignum.c', 'numeric.c']","`fdiv` method is separately defined for Fixnum and Bignum classes, rather than being unified under the parent Integer class."
+2a01ac897d98e1794666782ece6673185613171a,1505068675,"avoid false positive on fiber_verify().
+
+* cont.c (fiber_store): move `cont_save_machine_stack()` timing to
+  avoid `fiber_verify()` false positive on `FIBER_USE_NATIVE == 0`
+  and `GC.stress = true`.
+  This patch is very dirty and it should be removed soon.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@59830 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['cont.c'],"`fiber_verify()` is causing false positives when `FIBER_USE_NATIVE == 0` and `GC.stress = true`, due to `cont_save_machine_stack()` execution timing in `fiber_store`."
+2ac58e689131e368a0148b05856054c0e04d7409,1468400987,"* enc/iso_8859_9.c, test/ruby/enc/test_case_comprehensive.rb:
+  Implement non-ASCII case conversion for ISO-8859-9, by Kazuki Iijima.
+* enc/iso_8859_9.c: Exclude dotless i/I with dot from case-insensitive
+  matching because they are not a case pair.
+* test/ruby/enc/test_iso_8859.rb: Make test coverage for ISO-8859-9
+  a bit more complete.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@55666 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['enc/iso_8859_9.c', 'test/ruby/enc/test_case_comprehensive.rb', 'test/ruby/enc/test_iso_8859.rb']","ISO-8859-9 encoding doesn't correctly implement non-ASCII case conversion, while dotless i/I with a dot aren't correctly excluded from the case-insensitive matching process. Test coverage for ISO-8859-9 isn't comprehensive."
+2c80c9495e4217d8449eb47deedd5adaf6374c0b,1439325312,"rb_parser_compile_*: remove volatile arg
+
+RB_GC_GUARD is sufficient to prevent tail call optimization from
+making the object invisible from GC., and we don't need to
+encourage more volatile usage.
+
+* parse.y (rb_parser_compile_cstr): remove volatile arg
+  (rb_parser_compile_string): ditto
+  (rb_parser_compile_file): ditto
+  (rb_parser_compile_string_path): ditto
+  (rb_parser_compile_file_path): ditto
+  [ruby-core:70323] [Misc #11431]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@51537 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['node.h', 'parse.y']",Unnecessary use of volatile argument in rb_parser_compile_* functions potentially obstructing GC due to tail call optimization.
+2d4bc584eef5dcd11dbae4c92fe8b404f054ff46,1446857711,"* vm_trace.c (rb_threadptr_exec_event_hooks_orig):
+  maintain trace_running counter on internal events.
+
+  This patch is made by Takashi Kokubun <takashikkbn@gmail.com>.
+  [Bug #11603] https://github.com/ruby/ruby/pull/1059
+
+
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@52476 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['vm_trace.c'],Internal events are not maintaining trace_running counter properly.
+2d4c248d77fc1918536fc59befe67d9bcbb47097,1544694077,"thread_pthread.c (native_ppoll_sleep): drop ubf_select references
+
+We don't use ubf_select after r65495 / 5de7b3b4f27df747899c243adbb10c9799ad1399
+(""thread_pthread.c (native_ppoll_sleep): new eventfd (or pipe) for ubf""),
+so we don't need to unregister the thread from the ubf list.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@66382 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['thread_pthread.c'],Unnecessary unregistration of the thread from the ubf list in native_ppoll_sleep due to non-use of ubf_select.
+2d670274481647bf3bc9c82a9472bc8500a97a45,1620629963,"Removed missing/dup2.c
+
+This function should be always available, as POSIX-compliant or
+Windows platform are required since 1.9.  Also the code in this
+file is MT-unsafe.
+","['include/ruby/missing.h', 'io.c', 'missing/dup2.c']","The function in missing/dup2.c is always available but the code is multi-threading unsafe, posing potential issues on POSIX-compliant or Windows platforms required since 1.9."
+2d8841791facb07155c710d8a7db7b0bf8be0d21,1478354018,"IPAddr#== and IPAddr#<=> no longer raise an exception if coercion fails
+
+* lib/ipaddr.rb (IPAddr#==): If coercion fails, return false
+  instead of passing through the exception. [ruby-core:77451]
+  [Bug #12799]
+
+* lib/ipaddr.rb (IPAddr#<=>): If coercion fails, return nil
+  instead of passing through the exception. [ruby-core:77451]
+  [Bug #12799]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@56594 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['lib/ipaddr.rb', 'test/test_ipaddr.rb']",Coercion failures in the methods IPAddr#== and IPAddr#<=> are causing unwanted exceptions to be raised.
+3044a0bcd90b2176ed471a6fb970ad37d5f162cd,1463346693,"proc.c: fix RDoc of Proc#===/call/yield/[]
+
+[Bug #12332]
+
+Since r52050 (""proc.c: enable optimization of Proc#call"")
+for [Feature #11569], we need to maintain this documentation
+in a way RDoc comprehends.  This is probably not worth fixing
+in RDoc itself since this uses a non-standard internal C API
+which is subject to change without notice.
+
+ref:
+http://mid.gmane.org/20160429212836.GA16605@dcvr.yhbt.net
+http://mid.gmane.org/1461959651.806728.670.51764@mail.rambler.ru
+http://blade.nagaokaut.ac.jp/ruby/ruby-talk/435458
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@55010 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['proc.c'],"The RDoc documentation for Proc#===/call/yield/[] is not being properly maintained, preventing comprehension due to the enablement of optimization of Proc#call since r52050."
+326d89b7cee05b33e6f73fb293a4ae9d5af6f7f2,1598375650,"Correctly account for heap_pages_final_slots so it does not underflow
+
+`rb_objspace_call_finalizer` creates zombies, but does not do the correct accounting (it should increment `heap_pages_final_slots` whenever it creates a zombie). When we do correct accounting, `heap_pages_final_slots` should never underflow (the check for underflow was introduced in 39725a4db6b121c7779b2b34f7da9d9339415a1c).
+
+The implementation moves the accounting from the functions that call `make_zombie` into `make_zombie` itself, which reduces code duplication.
+",['gc.c'],The `rb_objspace_call_finalizer` misappropriates `heap_pages_final_slots` resulting in underflow when creating zombies.
+38cfb957dd74948b5b18ead36ac6cac494b9c423,1440550030,"id_table.h: callback function types
+
+* id_table.h (rb_id_table_foreach_func_t): define callback
+  function type for rb_id_table_foreach().
+
+* id_table.h (rb_id_table_foreach_values_func_t): ditto for
+  rb_id_table_foreach_values().
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@51682 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['id_table.c', 'id_table.h']",Definition of callback function types for `rb_id_table_foreach()` and `rb_id_table_foreach_values()` does not exist in `id_table.h`.
+39c4aeec4cf9f127ecb4b0cae92c58540fea6a7c,1538541463,"Fix wrong use of BIGNUM_EMBED_LEN_NUMBITS
+
+* internal.h (BIGNUM_EMBED_LEN_SHIFT): BIGNUM_EMBED_LEN_NUMBITS is the
+  bit width of embedded bignum length, and BIGNUM_EMBED_LEN_SHIFT is
+  the bit offset of it.  These two values happened to equal by chance,
+  however they are different things.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@64904 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['internal.h'],"BIGNUM_EMBED_LEN_NUMBITS is mistakenly used in place of BIGNUM_EMBED_LEN_SHIFT, leading to potential discrepancies in calculation as the two values differ fundamentally despite occasionally producing the same result."
+3b257773a55b3d58e8a41d82203bb5a66304f3fe,1542084943,".travis.yml: specify --tty=no
+
+To reduce the amount of output, prefer --tty=no instead of
+--color=never.  This option not only disables color output but also
+kill some tty-related features, like spinners.  Travis limits its
+output by the physical size of the log, not by the number of lines.
+This change should make more room for new logs.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65702 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['tool/m4/_colorize_result_prepare.m4'],"Excessive output in Travis logs due to tty-related features like spinners is causing logs to hit physical limit, reducing room for new logs."
+3dc7727d22fecbc355597edda25d2a245bf55ba1,1532910668,"thread.c: move ppoll wrapper into thread_pthread.c
+
+thread_pthread.c relies on ppoll for rb_sigwait_sleep, so ensure
+the compatibility wrapper is available for it.
+
+[Bug #14950]
+
+Reported-by: SHIBATA Hiroshi <hsbt@ruby-lang.org>
+Reported-by: Greg L <Greg.mpls@gmail.com>
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@64110 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['thread.c', 'thread_pthread.c']",'Incompatibility issue in thread_pthread.c due to unavailability of ppoll wrapper creating problems for rb_sigwait_sleep function.'
+4096e4b08c46dddb8edc9dabf70e737946ac6df8,1569758274,"Move the logic to test bundled gems to Ruby code
+
+* Writing shell scripts in a Makefile is very error-prone.
+* TEST_BUNDLED_GEMS_ALLOW_FAILURES seemed to not work before.
+",['tool/test-bundled-gems.rb'],The Makefile shell scripts testing bundled gems are error-prone and the TEST_BUNDLED_GEMS_ALLOW_FAILURES functionality appears to be non-functional.
+41f4ac6aa21588722a6323dbbc34274b7e9aec49,1525157743,"ast.c: use enum in switch for warnings
+
+* ext/-test-/ast/ast.c (node_children): use enum instead of int
+  for not-handled enumeration value in switch warnings.
+
+* ext/-test-/ast/ast.c (node_children): fix the rb_bug message.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@63313 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['ext/-test-/ast/ast.c'],"Not-handled enumeration warning values are currently causing issues when using switch statements, and rb_bug message needs correction in node_children.
+"
+423d042371d0402071c309dc403ea2701600a98b,1455351141,"no_proxy with whitespaces and leading dots
+
+* lib/uri/generic.rb (find_proxy): exclude white-spaces and allow
+  for a leading dot in the domain name in no_proxy.
+  [ruby-core:54542] [Feature #8317]
+
+The previous implementation wouldn't allow for white-spaces nor a leading dot
+in the domain name. The latter is described in the wget documentation as a valid case.
+
+By being more strict on the characters, which are counted to a domainname,
+we allow for white-spaces.
+Also, a possible leading dot will be handled gracefully.
+
+[Fix GH-285]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@53816 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['lib/uri/generic.rb', 'test/uri/test_generic.rb']","The current no_proxy implementation does not allow for white-spaces or a leading dot in the domain name, leading to issues with certain valid domain configurations."
+44cf5baa62469d5f8f6cca592ef2c3b25b80ed02,1514971151,"dln.c: dln_incompatible_library_p
+
+* dln.c (dln_incompatible_library_p): renamed as the error message
+  with dln prefix, since it is not bound to xmalloc restrictively.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@61577 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['dln.c'],Error message with 'dln' prefix incorrectly bound restrictively to 'xmalloc' in 'dln_incompatible_library_p'.
+4c5e862434157c4ef258f432431262b3685c4036,1638529251,"[rubygems/rubygems] Improve source gemfile/lockfile equivalence checks
+
+Since we no longer have multiple global sources, each top level dependency is
+always pinned to a single source, so it makes little sense to talk about
+adding or removing a source. Instead, source changes always mean to
+change the source one or more dependencies are pinned to. This logic can
+now be much simpler.
+
+https://github.com/rubygems/rubygems/commit/f1d33fa0df
+","['lib/bundler/definition.rb', 'spec/bundler/install/deploy_spec.rb']","Issues with source gemfile/lockfile equivalence checks as each top level dependency, instead of being added or removed, is always pinned to a single source."
+4c875b6e667d205fef5533670460e2043c9aaa6a,1540427783,"time.c: benchmark recovery
+
+* time.c (time_localtime): check if `vtm.zone` is a simple zone
+  name string before trying to call the conversion method.  since
+  r64952, `Time.getlocal` on UTC time has lost the performance
+  about 45%, due to this call.  the performance is about 90% of
+  r64951 by avoiding it.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65360 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['time.c'],The implementation of `Time.getlocal` method for UTC time has lost significant performance (about 45%) due to unnecessary conversion method calls.
+54072e329cab7207fba133caba4fc12b45add8f9,1575890509,"Add ipaddr optional parameter to Net::HTTP#start
+
+to replace the address for TCP/IP connection [Feature #5180]
+
+There're 3 layers of hostname:
+* host address for TCP/IP
+* TLS server name
+* HTTP Host header value
+To test DNS round robin or check server certificate from server local,
+people sometimes want to connect server with given IP address but keep
+TLS server name and HTTP Host header value.
+
+closes [Feature #15215]
+closes https://github.com/ruby/ruby/pull/1893
+closes https://github.com/ruby/ruby/pull/1977
+","['lib/net/http.rb', 'test/net/http/test_https.rb']","During DNS round robin testing or server certificate checks from server locals, there's no option to connect to a server using a specific IP address while maintaining the original TLS server name and HTTP Host header value."
+561dda99344536cb281b5a55c48856d3dae717c6,1646877231,"[DOC] Enhanced RDoc for String (#5635)
+
+
+
+Treats:
+
+    #count
+    #delete
+    #delete!
+    #squeeze
+    #squeeze!
+
+Adds section ""Multiple Character Selectors"" to doc/character_selectors.rdoc.
+
+Co-authored-by: Peter Zhu <peter@peterzhu.ca>",['string.c'],"The documentation for String methods #count, #delete, #delete!, #squeeze, and #squeeze! and the ""Multiple Character Selectors"" section in character_selectors.rdoc are missing or inadequate."
+56faa13a1c5261a0d046a4c0203e88fccfafae17,1575170690,"remove spaces to pass a test.
+
+23d7f4c5e1ce164e78d77de694dccc0c41f6de3d breaks a test which expect
+to match error message. To avoid this failure, use #strip for expect
+and actual results.
+",['test/did_you_mean/test_verbose_formatter.rb'],"A test that matches error messages fails due to unexpected spaces in the output, needs mechanism to handle leading and trailing spaces."
+5d6c1f42d56e390732397bc115f7d7240eec5e10,1500040200,"zlib.c: fix unnormalized Fixnum
+
+* ext/zlib/zlib.c (rb_gzfile_total_out): cast to long not to
+  result in an unsigned long to normalized to Fixnum on LLP64
+  platforms.  [ruby-core:81488]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@59337 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['ext/zlib/zlib.c'],Casting to long in zlib results in unnormalized Fixnum on LLP64 platforms.
+5df321fb1dfdfc032d882f7e160279512c8078b8,1452857129,"* regint.h (PLATFORM_UNALIGNED_WORD_ACCESS): The value of
+  UNALIGNED_WORD_ACCESS should be used to determine whether
+  unaligned word access is allowed or not. After this commit,
+  ./configure CPPFLAGS=""-DUNALIGNED_WORD_ACCESS=0"" disables
+  unaligned word access even on platforms that support the feature.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@53543 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['regint.h'],"Disabling unaligned word access using CPPFLAGS=""-DUNALIGNED_WORD_ACCESS=0"" doesn't function correctly, even on platforms with native support."
+5f2c4e344dc2f19aab54523ae418800b08adaa61,1636026244,"[ruby/net-http] Reset keep_alive timer on new connection
+
+The last_communicated timestamp is for HTTP persistent connection, to
+decide whether the current TCP connection may be reused for the
+subsequent requests or not. Naturally, the timer must be reset if the
+connection is recreated since it is no longer relevant.
+
+https://github.com/ruby/net-http/commit/0a013de42d
+","['lib/net/http.rb', 'test/net/http/test_http.rb']","The keep_alive timer is not resetting when a new HTTP persistent connection is created, causing incorrect decisions on reusing TCP connections for subsequent requests."
+612985f5bf2690cfb1e3eddd340030d39fa97fba,1518012504,"mjit.c: fix -Wdiscarded-qualifiers warning
+
+../mjit.c: In function ‘system_tmpdir’:
+../mjit.c:1231:9: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+  tmpdir = ""/tmp"";
+         ^
+../mjit.c: At top level:
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@62288 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['mjit.c'],"'MJIT system_tmpdir function causes a -Wdiscarded-qualifiers warning, due to an assignment discarding a 'const' qualifier from pointer target type.'"
+61d9da258d0701c25f4876bb89fbbd3912b3ef98,1492387847,"gc.c: rb_threadptr_stack_check
+
+* gc.c (rb_threadptr_stack_check): check probability of stack
+  overflow for the given thread, not the current thread.
+
+* vm_eval.c (stack_check): check the given thread, not the current
+  thread.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@58375 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['eval_intern.h', 'gc.c', 'vm_eval.c']",The current implementation of stack overflow checks is getting applied to the current thread instead of the specified target thread.
+66b327af5619a2e0de89b7d25c75f378164304d6,1592475255,"[rubygems/rubygems] Fix redundant commands
+
+They are preceded by `install_gemfile` calls, which mean `bundle
+install` is being run twice for no reason.
+
+https://github.com/rubygems/rubygems/commit/d2b2d10862
+",['spec/bundler/commands/install_spec.rb'],"`bundle install` command is being executed twice due to preceding `install_gemfile` calls, leading to redundancy."
+672ee5f6ed5a6840a3be9150b6721a5ee8f8766b,1557891016,"Symbols can move so only cache IDs
+
+IDs can't move, we need to use them to look up the symbol objects later.
+",['enumerator.c'],"Symbol objects may change their location, causing issues when caching based on their initial positions, which necessitates the use of immutable IDs for lookups."
+6a832cdb8d659f2206606007f73f52253d8cbae9,1508575282,"Use GetSystemTimePreciseAsFileTime on recent Windows
+
+* win32/win32.c (gettiemeofday, wutime): use GetSystemTimePreciseAsFileTime
+  instead of GetSystemTimeAsFileTime if it is available.
+  This patch is based on Takehiro Kubo <kubo@jiubao.org> 's one (change only
+  the name of wrapper function).  Thanks! and sorry to late
+  [ruby-dev:50167] [Feature #13732]
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@60240 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['win32/win32.c'],The current method for obtaining the system time on Windows may result in decreased precision. This might be due to using GetSystemTimeAsFileTime that does not provide the most accurate time.
+6c415d0163d6d02e891b668a9adbfb07872b0c20,1539335989,"test/win32ole/test_win32ole_event.rb: wait longer
+
+for unstable spec. I added r64963 but it couldn't rescue:
+https://ci.appveyor.com/project/ruby/ruby/builds/19451743/job/hg0tyoxbacrrlnsr
+
+Since #test_on_event is especially unstable,
+https://ci.appveyor.com/project/ruby/ruby/builds/19337514/job/0wp2oe9dkr9gt1bi
+https://ci.appveyor.com/project/ruby/ruby/builds/19451743/job/hg0tyoxbacrrlnsr
+this commit lets it sleep longer as needed.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65030 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['test/win32ole/test_win32ole_event.rb'],"The #test_on_event in test/win32ole/test_win32ole_event.rb is unstable across different builds, lacking adequate time to process or sleep."
+6fd18ca51bbce302865d23632b15af53d3e8f11b,1451442539,"forwardable.rb: adjust backtrace by tail call
+
+* lib/forwardable.rb (def_instance_delegator): adjust backtrace of
+  method body by tail call optimization.  adjusting the delegated
+  target is still done by deleting backtrace.
+* lib/forwardable.rb (def_single_delegator): ditto.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@53383 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['lib/forwardable.rb', 'test/test_forwardable.rb']",Tail call optimization in def_instance_delegator and def_single_delegator methods is altering the backtrace of the method body.
+77db0ca6c881b6fc705873f471fe4c52bffc0d50,1693902593,"Prevent a warning: method redefined; discarding old included
+
+```
+[ 3463/25719] JSONGeneratorTest#test_string_ext_included_calls_super/home/chkbuild/chkbuild/tmp/build/20230905T063003Z/ruby/test/json/json_generator_test.rb:411: warning: method redefined; discarding old included
+/home/chkbuild/chkbuild/tmp/build/20230905T063003Z/ruby/test/json/json_generator_test.rb:399: warning: previous definition of included was here
+```
+
+http://rubyci.s3.amazonaws.com/debian10/ruby-master/log/20230905T063003Z.log.html.gz
+",['test/json/json_generator_test.rb'],"Method redefinition warning in JSONGeneratorTest, causing the older version of 'included' method to be discarded."
+7a2263fb389cbd0fb9cc8d86ed909b7e080ef1e7,1541488945,"mjit_worker.c: strictly control MJIT copy job
+
+-available region. reducing risk of SEGV in mjit_copy_job_handler() like
+http://ci.rvm.jp/results/trunk-mjit@silicon-docker/1446117
+
+I'm not sure which exact part is causing ""[BUG] Segmentation fault at 0x0000000000000008""
+on `(mjit_copy_job_handler+0x12) [0x564a6c4ce632] /home/ko1/ruby/src/trunk-mjit/mjit.c:26`...
+
+mjit.c: ditto
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65569 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['mjit.c', 'mjit_worker.c']",Unclear cause of Segmentation fault at 0x0000000000000008 in `mjit_copy_job_handler+0x12` potentially due to lack of strict control in MJIT copy job.
+7cfabe1acc55b24fc2c479a87efa71cf74e9e8fc,1690540783,"Preserve `ec` argument across `longjmp`
+
+Fix segfault on icc 2023.2.
+An optimizer may allocate this argument to a register, and it may be
+clobbered by `longjmp`, e.g. exceptions.
+",['load.c'],"Issues with preserving the `ec` argument across `longjmp`, leading to segfaults on icc 2023.2, potentially due to exceptions clobbering allocated registers."
+7d24c27d2123c509c546c1563c01c1a01eb34f0f,1513568300,"io.c: open_key_args by rb_io_open
+
+* io.c (open_key_args): open by rb_io_open always also when
+  open_args: option is given.
+
+From: Nobuyoshi Nakada <nobu@ruby-lang.org>
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@61314 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['io.c'],"The `open_key_args` function does not use `rb_io_open` when the `open_args` option is provided, causing inconsistent behaviour in file opening."
+8275cad1e1646a2b301962313dc3e8ff1deb87b3,1671473606,"Fix buffer overrun when re-embedding objects
+
+We eagerly set the new shape of an object when moving an object during
+compaction. This new shape may have a different capacity than the
+current original shape capacity. This means that we cannot copy from the
+original buffer using size of the new capacity. Instead, we should use
+the ivar count (which is less than or equal to both the new and original
+capacities).
+
+Co-Authored-By: Matt Valentine-House <matt@eightbitraptor.com>
+",['gc.c'],Object reshaping during compaction leads to buffer overrun due to mismatch in capacities between new and original shape.
+83498854eb5a824f1f83c31fac18c9279f9ee10d,1567401605,"Make Enumerator::Lazy#with_index be lazy
+
+Previously, Enumerator::Lazy#with_index was not defined, so it
+picked up the default implementation from Enumerator, which was
+not lazy.
+
+Based on earlier patch from nobu.
+
+Fixes [Bug #7877]
+","['enumerator.c', 'test/ruby/test_lazy_enumerator.rb']","The default implementation of Enumerator::Lazy#with_index from Enumerator is not lazy, contrary to expected behavior."
+83dc06601fd29cc0bb7be5e4aa4f5fff4b53ae20,1491904013,"Import gemspec from ruby/etc.
+
+  * Update configuraiton for gem release.
+  * Bump version to 0.2.1. Because 0.2.0 is already reserved on rubygems.org
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@58315 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['ext/etc/etc.gemspec'],"The current version 0.2.0 of the Ruby gem is already reserved on rubygems.org, which prevents the gem from being released or updated."
+88a37dc62099b49e71a05342460da4061d5f23dd,1566921375,"Stop passing CC_LIBS in compile_c_to_o
+
+To fix ""gcc: -lgcc: linker input file unused because linking not done"" in
+https://rubyci.org/logs/rubyci.s3.amazonaws.com/openbsd65/ruby-master/log/20190826T200009Z.log.html.gz
+
+Still I'm intentionally leaving CC_DLDFLAGS_ARGS because making compiler
+options different might result in compile/link failure. (Of course
+CC_DLDFLAGS_ARGS usually should not have compiler options, but it might
+include by bad configure setup)
+
+The same problem may exist in MJIT_LIBS used inside CC_LIBS as well, but
+I just ignored that case because it impacts only MinGW / cygwin, hoping
+that their users do not perform a wrong configure.
+",['mjit_worker.c'],"When passing CC_LIBS in compile_c_to_o, gcc linker input file remains unused due to incomplete linking, causing issues in certain configurations."
+8d9a9aab67d6d517995532737a37379c20dc7f76,1542698848,"thread_pthread.c (rb_reserved_fd_p): false-positive on negative FD
+
+Negative-numbered FDs are never valid FDs on POSIX-like
+platforms, and we initialize our self-pipes/eventfd values
+to ""-1"", so stop treating -1 as a reserved FD if our system
+is too low on resources to allocate FDs at startup.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65832 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['thread_pthread.c'],"Negative numbered File Descriptors (FDs), especially -1, are being mistakenly recognized as reserved FDs during low-resource conditions, despite being invalid on POSIX-like platforms."
+931cda4db8afd6b544a8d85a6815765a9c417213,1533000819,"test/ruby/test_io.rb (test_race_gets_and_close): use SIGABRT on timeout
+
+I can't reproduce the test failure and I'm still not sure what's
+wrong, but maybe we can get a core dump from P895:
+http://ci.rvm.jp/results/trunk@P895/1174672
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@64135 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['test/ruby/test_io.rb'],"Non-reproducible test failure in test_race_gets_and_close on P895. Unable to identify cause of failure, consideration needed for generating a core dump."
+94b1db5d673295b4276e809de4937a9536711540,1439812615,"parse.y: fix block after conditional
+
+* parse.y: fix syntax error at do-block after a conditional
+  operator.  separate label-allowed and after-a-label states from
+  others as bit flags.  [ruby-dev:48790] [Bug #10653]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@51617 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['parse.y', 'test/ruby/test_syntax.rb']",Syntax error occurring in do-block after a conditional operator due to improper separation of label-allowed and after-a-label states.
+952b218ffe78b7319c5e02887e7dd30d46dbc40e,1546055835,"spawn_spec.rb: add missing platform guard
+
+this exists for `context ""when passed close_others: false"" do`, but this
+seems to be missing for `context ""when passed close_others: true""`.
+And this seems to hang forever on Windows since r66622.
+https://ci.appveyor.com/project/ruby/ruby/builds/21277729
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@66627 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['spec/ruby/core/process/spawn_spec.rb'],"Windows hangs indefinitely when `close_others: true` is passed, contrasting with the behavior of `close_others: false`. This inconsistency is found in spawn_spec.rb."
+96c26fbba3e4b28602206c7215f4397d52b4ea75,1541641387,"st.c: suppress integer overlow warnings
+
+This `i += h;` overflows.  Don't know the intention of the
+operation, so just suppress UBSAN.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65616 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['st.c'],"`i += h;` operation in st.c triggers integer overflow, causing UBSAN warnings."
+985961769d4a4684300ec05602fd7d82c7a29e38,1531790552,"Fix message when `order` was an invalid value
+
+The symbol that can be used is `:bottom`, not `:down`.
+Ref: https://github.com/ruby/ruby/blob/e39b2cff8ac2dc93b35bd43ffcce3ded8e3b4c25/error.c#L1061
+
+[Fix GH-1916]
+
+From: yuuji.yaginuma <yuuji.yaginuma@gmail.com>
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@63984 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['error.c'],Invalid `order` values cause inaccurate error messages to be displayed. This occurs when a specific value `:down` is used instead of the working value `:bottom`.
+9e3afec027708a3c9919989eeed0d389c8a4c203,1480424083,"thread.c: fix doc of abort_on_exception [ci skip]
+
+* thread.c (rb_thread_s_abort_exc, rb_thread_s_abort_exc_set):
+  [DOC] the raised exception will be re-raised in the main thread,
+  and then follows the ordinary exception sequence, exit status is
+  not 0.  [ruby-core:78415] [Bug #12991]
+
+* thread.c (rb_thread_abort_exc_set): ditto.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@56928 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['thread.c'],"The documentation for abort_on_exception in thread.c is incorrect, leading to confusion. The raised exception re-raises in the main thread and alters exit status, contrary to current documentation."
+9e813c1fc49ac5d1eba6ce38b8a1b44a80bafb91,1600247843,"RUBY_ISEQ_DUMP_DEBUG=to_binary never kept the debug information for String literals
+
+* That is, for plain string literals, not interpolated.
+* The test below is very similar and uses the same check.
+",['test/ruby/test_literal.rb'],The debugger isn't retaining information for plain String literals when using RUBY_ISEQ_DUMP_DEBUG=to_binary.
+9f87c0cc6dff70e8a1c4d204d1d45920d26f2e3a,1639565204,"[rubygems/rubygems] Pass `:bimode` explicitly to `File.open`
+
+The `File::BINARY` flag is apparently ignored due to a ruby bug, and
+thus writing can cause encoding issues.
+
+https://github.com/rubygems/rubygems/commit/db4efbebf2
+","['lib/rubygems.rb', 'test/rubygems/test_gem_remote_fetcher.rb']",Writing to a file can cause encoding issues as the 'File::BINARY' flag is ignored due to a Ruby bug.
+a47697aa4459e8cc0cc4fd336ca31cfea9d734fc,1615907977,"LLDB: Introduce dump_page helper
+
+This dumps out object type information for every object on a page in the
+form:
+
+bits [LM R ] T_CLASS    [389]: Addr: 0x1007ebcf0 (flags: 0x100000062)
+",['misc/lldb_cruby.py'],"No quick method to dump object type information for every object on a page, hindering process analysis and debugging."
+a90117c8c90134994bac3146d282a6f73dd17416,1584063783,"Skip test_abort_tls with --jit-wait for now
+
+Perhaps the server blocks for an unexpectedly long time by waiting for
+JIT. As it's usually passing, I don't think it's detecting a bug.
+",['test/net/ftp/test_ftp.rb'],"The server might be blocking for an unexpectedly long time by waiting for JIT in the test_abort_tls, resulting in intermittent test failures."
+ad0b5ebc503ae188db87f5de0715ead017dd5977,1458305860,"* bignum.c (rb_big_to_s, Bignum#to_s): remove its definition because
+  it is unified with Integer#to_s.
+
+* numeric.c (int_to_s): treat Bignum values directly.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@54176 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['bignum.c', 'numeric.c']",The method Bignum#to_s in bignum.c is duplicating functionality with the Integer#to_s method in numeric.c.
+adcfd6969070c3c51b35221d183728bbde8b8539,1654800021,"[DOC] Fix markup for `String` (#5984)
+
+* Add missing space for `String#start_with?`.
+* Add missing pluses for `String#tr` and
+  `Methods for Converting to New String` label.
+* Move quote into the tag for `Whitespace in Strings` label.","['string.c', 'string.rb']","Markup for `String`, `String#start_with?`, `String#tr`, and various labels have formatting issues, resulting in incorrect or missing stylizations."
+b0f44cfa5da53b90817732cb25b4d3a1cddecb89,1690598993,"Test sync_default_gems.rb only when git 2.32 is available
+
+With older git, as `GIT_CONFIG_GLOBAL` environment variable is not
+supported, these tests clobber user's configurations.
+",['tool/test/test_sync_default_gems.rb'],Tests in sync_default_gems.rb are overwriting user configurations due to the lack of `GIT_CONFIG_GLOBAL` environment variable support in older versions of git.
+b1541606a28872327716243a5b31706c0c2e3c22,1588914809,"[rubygems/rubygems] Fix incorrect `gem uninstall --all` message
+
+Currently `gem uninstall --all` shows the following incorrect message
+after completion:
+
+```
+INFO:  Uninstalled all gems in
+```
+
+Now it shows something that actually makes sense like:
+
+```
+INFO:  Uninstalled all gems in /home/deivid/Code/rubygems/tmp/test_rubygems_6986/gemhome
+```
+
+https://github.com/rubygems/rubygems/commit/8fa05e8f8c
+","['lib/rubygems/commands/uninstall_command.rb', 'test/rubygems/test_gem_commands_uninstall_command.rb']","The `gem uninstall --all` command prints an incomplete informational message after successful execution, providing no details about where gems were uninstalled from."
+b30248f74a8f6ce37a78f07597c7c5452ff50abd,1669829030,"YJIT: Deallocate when assumptions tables are empty
+
+When we run global invalidation for TracePoints or code GC, we clear out
+all blocks in our assumptions table but we don't deallocate the backing
+buffers. Let's reclaim some memory during these rare events.
+",['yjit/src/invariants.rs'],"During global invalidation for TracePoints or code GC, blocks in our assumptions table are cleared, but the backing buffers are not deallocated, leading to unnecessary memory usage."
+b3f3cb0c383408ea2a6385e6a61f68f371e83497,1652100324,"Call gc_sweep_finish_size_pool on size pools with no pages
+
+Size pools with no pages won't be swept so gc_sweep_finish_size_pool
+will never be called on it, but gc_sweep_finish_size_pool must be called
+to grow the size pool.
+",['gc.c'],"Size pools with no pages aren't being swept, causing `gc_sweep_finish_size_pool` to not be called, which is necessary for size pool growth."
+b6e2851431a12edff6259e876818fee8f4506acb,1524896623,"thread_sync.c: remove ""volatile"" qualifiers
+
+I may store ->ec in rb_mutex_t instead of ->th to support green
+thread.  For now, ""volatile"" is useless for thread-safety
+anyways and we're not dealing with *jmp or signals with mutex.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@63282 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['thread_sync.c'],"The ""volatile"" qualifier in thread_sync.c is currently not contributing to thread-safety and might pose issues with green thread support and mutex-related operations."
+bbedd29b6e98ef6e3fc2ce2b358d2b509b7cd1bb,1629812862,"[Bug #18117] Fix Ractor race condition with GC
+
+rb_objspace_reachable_objects_from requires that the GC not be active.
+Since the Ractor barrier is not executed for incremental sweeping,
+Ractor may call rb_objspace_reachable_objects_from after sweeping
+has started to share objects. This causes a crash that looks like
+the following:
+
+```
+<internal:ractor>:627: [BUG] rb_objspace_reachable_objects_from() is not supported while during_gc == true
+```
+
+Co-authored-by: Vinicius Stock <vinicius.stock@shopify.com>
+","['bootstraptest/test_ractor.rb', 'ractor.c']","Ractor shares objects after sweeping has started, leading to a race condition with GC and causing a crash. The issue arises due to an unsupported call to rb_objspace_reachable_objects_from() while during_gc == true."
+beaf2ace87dee90c1afcaf624335a54a5019f745,1515052277,"ULL suffix is a C99ism
+
+Don't assume long long == 8 bytes.
+
+If you can assume C99, there are macros named UINT64_C and
+such for appropriate integer literal suffixes.
+If you can't, no way but do a bitwise or.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@61594 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['string.c'],Assumption that 'long long' is equivalent to 8 bytes is leading to inappropriate integer literal suffixes since ULL suffix is a C99ism.
+c102e5e0ea5965915e73427845446501d66ea905,1539909342,"addr2line.c: this file has no portability
+
+It seems nobody on earth is interested in such thing for it.
+Ignore compiler warnings.
+
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@65159 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['addr2line.c'],Warnings are being generated due to a lack of portability considerations in the addr2line.c file.
+c32180d5ceee28d035db8ce1a7e9973238a4553e,1666193588,"[ruby/stringio] [DOC] Enhanced RDoc for StringIO
+(https://github.com/ruby/stringio/pull/35)
+
+Treated:
+- #getc
+- #getbyte
+- #ungetc
+- #ungetbyte
+- #readchar
+- #readbyte
+- #each_char
+
+https://github.com/ruby/stringio/commit/6400af8d9f
+",['ext/stringio/stringio.c'],"Documentation for methods like #getc, #getbyte, #ungetc, #ungetbyte, #readchar, #readbyte, #each_char in StringIO is unclear and needs enhancement."
+c44978b99f0454b8f00674f2f407893c8c47248e,1522224346,"webrick: favor .write over << method
+
+This will make the next change to use IO.copy_stream
+easier-to-read.  When we can drop Ruby 2.4 support in a few
+years, this will allow us to use writev(2) with multiple
+arguments for headers and chunked responses.
+
+* lib/webrick/cgi.rb (write): new wrapper method
+  lib/webrick/httpresponse.rb: (send_header): use socket.write
+  (send_body_io): ditto
+  (send_body_string): ditto
+  (send_body_proc): ditto
+  (_write_data): ditto
+  (ChunkedWrapper#write): ditto
+  (_send_file): ditto
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@62953 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['lib/webrick/cgi.rb', 'lib/webrick/httpresponse.rb']",Usage of '<<' method over '.write' method in various components of 'webrick' is causing difficulties in upgrading to IO.copy_stream and multi-argument writev(2).
+c4fc737f755f35ae1ddcf41dd06aad7b23be21da,1595482212,"include/ruby/util.h: delete unused codes
+
+- util.h includes defines.h,
+- ... which includes ruby/backward/2/stdarg.h,
+- ... which always defines _.
+
+This `#ifndef _` must never happen.
+",['include/ruby/util.h'],"The file util.h unexpectedly includes a defined underscore '_', resulting in a condition that should never happen."
+c5c15a565b9b88745fe08f2ff78c2e0e5b401498,1686712460,"Allow test-unit-ruby-core files to be loaded from bundled gems
+
+Separate the directly from the customized test-unit, since it may not
+work with bundled gems.
+","['gems/lib/core_assertions.rb', 'gems/lib/rake/extensiontask.rb', 'tool/test-bundled-gems.rb']","Test-unit-ruby-core files are not loaded properly when the gems are bundled, causing potential compatibility issues."
+c693dfd7ef686ccda9db18340bc426e1227e5b53,1673472378,"[ruby/irb] Drop unused arguments in `RubyLex`
+(https://github.com/ruby/irb/pull/504)
+
+* Simplify `RubyLex#set_prompt`
+
+It's optional argument is never used by any caller.
+
+* Remove the optional `p` argument from `RubyLex#set_input`
+
+The argument is only used in a test case, which can be easily replaced by
+a block argument.
+","['lib/irb/ruby-lex.rb', 'test/irb/test_ruby_lex.rb']","Unused optional arguments in `RubyLex#set_prompt` and `RubyLex#set_input` methods in 'irb', which are never used by any caller, lead to unnecessary code complexity."
+cc6806c76c217354c6d1ad70585b033a00faa7a9,1550651477,"Skip EPERM
+
+Docker's default seccomp whitelist does not include statx syscall
+by the default.  Skipt this error for now.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@67102 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['test/pathname/test_pathname.rb'],"Docker's default seccomp whitelist is missing the statx syscall, causing a permissions error."
+d4819da61111c508a3d582b7cf9957cc896fea14,1456302064,"parse without $.
+
+* io.c (rb_io_gets_internal): read one line from an IO without
+  setting ARGF.lineno.
+
+* parse.y (lex_io_gets): use rb_io_gets_internal not to affect
+  $. global variable.
+
+* ruby.c (load_file): no longer reset $.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@53913 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['io.c', 'parse.y', 'ruby.c']","Reading a line from an IO is affecting the $. global variable and the ARGF.lineno, it should not."
+d67fe1e9de70592622b6c3f0f7353337886e7c35,1634963918,"[ruby/openssl] test/openssl/test_ssl: fix illegal SAN extension
+
+A certificate can only have one SubjectAltName extension. OpenSSL 3.0
+performs a stricter validation and certificates containing multiple SANs
+will be rejected.
+
+https://github.com/ruby/openssl/commit/558cfbe5f5
+",['test/openssl/test_ssl.rb'],"Certificates with multiple SubjectAltName extensions are not validated correctly with OpenSSL 3.0, leading to rejection."
+d92054e3711ca5dd336b753c238f4e53a9881157,1669244412,"YJIT: Use a Box for branch targets to save memory
+
+We frequently make branches that only have one target but we used to
+always allocate space for two branch targets. This patch moves all the
+information a branch target has into a struct and refer to them using
+Option<Box<BranchTarget>>, this way when the second branch target is not
+present it only takes 8 bytes.
+
+Retained heap size on railsbench went from 16.17 MiB to 14.57 MiB, a
+ratio of about 1.1.
+",['yjit/src/core.rs'],"Allocating space for two branch targets in YJIT, even when only one is needed, results in unnecessary memory usage."
+dba61f487cd7c1555f1187a2e2846506c1b143be,1670094231,"return early if there is no is_entries buffer
+
+If there is a compilation error, is_entries may not be allocated, but
+ic_size could be greater than 0.  If we don't have a buffer to iterate
+over, just return early.  Otherwise GC could segv
+
+[Bug #19173]
+","['iseq.c', 'test/ruby/test_iseq.rb']","If a compilation error occurs, the not allocated is_entries buffer can cause a segmentation violation when the GC attempts to iterate over it, despite ic_size being greater than 0."
+ddd37e549195978e12cf4f5cc2cb0f6a69e191d0,1489005698,"docs for FileUtils.ln methods
+
+* lib/fileutils.rb: [DOC] add clarifying call-seq's for FileUtil.ln,
+  ln_s, and ln_sf, with better argument names for the created link and
+  link target.  Reported by Mike Vastola. [ruby-core:62532] [Bug #9829]
+
+* lib/fileutils.rb: [DOC] further improve descriptions of FileUtils.ln
+  and related methods; improve examples: relative links probably won't
+  work in other dir, avoid `include', use more generic homedir name.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@57811 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['lib/fileutils.rb'],"The documentation for FileUtils.ln, ln_s, and ln_sf in lib/fileutils.rb lacks clarity and contains examples that may not work in all scenarios, causing confusion for users."
+de541fe1961370e64541d73c96cf790d30f28604,1559575562,"colorize_code must return escaped text
+
+This was needed before 0c459af7c233adb5f44022350bfe8fa132d8053e but it
+could be actually useless now. But I added this anyway just in case.
+","['lib/irb/color.rb', 'test/irb/test_color.rb']","'colorize_code' method is not returning escaped text as expected, potentially leading to unhandled text processing errors."
+dfe21ef7a15a30fc33f3a5cc089e15d09e905eb4,1621506809,"Do not block JIT with pending_stale_p
+
+Because we want to flush pending stale units before unloading units, the
+pending_stale_p check is implemented in this waiting loop.
+
+However, once all methods are called more than --jit-min-calls,
+mjit_worker_wakeup will not be signaled again. As a result, when
+mjit_recompile is called after that and pending_stale_p becomes true,
+MJIT stops processing methods in the unit queue even if the queue is
+very long and MJIT does nothing, waiting for the signal.
+
+There should be a better way to handle this, but as a fix to be
+backported to Ruby 3.0, let me make an obvious simple commit here.
+",['mjit_worker.c'],"MJIT stops processing methods in the unit queue when pending_stale_p becomes true, causing unnecessary pause, especially when the queue is long."
+e16bd0f4d81ef74035712853a5eb527f28abb342,1510322341,"bin/erb: change template file encoding to UTF-8
+
+Unlike Ruby source file encoding (script encoding) whose default is
+changed to UTF-8 in Ruby 2.0 (Feature #6679), template's file encoding
+given to erb(1) has been ASCII-8BIT since ERB supports m17n at r21170.
+
+Like Ruby source file encoding, erb template file encoding should be
+UTF-8 in Ruby 2.
+
+[Bug #14095] [ruby-core:83708]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@60739 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['test/erb/test_erb_command.rb'],"The ERB template file encoding defaults to ASCII-8BIT, causing potential incompatibility issues as Ruby 2.0 source file encoding defaults to UTF-8."
+e1e61e256bd65ac3f293ba1513d1a934b9a3bff9,1612599796,"Improve performance of Array#- when it is called with empty array
+
+This change make Array#- return a copy of the receiver when
+the other array is empty.
+",['array.c'],Array subtraction method (#-) exhibits poor performance when called with an empty array.
+e4e416380d4b1b36ca1cc2e1e1ed993c9be694bb,1621374787,"Revert any references that are on the machine stack after compacting
+
+Since compaction can be concurrent, the machine stack is allowed to
+change while compaction is happening.  When compaction finishes, there
+may be references on the machine stack that need to be reverted so that
+we can remove the read barrier.
+",['gc.c'],"After compaction, references on the machine stack aren't reverted which can interfere with the removal of the read barrier."
+e7d578bf587050c08aaf9f9ac1b71ce69be044d7,1440917176,"test_win32ole_event.rb: skip 80041008
+
+* test/win32ole/test_win32ole_event.rb (exec_notification_query_async):
+  skip error with OLE error code:80041008, which seems to occur when
+  logging in as a non admistrator user.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@51725 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['test/win32ole/test_win32ole_event.rb'],Non-administrator users are encountering an OLE error code:80041008 while executing notification query asynchronously.
+e9ea494171745cc22f458952b0aaf4443820caa9,1562073083,"The behavior of statx(2) depends on the filesystem
+
+birthtime may not be supported on some filesystems, and
+NotImplementedError can be raised.  [Bug #15972]
+",['test/ruby/test_file_exhaustive.rb'],Usage of statx(2) causes NotImplementedError due to dependency on file system and potential lack of support for 'birthtime'.
+ee5b54822cd08c11ae1b2060d28074d36aa45954,1553768348,"parse.y: show error line separately
+
+* parse.y: show compile error and the error line separately,
+  instead of building the error message by snprintf then yyerror.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@67358 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['parse.y'],"Compile errors and their associated lines are not shown separately, resulting in difficulty to identify the cause of compilation issues due to combined error message format."
+efd103f3e58fcf3aeb6c4a0d3dd9233448698231,1671509702,"[rubygems/rubygems] Fix crash when showing some resolution errors
+
+If the conflict explanation includes empty ranges and version unions,
+Pub Grub was crashing.
+
+https://github.com/rubygems/rubygems/commit/eb360b77a2
+",['lib/bundler/vendor/pub_grub/lib/pub_grub/version_union.rb'],Pub Grub crashes when conflict explanation includes empty ranges and version unions during resolution errors.
+f37f357e808a7435f56946cd603a333feba7691b,1693334176,"[ruby/irb] Improve help/show_cmds message during debugger
+integration
+(https://github.com/ruby/irb/pull/693)
+
+* `help` should display debugger's help during irb:rdbg session
+
+* Update `show_cmds`'s output when in irb:rdbg session
+
+https://github.com/ruby/irb/commit/4029c2e564
+","['lib/irb/cmd/show_cmds.rb', 'lib/irb/statement.rb', 'test/irb/test_debug_cmd.rb']",The `help` and `show_cmds` commands are not displaying the correct output during irb:rdbg debugger session.
+f5ef84cb5eae9948e7011a9e6020dd4a8aeb246c,1480841429,"class.c: missing unknown_keyword_error
+
+* class.c (rb_get_kwargs): when values are stored, corresponding
+  keys have been remove from the keyword hash, and the hash should
+  be empty in that case.  [ruby-dev:49893] [Bug #13004]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@56981 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['class.c', 'test/ruby/test_keyword.rb']","Removing keys from the keyword hash when storing values in rb_get_kwargs doesn't empty the hash as expected, causing unknown keyword errors."
+f6461fa890fa12501fe1696a36ab2cca036477ff,1563768423,"Only the first argument can be --test-target-dir option
+
+Raise the proper exception when that option is not given but
+non-option argument is.
+","['common.mk', 'tool/test/runner.rb']",Incorrect handling of --test-target-dir option when it's not the first argument causing unwanted non-option arguments.
+f7bd7d6f1f499726cc4aca99714e1a0050dbd92b,1448915231,"* random.c: random_raw_seed don't use GRND_NONBLOCK. GRND_NONBLOCK
+  mean the result might not have an enough cryptic strength and
+  easy predictable. That's no good for SecureRandom.
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@52808 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['random.c'],"The use of GRND_NONBLOCK in random_raw_seed results in insecure random numbers due to insufficient cryptographic strength, compromising SecureRandom functionality."
+f7e266e6d2ccad63e4245a106a80c82ef2b38cbf,1639742731,"Enhanced RDoc for case mapping (#5245)
+
+Adds file doc/case_mapping.rdoc, which describes case mapping and provides a link target that methods doc can link to.
+
+Revises:
+
+    String#capitalize
+    String#capitalize!
+    String#casecmp
+    String#casecmp?
+    String#downcase
+    String#downcase!
+    String#swapcase
+    String#swapcase!
+    String#upcase
+    String#upcase!
+    Symbol#capitalize
+    Symbol#casecmp
+    Symbol#casecmp?
+    Symbol#downcase
+    Symbol#swapcase
+    Symbol#upcase
+",['string.c'],"Lack of detailed documentation for case mapping methods in String and Symbol classes, leading to ambiguous understanding of their usage."
+f7f097a3698aa3dec585488015e9652466f29455,1498775659,"remove unused rb_obj_basic_to_s_p function
+
+This hasn't been used since r36709 (2012-08-15)
+(""Kernel#inspect: improve consistency and do not call #to_s."")
+and was never part of public API in include/ruby/
+
+* class.c (rb_obj_basic_to_s_p): remove function
+* internal.h (rb_obj_basic_to_s_p): remove declaration
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@59208 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['class.c', 'internal.h']",The function rb_obj_basic_to_s_p in class.c and its declaration in internal.h remain in the codebase despite not being used since 2012 and not being part of the public API.
+f964fd3fa5070b95cb412cb529b47e168c0af25a,1546206172,"vm_args.c: search symbol proc in super classes
+
+* vm_args.c (refine_sym_proc_call): traverse ancestors to search
+  inherited methods for symbol proc.
+  [ruby-dev:50741] [Bug #15489]
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@66658 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+","['test/ruby/test_symbol.rb', 'vm_args.c']",Inherited methods for symbol proc are not being found due to lack of traversal through ancestors.
+fa09acafde3b7dbb23edadc6eddcce27f7395880,1556261980,"extend machine stacks when sanitizers are there
+
+It seems sanitizers require extra amount of machine stacks.  Without
+extending them the process tends to stack overflow.
+",['vm_core.h'],Sanitizers causing stack overflow due to insufficient machine stack size.
+fa326994aee83d1c1cd4b7cda9ae0d2631d0a13e,1511135972,"Update the last location of NODE_BLOCK
+
+* parse.y (block_append_gen): Update the last
+  location of NODE_BLOCK when a tail is appended.
+
+  e.g. The locations of NODE_BLOCK is fixed:
+
+  ```
+  a; b; c
+  ```
+
+  * Before
+
+  ```
+  NODE_BLOCK (line: 1, first_lineno: 1, first_column: 0, last_lineno: 1, last_column: 4)
+  ```
+
+  * After
+
+  ```
+  NODE_BLOCK (line: 1, first_lineno: 1, first_column: 0, last_lineno: 1, last_column: 7)
+  ```
+
+git-svn-id: svn+ssh://ci.ruby-lang.org/ruby/trunk@60855 b2dd03c8-39d4-4d8f-98ff-823fe69b080e
+",['parse.y'],"When appending a tail to NODE_BLOCK, the last location of the node isn't updated, causing inconsistencies in location metadata."

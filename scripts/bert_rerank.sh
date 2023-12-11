@@ -5,7 +5,7 @@
 #SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=8
-#SBATCH --mem=50G
+#SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #SBATCH --gpus=1
 
@@ -22,6 +22,9 @@ nvidia-smi
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
 # repo_path="2_8/django_django"
+# repo_path="2_7/julialang_julia"
+# repo_path="2_7/ruby_ruby"
+# repo_path="2_8/pytorch_pytorch"
 # repo_path="2_9/huggingface_transformers"
 repo_path="2_9/redis_redis"
 # repo_path="smalldata/ftr"
@@ -53,6 +56,7 @@ rerank_depth=250 # depth to go while reranking
 # do_eval=True # whether to evaluate or not
 openai_model="gpt4" # openai model to use
 # best_model_path="data/combined/best_model"
+eval_folder="gpt_train"
 
 # repo_paths=(
 #     "2_7/apache_spark"
@@ -91,9 +95,11 @@ python -u src/BERTReranker_v4.py \
     --sanity_check \
     --do_eval \
     --do_train \
-    --ignore_gold_in_training \
-    # --eval_gold \
-    # --overwrite_cache \
+    --use_gpt_train \
+    --eval_gold \
+    --eval_folder $eval_folder \
+    --overwrite_cache \
+    # --ignore_gold_in_training \
     # --no_bm25 \
     # --do_combined \
     # --best_model_path $best_model_path \
@@ -112,10 +118,7 @@ echo "Job completed"
 
 
 
-# repo_path="2_8/pytorch_pytorch" ???????
 # repo_path="2_7/pandas-dev_pandas" ???????
-# repo_path="2_7/julialang_julia"
-# repo_path="2_7/ruby_ruby"
 # repo_path="2_8/ansible_ansible"
 # repo_path="2_7/moby_moby"
 # repo_path="2_7/jupyter_notebook"

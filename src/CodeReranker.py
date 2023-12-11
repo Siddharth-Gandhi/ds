@@ -1,15 +1,12 @@
 import argparse
 import os
-import sys
 from typing import List
 
 import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
-from regex import B
 from sklearn.model_selection import train_test_split
-from sympy import S
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 from transformers import (
@@ -470,7 +467,7 @@ def main(args):
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
 
-        recent_df = get_recent_df(combined_df, repo_name=repo_name, ignore_gold_in_training=False)
+        recent_df = get_recent_df(combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
 
         # Step 6: randomly sample 1500 rows from recent_df
         recent_df = recent_df.sample(params['train_commits'])
@@ -490,13 +487,14 @@ def main(args):
         if args.sanity_check:
                 print('Running sanity check on training data...')
                 processed_code_df = sanity_check_code(processed_code_df)
+                print('Sanity check complete')
 
         print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
         print(processed_code_df.info())
 
 
-        triplet_cache = os.path.join(repo_path, 'cache', 'code_triplets.parquet')
-
+        triplet_cache = os.path.join(repo_path, 'cache', 'diff_code_triplets.parquet')
+        print(f'Triplet cache path: {triplet_cache}')
         print(type(processed_code_df))
         triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, overwrite=args.overwrite_cache)
         triplet_size = len(triplets)
@@ -618,6 +616,7 @@ if __name__ == '__main__':
     parser.add_argument('--bert_best_model', type=str, help='Path to the best BERT model.')
     parser.add_argument('--psg_len', type=int, default=250, help='Length of each passage (default: 250)')
     parser.add_argument('--psg_stride', type=int, default=200, help='Stride of each passage (default: 250)')
+    parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
     args = parser.parse_args()
     print(args)
     combined_df = get_combined_df(args.repo_path)

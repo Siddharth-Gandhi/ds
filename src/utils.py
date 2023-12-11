@@ -301,6 +301,8 @@ def prepare_code_triplets(diff_data, code_reranker, cache_file, overwrite=False)
 
     triplets = []
 
+    print('Preparing triplets from scratch')
+
     for _, row in tqdm.tqdm(diff_data.iterrows(), total=len(diff_data)):
         # get the input ids
         # input_ids = file_content['input_ids'].squeeze()

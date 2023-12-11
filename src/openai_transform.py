@@ -107,26 +107,8 @@ def filter_df(combined_df):
     return filtered_df
 
 
-# Function to send request to OpenAI API
-# def transform_message(commit_message, model):
-#     user_message = f"Now do the same thing for this commit message: {commit_message}"
-#     try:
-#         response = client.chat.completions.create(
-#             model=model,
-#             messages=[
-#                 {"role": "system", "content": SYSTEM_MESSAGE},
-#                 {"role": "user", "content": user_message}
-#             ]
-#         )
-#         return response.choices[0].message.content
-#     except Exception as e:
-#         print(f"Error: {e}")
-#         return None
-
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
 def transform_message(commit_message, model):
-    return commit_message
-
     user_message = f"Now do the same thing for this commit message: {commit_message}"
     response = client.chat.completions.create(
         model=model,
@@ -137,11 +119,15 @@ def transform_message(commit_message, model):
     )
     return response.choices[0].message.content
 
-def process_repository(repo_path, model_name, save_model_name, train_sample_size, test_sample_size, VERSION):
+def process_repository(repo_path, model_name, save_model_name, train_sample_size, test_sample_size, VERSION, save_dir):
     print(f'Processing {repo_path}')
     repo_name = repo_path.split('/')[-1]
     gold_dir = f'gold/{repo_name}'
-    train_dir = f'{gold_dir}/train'
+    # train_dir = f'{gold_dir}/train'
+    # create gold_dir if it does not exist
+    if not os.path.exists(gold_dir):
+        os.makedirs(gold_dir)
+
     gold_commit_ids_file = f'{gold_dir}/{repo_name}_gpt4_gold_commit_ids.txt'
     combined_df = get_combined_df(repo_path)
     filtered_df = filter_df(combined_df)
@@ -168,7 +154,10 @@ def process_repository(repo_path, model_name, save_model_name, train_sample_size
     train_df = filtered_df[~filtered_df['commit_id'].isin(test_commit_ids)]
     print(f'Number of commits in train_df: {len(train_df)}')
 
-    assert not train_df['commit_id'].isin(test_commit_ids).any()
+    # assert none of commits between train_df and test_df overlap
+    assert not set(train_df['commit_id'].tolist()).intersection(
+        set(test_commit_ids)
+    )
 
     # sample train_sample_size commits from train_df with seed 42 without replacement
     train_df = train_df.sample(n=train_sample_size, random_state=42, replace=False)
@@ -176,6 +165,18 @@ def process_repository(repo_path, model_name, save_model_name, train_sample_size
     output_dir = os.path.join(save_dir, repo_name)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
+
+    # write train_commit_ids to a file
+    train_commit_ids_file = os.path.join(output_dir, f'{VERSION}_{repo_name}_{save_model_name}_train_commit_ids.txt')
+    if os.path.exists(train_commit_ids_file):
+        print(f'Found train commit ids file for {repo_path}, skipping')
+        return
+
+    with open(train_commit_ids_file, 'w') as f:
+        for commit_id in train_df['commit_id'].tolist():
+            f.write(f'{commit_id}\n')
+
+
 
     def process_df(final_df, is_train):
         print(f'Number of unique commit_ids: {len(final_df)}')
@@ -225,21 +226,20 @@ def main():
     model_name = "gpt-4"
     save_model_name = 'gpt4' if model_name == 'gpt-4' else 'gpt3.5'
     VERSION = 'v2'
-    train_sample_size = 1000
+    train_sample_size = 500
     test_sample_size = 100
 
-    sample_size = 100
     # REPO_LIST = []
     print(os.getcwd())
     # REPO_LIST = ['2_7/facebook_react']
-    REPO_LIST = ['2_7/apache_spark', '2_7/apache_kafka', '2_8/angular_angular', '2_8/django_django']
-                #  '2_7/julialang_julia', '2_7/ruby_ruby','2_8/ansible_ansible', '2_7/moby_moby', '2_7/jupyter_notebook','2_8/pytorch_pytorch']
+    # REPO_LIST = ['2_7/apache_spark', '2_7/apache_kafka', '2_8/angular_angular', '2_8/django_django',
+    REPO_LIST = ['2_7/julialang_julia', '2_7/ruby_ruby','2_8/pytorch_pytorch', '2_9/redis_redis', '2_9/huggingface_transformers']
     # Specify the model name as a variable
     print(f'Total number of repos: {len(REPO_LIST)}')
-    print(f'Using model: {model_name} with sample size: {sample_size}')
+    print(f'Using model: {model_name} with train_sample_size: {train_sample_size} and test_sample_size: {test_sample_size}')
 
     for repo_path in REPO_LIST:
-        process_repository(repo_path, model_name, save_model_name, train_sample_size, test_sample_size, VERSION)
+        process_repository(repo_path, model_name, save_model_name, train_sample_size, test_sample_size, VERSION, save_dir)
 
 if __name__ == "__main__":
     main()

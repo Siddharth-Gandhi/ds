@@ -18,11 +18,11 @@ echo "On host $(hostname)"
 nvidia-smi
 
 # repo_path="2_7/apache_spark"
-repo_path="2_7/apache_kafka"
+# repo_path="2_7/apache_kafka"
 # repo_path="2_7/facebook_react"
 # repo_path="2_8/angular_angular"
 # repo_path="2_8/django_django"
-# repo_path="smalldata/ftr"
+repo_path="smalldata/ftr"
 
 
 index_path="${repo_path}/index_commit_tokenized"
@@ -49,7 +49,8 @@ psg_stride=200
 aggregation_strategy="sump" # aggregation strategy for bert reranker
 rerank_depth=100 # depth to go while reranking
 openai_model="gpt4" # openai model to use
-bert_best_model="${repo_path}/models/microsoft_codebert-base_model_output/best_model"
+# bert_best_model="${repo_path}/models/microsoft_codebert-base_model_output/best_model"
+bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 # best_model_path="data/combined/best_model"
 
 repo_paths=(
@@ -90,8 +91,9 @@ python -u src/CodeReranker.py \
     --openai_model $openai_model \
     --bert_best_model $bert_best_model \
     --do_eval \
-    --eval_gold \
-    # --do_train \
+    --do_train \
+    --ignore_gold_in_training
+    # --eval_gold \
     # --sanity_check \
     # --overwrite_cache \
 
