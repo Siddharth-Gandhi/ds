@@ -2,13 +2,11 @@
 #SBATCH --job-name=bert_rerank
 #SBATCH --output=logs/bert_rerank/bert_rerank_output_%A.log
 #SBATCH --partition=gpu
-#SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
 #SBATCH --nodes=1
 #SBATCH --cpus-per-gpu=8
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #SBATCH --gpus=1
-
 
 # Activate the conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
@@ -24,10 +22,25 @@ nvidia-smi
 # repo_path="2_8/django_django"
 # repo_path="2_7/julialang_julia"
 # repo_path="2_7/ruby_ruby"
-# repo_path="2_8/pytorch_pytorch"
+repo_path="2_8/pytorch_pytorch"
 # repo_path="2_9/huggingface_transformers"
-repo_path="2_9/redis_redis"
+# repo_path="2_9/redis_redis"
+
 # repo_path="smalldata/ftr"
+
+repo_paths=(
+    "2_7/apache_spark"
+    "2_7/apache_kafka"
+    "2_7/facebook_react"
+    "2_8/angular_angular"
+    "2_8/django_django"
+    "2_8/pytorch_pytorch"
+    "2_7/julialang_julia"
+    "2_7/ruby_ruby"
+    "2_9/huggingface_transformers"
+    "2_9/redis_redis"
+)
+
 
 
 index_path="${repo_path}/index_commit_tokenized"
@@ -55,23 +68,10 @@ rerank_depth=250 # depth to go while reranking
 # do_train=True # whether to train or not
 # do_eval=True # whether to evaluate or not
 openai_model="gpt4" # openai model to use
-# best_model_path="data/combined/best_model"
-eval_folder="gpt_train"
+best_model_path="data/combined_commit_train/best_model"
+eval_folder="combined_commit_train"
 
-# repo_paths=(
-#     "2_7/apache_spark"
-#     "2_7/apache_kafka"
-#     "2_7/facebook_react"
-#     "2_8/angular_angular"
-#     "2_8/django_django"
-#     # "2_8/pytorch_pytorch"
-#     # "2_7/pandas-dev_pandas"
-#     # "2_7/julialang_julia"
-#     # "2_7/ruby_ruby"
-#     # "2_8/ansible_ansible"
-#     # "2_7/moby_moby"
-#     # "2_7/jupyter_notebook"
-# )
+
 
 python -u src/BERTReranker_v4.py \
     --repo_path $repo_path \
@@ -92,18 +92,20 @@ python -u src/BERTReranker_v4.py \
     --aggregation_strategy $aggregation_strategy \
     --rerank_depth $rerank_depth \
     --openai_model $openai_model \
-    --sanity_check \
-    --do_eval \
-    --do_train \
-    --use_gpt_train \
-    --eval_gold \
     --eval_folder $eval_folder \
-    --overwrite_cache \
-    # --ignore_gold_in_training \
-    # --no_bm25 \
+    --repo_paths "${repo_paths[@]}" \
+    --do_eval \
+    --eval_gold \
+    --no_bm25 \
+    --best_model_path $best_model_path \
+
     # --do_combined \
-    # --best_model_path $best_model_path \
-    # --repo_paths "${repo_paths[@]}" \
+    # --use_gpt_train \
+    # --sanity_check \
+    # --do_train \
+
+    # --overwrite_cache \
+    # --ignore_gold_in_training \
 
 
     # --debug \

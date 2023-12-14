@@ -284,12 +284,80 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
             print(f'Number of commits after removing gold commits: {len(recent_df)}')
     return recent_df
 
-def prepare_code_triplets(diff_data, code_reranker, cache_file, overwrite=False):
-    # given diff_data, the passage column is way too long. We need to split it into passages of length psg_len with stride psg_stride
-    # then we can create triplets from that
+# def prepare_code_triplets(diff_data, code_reranker, cache_file, overwrite=False):
+#     # given diff_data, the passage column is way too long. We need to split it into passages of length psg_len with stride psg_stride
+#     # then we can create triplets from that
 
-    # diff_data has columns: commit_id, file_path, query, passage, label
+#     # diff_data has columns: commit_id, file_path, query, passage, label
 
+#     if cache_file and os.path.exists(cache_file) and not overwrite:
+#         print(f"Loading data from cache file: {cache_file}")
+#         # with open(cache_file, 'rb') as file:
+#         #     return pickle.load(file)
+#         return pd.read_parquet(cache_file)
+
+#     def full_tokenize(s):
+#         return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
+
+#     triplets = []
+
+#     print('Preparing triplets from scratch')
+
+#     for _, row in tqdm.tqdm(diff_data.iterrows(), total=len(diff_data)):
+#         # get the input ids
+#         # input_ids = file_content['input_ids'].squeeze()
+#         # get the number of tokens in the file content
+#         file_tokens = full_tokenize(row['passage'])
+#         # query_tokens = full_tokenize(row['query'])
+#         # path_tokens = full_tokenize(row['file_path'])
+#         total_tokens = len(file_tokens)
+
+#         cur_psg_cnt = 0
+#         for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+#             cur_passage = []
+#             # add query tokens and path tokens
+#             # cur_passage.extend(query_tokens)
+#             # cur_passage.extend(path_tokens)
+
+#             # add the file tokens
+#             cur_passage.extend(file_tokens[cur_start:cur_start+code_reranker.psg_len])
+
+#             # now convert cur_passage into a string
+#             cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+
+
+#             # add the cur_passage to cur_result_passages
+#             triplets.append((row['query'], row['file_path'], cur_passage_decoded, row['label']))
+
+#             cur_psg_cnt += 1
+
+#             if cur_psg_cnt == code_reranker.psg_cnt:
+#                 break
+
+#     # convert to pandas dataframe
+#     triplets = pd.DataFrame(triplets, columns=['query', 'file_path', 'passage', 'label'])
+#     # Write data to cache file
+#     if cache_file:
+#         # with open(cache_file, 'wb') as file:
+#         #     pickle.dump(triplets, file)
+#         #     print(f"Saved data to cache file: {cache_file}")
+#         print(f"Saving data to cache file: {cache_file}")
+#         triplets.to_parquet(cache_file)
+#     return triplets
+
+def prep_line(line):
+        return line.rstrip().lstrip()
+
+def parse_diff(diff):
+    return [
+        line[1:] if line.startswith('+') else line
+        for line in diff.split('\n')
+        if not (line.startswith('-') or len(line) == 0 or (line.startswith('@@') and line.count('@@') > 1))
+        and len(prep_line(line)) > 2
+    ]
+
+def prepare_code_triplets(diff_data, code_reranker, cache_file, combined_df, overwrite=False):
+    print(f'Preparing code triplets from scratch for {len(diff_data)} diffs with psg_len: {code_reranker.psg_len}, psg_stride: {code_reranker.psg_stride}, psg_cnt: {code_reranker.psg_cnt}')
     if cache_file and os.path.exists(cache_file) and not overwrite:
         print(f"Loading data from cache file: {cache_file}")
         # with open(cache_file, 'rb') as file:
@@ -299,44 +367,67 @@ def prepare_code_triplets(diff_data, code_reranker, cache_file, overwrite=False)
     def full_tokenize(s):
         return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
 
+
+
+    def count_matching_lines(passage_lines, diff_lines):
+        # Create a 2D array to store the lengths of the longest common subsequences
+        dp = [[0] * (len(diff_lines) + 1) for _ in range(len(passage_lines) + 1)]
+
+        # Fill the dp array
+        for i in range(1, len(passage_lines) + 1):
+            for j in range(1, len(diff_lines) + 1):
+                if prep_line(passage_lines[i - 1]) == prep_line(diff_lines[j - 1]):
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                else:
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+        return dp[-1][-1]
+
     triplets = []
 
-    print('Preparing triplets from scratch')
-
     for _, row in tqdm.tqdm(diff_data.iterrows(), total=len(diff_data)):
-        # get the input ids
-        # input_ids = file_content['input_ids'].squeeze()
-        # get the number of tokens in the file content
         file_tokens = full_tokenize(row['passage'])
-        # query_tokens = full_tokenize(row['query'])
-        # path_tokens = full_tokenize(row['file_path'])
         total_tokens = len(file_tokens)
-
-        cur_psg_cnt = 0
+        cur_diff = combined_df[(combined_df['commit_id'] == row['commit_id']) & (combined_df['file_path'] == row['file_path'])]['diff'].values[0]
+        if pd.isna(cur_diff):
+            # if diff is NA/NaN
+            continue
+        cur_diff_lines = parse_diff(cur_diff)
+        cur_triplets = []
         for cur_start in range(0, total_tokens, code_reranker.psg_stride):
             cur_passage = []
-            # add query tokens and path tokens
-            # cur_passage.extend(query_tokens)
-            # cur_passage.extend(path_tokens)
 
-            # add the file tokens
             cur_passage.extend(file_tokens[cur_start:cur_start+code_reranker.psg_len])
 
             # now convert cur_passage into a string
             cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
 
+            cur_passage_lines = cur_passage_decoded.split('\n')
+
+            # remove lines with less than 2 characters
+            cur_passage_lines = [line for line in cur_passage_lines if len(prep_line(line)) > 2]
+
+            # check if there are lines matching the diff lines
+            # if there are, then we can add this directly to the triplets
+            # common_lines = set(cur_passage_lines).intersection(set(cur_diff_lines))
+            common_line_count = count_matching_lines(cur_passage_lines, cur_diff_lines)
 
             # add the cur_passage to cur_result_passages
-            triplets.append((row['query'], row['file_path'], cur_passage_decoded, row['label']))
+            cur_triplets.append((common_line_count, (row['query'], row['file_path'], cur_passage_decoded, row['label'])))
 
-            cur_psg_cnt += 1
+        # sort the cur_triplets by the number of common lines
+        cur_triplets.sort(key=lambda x: x[0], reverse=True)
 
-            if cur_psg_cnt == code_reranker.psg_cnt:
-                break
+        # now we want to filter cur_triplets to have all tuplets with x[0] > 3 to be in order and shuffle the rest
+
+        # now add the top code_reranker.psg_cnt to triplets
+        for triplet in cur_triplets[:code_reranker.psg_cnt]:
+            # print(f"Found {triplet[0]} matching lines for diff in cur_passage at index")
+            triplets.append(triplet[1])
+
 
     # convert to pandas dataframe
     triplets = pd.DataFrame(triplets, columns=['query', 'file_path', 'passage', 'label'])
-    # Write data to cache file
     if cache_file:
         # with open(cache_file, 'wb') as file:
         #     pickle.dump(triplets, file)

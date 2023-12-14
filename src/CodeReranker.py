@@ -268,13 +268,21 @@ class BERTCodeReranker:
 
             # now need to split this file content into psg_cnt passages
             # first tokenize the file content
+
+            # warning these asserts are useless since we are using NaNs
             assert file_content is not None, f'file_content is None for commit_id: {commit_id}, file_path: {file_path}'
             assert file_path is not None, f'file_path is None for commit_id: {commit_id}'
             assert query is not None, f'query is None'
-            file_tokens = full_tokenize(file_content)
+
             query_tokens = full_tokenize(query)
             path_tokens = full_tokenize(file_path)
 
+            if pd.isna(file_content):
+                # if file_content is NaN, then we can just set file_content to empty string
+                print(f'WARNING: file_content is NaN for commit_id: {commit_id}, file_path: {file_path}, setting file_content to empty string')
+                file_content = ''
+
+            file_tokens = full_tokenize(file_content)
 
 
             # now split the file content into psg_cnt passages
@@ -325,7 +333,6 @@ class BERTCodeReranker:
 
 def do_training(triplet_data, reranker, hf_output_dir, args):
     def tokenize_hf(example):
-        len(example)
         return reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
 
 
@@ -450,14 +457,29 @@ def main(args):
     code_reranker = BERTCodeReranker(params)
     # rerankers = [bert_reranker, code_reranker]
     save_model_name = params['model_name'].replace('/', '_')
-    hf_output_dir = os.path.join(repo_path, 'models', f'code_{save_model_name}_model_output')
+    # hf_output_dir = os.path.join(repo_path, 'models', f'code_{save_model_name}_model_output')
+    if not os.path.exists(os.path.join(repo_path, 'models')):
+        os.makedirs(os.path.join(repo_path, 'models'))
+
+    model_name = f'{save_model_name}_coderr'
+    if args.use_gpt_train:
+        model_name += '_gpt_train'
+
+
+    hf_output_dir = os.path.join(repo_path, 'models', model_name)
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
 
     # create eval directory to store results
     eval_path = os.path.join(repo_path, 'eval', f'code_{save_model_name}')
+    # check for a eval_folder argument and if it exists, use that as the eval folder
+    if args.eval_folder:
+        eval_path = os.path.join(eval_path, args.eval_folder)
+        if not os.path.exists(eval_path):
+            os.makedirs(eval_path)
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
+
 
     # training methods
 
@@ -467,10 +489,28 @@ def main(args):
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
 
-        recent_df = get_recent_df(combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
+        # recent_df = get_recent_df(combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
 
         # Step 6: randomly sample 1500 rows from recent_df
-        recent_df = recent_df.sample(params['train_commits'])
+        # recent_df = recent_df.sample(params['train_commits'])
+        if args.use_gpt_train:
+            gold_dir = os.path.join('gold', repo_name)
+            if not os.path.exists(gold_dir):
+                raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+
+            gold_train_file = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_train.parquet')
+            if not os.path.exists(gold_train_file):
+                raise ValueError(f'Gold train file {gold_train_file} does not exist, please run openai_transform.py first')
+
+            recent_df = pd.read_parquet(gold_train_file)
+            # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
+            recent_df = recent_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
+            triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
+        else:
+            recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
+            # Step 6: randomly sample 1500 rows from recent_df
+            recent_df = recent_df.sample(params['train_commits'])
+            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
         print(f'Number of commits after sampling: {len(recent_df)}')
 
         if not args.overwrite_cache and os.path.exists(os.path.join(repo_path, 'cache', 'code_data.parquet')):
@@ -485,9 +525,9 @@ def main(args):
             processed_code_df.to_parquet(os.path.join(repo_path, 'cache', 'code_data.parquet'))
 
         if args.sanity_check:
-                print('Running sanity check on training data...')
-                processed_code_df = sanity_check_code(processed_code_df)
-                print('Sanity check complete')
+            print('Running sanity check on training data...')
+            processed_code_df = sanity_check_code(processed_code_df)
+            print('Sanity check complete')
 
         print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
         print(processed_code_df.info())
@@ -496,10 +536,10 @@ def main(args):
         triplet_cache = os.path.join(repo_path, 'cache', 'diff_code_triplets.parquet')
         print(f'Triplet cache path: {triplet_cache}')
         print(type(processed_code_df))
-        triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, overwrite=args.overwrite_cache)
+        triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, combined_df ,overwrite=args.overwrite_cache)
         triplet_size = len(triplets)
         print(f'Triplet dataframe shape (before): {triplets.shape}')
-        triplets = triplets.sample(min(50000, triplet_size), random_state=42)
+        triplets = triplets.sample(min(100000, triplet_size), random_state=42)
         print(f'Triplet dataframe shape (after): {triplets.shape}')
 
         # drop column called full_passage
@@ -521,6 +561,7 @@ def main(args):
         # rerankers = [bert_reranker, code_reranker]
 
         if args.bert_best_model is not None:
+            print(f'Loading BERT model from {args.bert_best_model}...')
             bert_reranker = BERTReranker(bert_params)
             bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.bert_best_model, num_labels=1, problem_type='regression')
             bert_reranker.model.to(bert_reranker.device)
@@ -536,8 +577,22 @@ def main(args):
 
     if args.do_eval:
 
-        bert_with_training_output_path = os.path.join(eval_path, 'bert_code_with_training.txt')
-        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
+        # bert_with_training_output_path = os.path.join(eval_path, 'bert_code_with_training.txt')
+        # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
+
+        bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
+        # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
+
+        gold_dir = os.path.join('gold', repo_name)
+        if not os.path.exists(gold_dir):
+            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+        # check if gold data exists
+        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
+        if not os.path.exists(gold_data_path):
+            raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
+        print(f'Model: {args.openai_model}')
+        gold_df = pd.read_parquet(gold_data_path)
+        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
 
         print("BERT Evaluation with training")
         print(bert_with_training_eval)
@@ -617,6 +672,8 @@ if __name__ == '__main__':
     parser.add_argument('--psg_len', type=int, default=250, help='Length of each passage (default: 250)')
     parser.add_argument('--psg_stride', type=int, default=200, help='Stride of each passage (default: 250)')
     parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
+    parser.add_argument('--eval_folder', type=str, help='Folder name to store evaluation files.')
+    parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT data for training.')
     args = parser.parse_args()
     print(args)
     combined_df = get_combined_df(args.repo_path)

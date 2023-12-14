@@ -339,7 +339,17 @@ def main(args):
         print('Running BM25...')
         bm25_output_path = os.path.join(eval_path, 'bm25_baseline_metrics.txt')
         # print(f'BM25 output path: {bm25_output_path}')
-        bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], )
+        # bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], )
+        gold_dir = os.path.join('gold', repo_name)
+        if not os.path.exists(gold_dir):
+            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+        # check if gold data exists
+        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
+        if not os.path.exists(gold_data_path):
+            raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
+        print(f'Model: {args.openai_model}')
+        gold_df = pd.read_parquet(gold_data_path)
+        bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
         print("BM25 Baseline Evaluation")
         print(bm25_baseline_eval)
 
@@ -466,8 +476,18 @@ def main(args):
         # rerankers = [bert_reranker]
 
         bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
-        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
+        # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
+        gold_dir = os.path.join('gold', repo_name)
+        if not os.path.exists(gold_dir):
+            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+        # check if gold data exists
+        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
+        if not os.path.exists(gold_data_path):
+            raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
+        print(f'Model: {args.openai_model}')
+        gold_df = pd.read_parquet(gold_data_path)
+        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
         print("BERT Evaluation with training")
         print(bert_with_training_eval)
 
@@ -493,11 +513,13 @@ def main(args):
         print(gold_df.info())
 
         # run BM25 on gold data first
-        print('Running BM25 on gold data...')
-        bm25_gold_output_path = os.path.join(eval_path, f'bm25_v2_{args.openai_model}_gold_metrics.txt')
-        bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
-        print("BM25 Gold Evaluation")
-        print(bm25_gold_eval)
+
+        if not args.no_bm25:
+            print('Running BM25 on gold data...')
+            bm25_gold_output_path = os.path.join(eval_path, f'bm25_v2_{args.openai_model}_gold_metrics.txt')
+            bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
+            print("BM25 Gold Evaluation")
+            print(bm25_gold_eval)
 
         # # get results after training
         # if not os.path.exists(best_model_path):
@@ -520,7 +542,10 @@ def main(args):
         print(f'Found {len(args.repo_paths)} repositories: {args.repo_paths}')
         combined_triplet_data = pd.DataFrame()
         for repo_path in args.repo_paths:
-            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
+            if args.use_gpt_train:
+                triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
+            else:
+                triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
             if os.path.exists(triplet_cache):
                 repo_triplet_data = pd.read_pickle(triplet_cache)
                 combined_triplet_data = pd.concat([combined_triplet_data, repo_triplet_data], ignore_index=True)
@@ -532,7 +557,7 @@ def main(args):
 
         print(f'Shape of combined triplet data: {combined_triplet_data.shape}')
 
-        combined_hf_output_dir = os.path.join('data', 'combined')
+        combined_hf_output_dir = os.path.join('data', 'combined_commit_train' if not args.use_gpt_train else 'combined_gpt_train')
         if not os.path.exists(combined_hf_output_dir):
             os.makedirs(combined_hf_output_dir)
 
