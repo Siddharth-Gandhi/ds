@@ -9,6 +9,7 @@
 #SBATCH --gpus=1
 #SBATCH --exclude=boston-2-25,boston-2-27,boston-2-29,boston-2-31
 
+
 # Activate the conda environment
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ds
@@ -23,8 +24,8 @@ nvidia-smi
 # repo_path="2_8/django_django"
 # repo_path="smalldata/ftr"
 # repo_path="2_7/julialang_julia"
-# repo_path="2_7/ruby_ruby"
-repo_path="2_8/pytorch_pytorch"
+repo_path="2_7/ruby_ruby"
+# repo_path="2_8/pytorch_pytorch"
 # repo_path="2_9/huggingface_transformers"
 # repo_path="2_9/redis_redis"
 

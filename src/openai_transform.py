@@ -48,19 +48,11 @@ Do not mention the names or contact information of any people involved in the co
 
 For example, given the commit message below:
 '[Fizz] Fix for failing id overwrites for postpone (#27684)
-When we postpone during a render we inject a new segment synchronously
-which we postpone. That gets assigned an ID so we can refer to it
-immediately in the postponed state.
+When we postpone during a render we inject a new segment synchronously which we postpone. That gets assigned an ID so we can refer to it immediately in the postponed state.
 
-When we do that, the parent segment may complete later even though it's
-also synchronous. If that ends up not having any content in it, it'll
-inline into the child and that will override the child's segment id
-which is not correct since it was already assigned one.
+When we do that, the parent segment may complete later even though it's also synchronous. If that ends up not having any content in it, it'll inline into the child and that will override the child's segment id which is not correct since it was already assigned one.
 
-To fix this, we simply opt-out of the optimization in that case which is
-unfortunate because we'll generate many more unnecessary empty segments.
-So we should come up with a new strategy for segment id assignment but
-this fixes the bug.
+To fix this, we simply opt-out of the optimization in that case which is unfortunate because we'll generate many more unnecessary empty segments. So we should come up with a new strategy for segment id assignment but this fixes the bug.
 
 Co-authored-by: Josh Story <story@hey.com>'
 

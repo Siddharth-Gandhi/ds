@@ -1,0 +1,11 @@
+repo_name,avg_commit_query_len,avg_gpt4_query_len,avg_files_edited,median_files_edited
+facebook_react,180.5,36.4,5.1,4.0
+angular_angular,164.6,37.5,3.5,2.0
+apache_spark,576.8,38.4,3.9,3.0
+apache_kafka,198.3,39.7,5.4,3.0
+django_django,52.0,25.3,2.0,2.0
+julialang_julia,84.6,31.4,2.4,2.0
+ruby_ruby,121.5,33.1,1.4,1.0
+pytorch_pytorch,326.6,36.8,3.4,3.0
+huggingface_transformers,231.2,33.0,5.1,4.0
+redis_redis,161.0,36.3,2.4,2.0
