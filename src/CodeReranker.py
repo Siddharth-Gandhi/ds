@@ -21,9 +21,12 @@ from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
 from utils import (  # prepare_triplet_data_from_df,
     AggregatedSearchResult,
+    get_code_df,
     get_combined_df,
     get_recent_df,
     prepare_code_triplets,
+    process_code_df,
+    sanity_check_code,
     sanity_check_triplets,
     set_seed,
 )
@@ -33,99 +36,6 @@ set_seed(42)
 
 
 
-def sanity_check_code(data):
-    problems = 0
-    for i, row in tqdm(data.iterrows(), total=len(data)):
-        try:
-            if row['label'] == 0:
-                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 0
-            else:
-                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 1
-        except AssertionError:
-            print(f"Assertion failed at index {i}: {row}")
-            # break  # Optional: break after the first failure, remove if you want to see all failures
-            # remove the row with label 0
-
-            if row['label'] == 0:
-                problems += 1
-                # data.drop(i, inplace=True)
-                data = data.drop(i)
-                # print(f"Dropped row at index {i}")
-
-    print(f"Total number of problems in sanity check of training data: {problems}")
-    return data
-
-def get_code_df(df, searcher, search_depth, num_positives, num_negatives):
-    code_data = []
-    print(f'Preparing code data from dataframe of size: {len(df)} with search_depth: {search_depth}')
-    # for _, row in df.iterrows():
-    total_positives, total_negatives = 0, 0
-    for _, row in tqdm(df.iterrows(), total=len(df)):
-        cur_positives = 0
-        cur_negatives = 0
-        commit_message = row['commit_message']
-        actual_files_modified = row['actual_files_modified']
-
-        agg_search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump', sort_contributing_result_by_date=True)
-
-        for agg_result in agg_search_results:
-            most_recent_search_result = agg_result.contributing_results[0]
-            file_path = most_recent_search_result.file_path
-            commit_id = most_recent_search_result.commit_id
-
-            if file_path in actual_files_modified and cur_positives < num_positives:
-                # this is a positive sample
-                code_data.append((commit_message, file_path, commit_id, 1))
-                cur_positives += 1
-                total_positives += 1
-            elif file_path not in actual_files_modified and cur_negatives < num_negatives:
-                # this is a negative sample
-                code_data.append((commit_message, file_path, commit_id, 0))
-                cur_negatives += 1
-                total_negatives += 1
-
-            if cur_positives == num_positives and cur_negatives == num_negatives:
-                break
-
-    # convert to pandas dataframe
-    # data = pd.DataFrame(data, columns=['query', 'passage', 'label'])
-    code_df = pd.DataFrame(code_data, columns=['query', 'file_path', 'commit_id', 'label'])
-    # print distribution of labels
-    print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
-    # print percentage of positives and negatives
-    denom = total_positives + total_negatives
-    print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
-    return code_df
-
-def process_code_df(diff_data, df):
-    # given diff_data, we want to use commit_id and file_path to get the diff from the df
-
-    # first we need to get the diff from the df
-    # we can use the commit_id and file_path to get the diff
-    res_df = []
-    null_rows = 0
-    # for _, row in diff_data.iterrows():
-    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
-        commit_id = row['commit_id']
-        file_path = row['file_path']
-        # get the diff from the df
-        diff = df[(df['commit_id'] == commit_id) & (df['file_path'] == file_path)]['cur_file_content']
-        # check if diff is NA/NaN
-        if diff.isnull().values.any():
-            # if it is, then we can just skip this row
-            null_rows += 1
-            continue
-        diff = diff.values[0]
-
-        res_df.append((commit_id, file_path, row['query'], diff, row['label']))
-
-    res_df = pd.DataFrame(res_df, columns=['commit_id', 'file_path', 'query', 'passage', 'label'])
-    # make query and passage into strings and label into int
-    res_df['query'] = res_df['query'].astype(str)
-    res_df['passage'] = res_df['passage'].astype(str)
-    res_df['label'] = res_df['label'].astype(int)
-    print(f"Number of null rows: {null_rows}")
-    return res_df
 
 
 class BERTCodeReranker:
@@ -295,7 +205,7 @@ class BERTCodeReranker:
             for cur_start in range(0, total_tokens, self.psg_stride):
                 cur_passage = []
                 # add query tokens and path tokens
-                cur_passage.extend(query_tokens)
+                # cur_passage.extend(query_tokens)
                 cur_passage.extend(path_tokens)
 
                 # add the file tokens
@@ -489,10 +399,6 @@ def main(args):
         if not os.path.exists(os.path.join(repo_path, 'cache')):
             os.makedirs(os.path.join(repo_path, 'cache'))
 
-        # recent_df = get_recent_df(combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
-
-        # Step 6: randomly sample 1500 rows from recent_df
-        # recent_df = recent_df.sample(params['train_commits'])
         if args.use_gpt_train:
             gold_dir = os.path.join('gold', repo_name)
             if not os.path.exists(gold_dir):
@@ -505,12 +411,12 @@ def main(args):
             recent_df = pd.read_parquet(gold_train_file)
             # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
             recent_df = recent_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
-            triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
+            # triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
         else:
             recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
             # Step 6: randomly sample 1500 rows from recent_df
             recent_df = recent_df.sample(params['train_commits'])
-            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
+            # triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
         print(f'Number of commits after sampling: {len(recent_df)}')
 
         if not args.overwrite_cache and os.path.exists(os.path.join(repo_path, 'cache', 'code_data.parquet')):
@@ -525,27 +431,44 @@ def main(args):
             processed_code_df.to_parquet(os.path.join(repo_path, 'cache', 'code_data.parquet'))
 
         if args.sanity_check:
+            # checking if files for a particular query are all separate
+            # (i.e. for a train query, one file does not have both label 0 and 1)
             print('Running sanity check on training data...')
             processed_code_df = sanity_check_code(processed_code_df)
             print('Sanity check complete')
 
+
+        # processed_code_df has columns
+        # 1. query (train_query),
+        # 2. commit_id (bm25_search_result_commit_id),
+        # 3. file_path (bm25_search_result_file_path),
+        # 4. file_content (bm25_search_result_file_content),
+        # 5. label (bm25_search_result_label), - whether this file was in the relevant set of train_query or not
+
         print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
         print(processed_code_df.info())
 
-
         triplet_cache = os.path.join(repo_path, 'cache', 'diff_code_triplets.parquet')
         print(f'Triplet cache path: {triplet_cache}')
-        print(type(processed_code_df))
-        triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, combined_df ,overwrite=args.overwrite_cache)
-        triplet_size = len(triplets)
-        print(f'Triplet dataframe shape (before): {triplets.shape}')
-        triplets = triplets.sample(min(100000, triplet_size), random_state=42)
-        print(f'Triplet dataframe shape (after): {triplets.shape}')
 
-        # drop column called full_passage
-        if 'full_passage' in triplets.columns:
-            triplets = triplets.drop(columns=['full_passage'])
-        print(f'Triplet dataframe shape: {triplets.shape}')
+        # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
+        triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, combined_df ,overwrite=args.overwrite_cache)
+
+
+        #### Sampling to keep number of triplets reasonable.
+        print(f'Triplet dataframe shape (before sampling): {triplets.shape}')
+        # triplets = triplets.sample(min(100000, triplet_size), random_state=42)
+        # keep all triplets with label 1 and equal number of triplets with label 0 sampled randomly
+        # Filter out all rows with label 1
+        df_label_1 = triplets[triplets['label'] == 1]
+        # Count the number of label 1 rows
+        n_label_1 = len(df_label_1)
+        # Randomly sample an equal number of rows with label 0
+        df_label_0_sample = triplets[triplets['label'] == 0].sample(n=n_label_1)
+        # Concatenate the two DataFrames
+        triplets = pd.concat([df_label_1, df_label_0_sample])
+        print(f'Triplet dataframe shape (after sampling): {triplets.shape}')
+
         print(triplets.info())
         do_training(triplets, code_reranker, hf_output_dir, args)
 

@@ -11,8 +11,8 @@ import numpy as np
 import pandas as pd
 import tiktoken
 import torch
-import tqdm
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 # from turtle import pos
 
@@ -136,7 +136,7 @@ def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_
     print(f'Preparing data from dataframe of size: {len(df)} with search_depth: {search_depth}')
     # for _, row in df.iterrows():
     total_positives, total_negatives = 0, 0
-    for _, row in tqdm.tqdm(df.iterrows(), total=len(df)):
+    for _, row in tqdm(df.iterrows(), total=len(df)):
         cur_positives = 0
         cur_negatives = 0
         pos_commit_ids = set()
@@ -220,7 +220,7 @@ def sanity_check_triplets(data):
         # Output: DataFrame without the problematic row
     """
     problems = 0
-    for i, row in tqdm.tqdm(data.iterrows(), total=len(data)):
+    for i, row in tqdm(data.iterrows(), total=len(data)):
         try:
             if row['label'] == 0:
                 assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 0
@@ -303,7 +303,7 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
 
 #     print('Preparing triplets from scratch')
 
-#     for _, row in tqdm.tqdm(diff_data.iterrows(), total=len(diff_data)):
+#     for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
 #         # get the input ids
 #         # input_ids = file_content['input_ids'].squeeze()
 #         # get the number of tokens in the file content
@@ -385,7 +385,7 @@ def prepare_code_triplets(diff_data, code_reranker, cache_file, combined_df, ove
 
     triplets = []
 
-    for _, row in tqdm.tqdm(diff_data.iterrows(), total=len(diff_data)):
+    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
         file_tokens = full_tokenize(row['passage'])
         total_tokens = len(file_tokens)
         cur_diff = combined_df[(combined_df['commit_id'] == row['commit_id']) & (combined_df['file_path'] == row['file_path'])]['diff'].values[0]
@@ -435,3 +435,98 @@ def prepare_code_triplets(diff_data, code_reranker, cache_file, combined_df, ove
         print(f"Saving data to cache file: {cache_file}")
         triplets.to_parquet(cache_file)
     return triplets
+
+
+def sanity_check_code(data):
+    problems = 0
+    for i, row in tqdm(data.iterrows(), total=len(data)):
+        try:
+            if row['label'] == 0:
+                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 0
+            else:
+                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 1
+        except AssertionError:
+            print(f"Assertion failed at index {i}: {row}")
+            # break  # Optional: break after the first failure, remove if you want to see all failures
+            # remove the row with label 0
+
+            if row['label'] == 0:
+                problems += 1
+                # data.drop(i, inplace=True)
+                data = data.drop(i)
+                # print(f"Dropped row at index {i}")
+
+    print(f"Total number of problems in sanity check of training data: {problems}")
+    return data
+
+def process_code_df(diff_data, df):
+    # given diff_data, we want to use commit_id and file_path to get the diff from the df
+
+    # first we need to get the diff from the df
+    # we can use the commit_id and file_path to get the diff
+    res_df = []
+    null_rows = 0
+    # for _, row in diff_data.iterrows():
+    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
+        commit_id = row['commit_id']
+        file_path = row['file_path']
+        # get the diff from the df
+        diff = df[(df['commit_id'] == commit_id) & (df['file_path'] == file_path)]['cur_file_content']
+        # check if diff is NA/NaN
+        if diff.isnull().values.any():
+            # if it is, then we can just skip this row
+            null_rows += 1
+            continue
+        diff = diff.values[0]
+
+        res_df.append((commit_id, file_path, row['query'], diff, row['label']))
+
+    res_df = pd.DataFrame(res_df, columns=['commit_id', 'file_path', 'query', 'passage', 'label'])
+    # make query and passage into strings and label into int
+    res_df['query'] = res_df['query'].astype(str)
+    res_df['passage'] = res_df['passage'].astype(str)
+    res_df['label'] = res_df['label'].astype(int)
+    print(f"Number of null rows: {null_rows}")
+    return res_df
+
+def get_code_df(df, searcher, search_depth, num_positives, num_negatives):
+    code_data = []
+    print(f'Preparing code data from dataframe of size: {len(df)} with search_depth: {search_depth}')
+    # for _, row in df.iterrows():
+    total_positives, total_negatives = 0, 0
+    for _, row in tqdm(df.iterrows(), total=len(df)):
+        cur_positives = 0
+        cur_negatives = 0
+        commit_message = row['commit_message']
+        actual_files_modified = row['actual_files_modified']
+
+        agg_search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump', sort_contributing_result_by_date=True)
+
+        for agg_result in agg_search_results:
+            most_recent_search_result = agg_result.contributing_results[0]
+            file_path = most_recent_search_result.file_path
+            commit_id = most_recent_search_result.commit_id
+
+            if file_path in actual_files_modified and cur_positives < num_positives:
+                # this is a positive sample
+                code_data.append((commit_message, file_path, commit_id, 1))
+                cur_positives += 1
+                total_positives += 1
+            elif file_path not in actual_files_modified and cur_negatives < num_negatives:
+                # this is a negative sample
+                code_data.append((commit_message, file_path, commit_id, 0))
+                cur_negatives += 1
+                total_negatives += 1
+
+            if cur_positives == num_positives and cur_negatives == num_negatives:
+                break
+
+    # convert to pandas dataframe
+    # data = pd.DataFrame(data, columns=['query', 'passage', 'label'])
+    code_df = pd.DataFrame(code_data, columns=['query', 'file_path', 'commit_id', 'label'])
+    # print distribution of labels
+    print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
+    # print percentage of positives and negatives
+    denom = total_positives + total_negatives
+    print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
+    return code_df
