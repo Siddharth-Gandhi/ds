@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 from typing import List
 
 # import numpy as np
@@ -18,9 +17,7 @@ from transformers import (
     TrainingArguments,
 )
 
-# Parser stuff
-from tree_sitter import Language, Parser
-
+import wandb
 from BERTReranker_v4 import BERTReranker
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
@@ -33,6 +30,9 @@ from utils import (
     sanity_check_code,
     set_seed,
 )
+
+# Parser stuff
+
 
 # set seed
 set_seed(42)
@@ -293,6 +293,7 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
         logging_steps=1000,
         fp16=True,
         dataloader_num_workers=args.num_workers,
+        report_to="wandb",
         )
 
     # small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
@@ -328,7 +329,8 @@ def main(args):
     if torch.cuda.is_available():
         print('Current cuda device: ', torch.cuda.current_device())
         print(torch.cuda.get_device_name(torch.cuda.current_device()))
-    metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
+    # metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
+    metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'R@1', 'R@10', 'R@100', 'R@1000']
     repo_path = args.repo_path
     repo_name = repo_path.split('/')[-1]
     index_path = args.index_path
@@ -449,6 +451,9 @@ def main(args):
         df_label_0_sample = triplets[triplets['label'] == 0].sample(n=n_label_1)
         # Concatenate the two DataFrames
         triplets = pd.concat([df_label_1, df_label_0_sample])
+
+        triplets = triplets.sample(10)
+
         print(f'Triplet dataframe shape (after sampling): {triplets.shape}')
 
         print(triplets.info())
@@ -537,6 +542,7 @@ def main(args):
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
+        wandb.log(bert_gold_eval)
 
 
 
@@ -556,6 +562,7 @@ if __name__ == '__main__':
     parser.add_argument('-e', '--num_epochs', type=int, default=10, help='Number of epochs to train (default: 10)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=5e-5, help='Learning rate (default: 5e-5)')
     # parser.add_argument('-l', '--load_model', action='store_true', help='Load a pretrained model.')
+    parser.add_argument('--run_name', type=str, help='Wandb run name.')
     parser.add_argument('--num_positives', type=int, default=10, help='Number of positive samples per query (default: 10)')
     parser.add_argument('--num_negatives', type=int, default=10, help='Number of negative samples per query (default: 10)')
     parser.add_argument('--train_depth', type=int, default=1000, help='Number of samples to train on (default: 1000)')
@@ -582,6 +589,18 @@ if __name__ == '__main__':
     parser.add_argument('--eval_folder', type=str, help='Folder name to store evaluation files.')
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT data for training.')
     args = parser.parse_args()
+    run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes)
+    # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
+    run.define_metric('MAP', summary='max')
+    run.define_metric('P@1', summary='max')
+    run.define_metric('P@10', summary='max')
+    run.define_metric('P@20', summary='max')
+    run.define_metric('P@30', summary='max')
+    run.define_metric('MRR', summary='max')
+    run.define_metric('R@1', summary='max')
+    run.define_metric('R@10', summary='max')
+    run.define_metric('R@100', summary='max')
+    run.define_metric('R@1000', summary='max')
     print(args)
     combined_df = get_combined_df(args.repo_path)
     bert_params = {

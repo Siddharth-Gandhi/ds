@@ -15,30 +15,35 @@ conda activate ds
 echo "On host $(hostname)"
 nvidia-smi
 
+
+eval_folder="combined_commit_train"
+notes="first note"
+
+
 # repo_path="2_7/apache_spark"
 # repo_path="2_7/apache_kafka"
-# repo_path="2_7/facebook_react"
+repo_path="data/2_7/facebook_react"
 # repo_path="2_8/angular_angular"
 # repo_path="2_8/django_django"
 # repo_path="2_7/julialang_julia"
 # repo_path="2_7/ruby_ruby"
-repo_path="2_8/pytorch_pytorch"
+# repo_path="data/2_8/pytorch_pytorch"
 # repo_path="2_9/huggingface_transformers"
 # repo_path="2_9/redis_redis"
 
 # repo_path="smalldata/ftr"
 
 repo_paths=(
-    "2_7/apache_spark"
-    "2_7/apache_kafka"
-    "2_7/facebook_react"
-    "2_8/angular_angular"
-    "2_8/django_django"
-    "2_8/pytorch_pytorch"
-    "2_7/julialang_julia"
-    "2_7/ruby_ruby"
-    "2_9/huggingface_transformers"
-    "2_9/redis_redis"
+    "data/2_7/apache_spark"
+    "data/2_7/apache_kafka"
+    "data/2_7/facebook_react"
+    "data/2_8/angular_angular"
+    "data/2_8/django_django"
+    "data/2_8/pytorch_pytorch"
+    "data/2_7/julialang_julia"
+    "data/2_7/ruby_ruby"
+    "data/2_9/huggingface_transformers"
+    "data/2_9/redis_redis"
 )
 
 
@@ -69,7 +74,6 @@ rerank_depth=250 # depth to go while reranking
 # do_eval=True # whether to evaluate or not
 openai_model="gpt4" # openai model to use
 best_model_path="data/combined_commit_train/best_model"
-eval_folder="combined_commit_train"
 
 
 
@@ -82,6 +86,8 @@ python -u src/BERTReranker_v4.py \
     --batch_size $batch_size \
     --num_epochs $num_epochs \
     --learning_rate $learning_rate \
+    --run_name $eval_folder \
+    --notes $notes \
     --num_positives $num_positives \
     --num_negatives $num_negatives \
     --train_depth $train_depth \
@@ -94,11 +100,11 @@ python -u src/BERTReranker_v4.py \
     --openai_model $openai_model \
     --eval_folder $eval_folder \
     --repo_paths "${repo_paths[@]}" \
-    --do_eval \
     --eval_gold \
     --no_bm25 \
     --best_model_path $best_model_path \
 
+    # --do_eval \
     # --do_combined \
     # --use_gpt_train \
     # --sanity_check \

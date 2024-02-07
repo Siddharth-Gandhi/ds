@@ -7,6 +7,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gpus=1
+#SBATCH --nodelist=boston-1-7
 
 # Activate the conda environment
 
@@ -15,6 +16,11 @@ conda activate ds
 
 echo "On host $(hostname)"
 nvidia-smi
+
+
+eval_folder="first_wandb"
+notes="first note"
+
 
 # repo_path="2_8/angular_angular"
 # repo_path="2_7/apache_spark"
@@ -37,7 +43,6 @@ n=100 # number of samples to evaluate on
 model_path="microsoft/codebert-base"
 # model_path="microsoft/graphcodebert-base"
 
-eval_folder="no_train"
 
 
 # overwrite_cache=False # whether to overwrite the cache
@@ -60,18 +65,18 @@ openai_model="gpt4" # openai model to use
 bert_best_model="data/combined_commit_train/best_model"
 
 # repo_paths=(
-#     "2_7/apache_spark"
-#     "2_7/apache_kafka"
-#     "2_7/facebook_react"
-#     "2_8/angular_angular"
-#     "2_8/django_django"
-    # "2_8/pytorch_pytorch"
-    # "2_7/pandas-dev_pandas"
-    # "2_7/julialang_julia"
-    # "2_7/ruby_ruby"
-    # "2_8/ansible_ansible"
-    # "2_7/moby_moby"
-    # "2_7/jupyter_notebook"
+#     "data/2_7/apache_spark"
+#     "data/2_7/apache_kafka"
+#     "data/2_7/facebook_react"
+#     "data/2_8/angular_angular"
+#     "data/2_8/django_django"
+    # "data/2_8/pytorch_pytorch"
+    # "data/2_7/pandas-dev_pandas"
+    # "data/2_7/julialang_julia"
+    # "data/2_7/ruby_ruby"
+    # "data/2_8/ansible_ansible"
+    # "data/2_7/moby_moby"
+    # "data/2_7/jupyter_notebook"
 # )
 
 python -u src/CodeReranker.py \
@@ -83,6 +88,8 @@ python -u src/CodeReranker.py \
     --batch_size $batch_size \
     --num_epochs $num_epochs \
     --learning_rate $learning_rate \
+    --run_name $eval_folder \
+    --notes $notes \
     --num_positives $num_positives \
     --num_negatives $num_negatives \
     --train_depth $train_depth \
@@ -99,10 +106,12 @@ python -u src/CodeReranker.py \
     --do_eval \
     --eval_gold \
     --bert_best_model $bert_best_model \
-    --do_train \
     --sanity_check \
     --use_gpt_train \
-    --overwrite_cache \
+    --do_train \
+
+
+    # --overwrite_cache \
 
     # --ignore_gold_in_training \
 

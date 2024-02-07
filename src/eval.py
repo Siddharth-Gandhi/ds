@@ -68,7 +68,7 @@ class SearchEvaluator:
             elif metric.startswith('P@'):
                 k = int(metric.split('@')[1])
                 evaluations[metric] = self.precision_at_k(relevant, k)
-            elif metric.startswith('Recall@'):
+            elif metric.startswith('R@'):
                 k = int(metric.split('@')[1])
                 evaluations[metric] = self.calculate_recall(retrieved_files, actual_modified_files, relevant, k)
 
@@ -120,11 +120,13 @@ class ModelEvaluator:
         model_name = self.model.__class__.__name__
 
         if not overwrite_eval and output_file_path and os.path.exists(output_file_path):
-            print(f'Output file {output_file_path} already exists, set overwrite_eval flag to False, skipping...')
+            print(f'Output file {output_file_path} already exists - not writing to file, set overwrite_eval flag to True for that...')
             # print the contents of the file
-            with open(output_file_path, "r") as file:
-                print(file.read())
-            return
+            # with open(output_file_path, "r") as file:
+            #     print(file.read())
+            # return
+            output_file_path=None
+
         if gold_df is None:
             sampled_commits = self.sample_commits(n)
             results = self.evaluate_df(sampled_commits, k, aggregation_strategy, rerankers)
