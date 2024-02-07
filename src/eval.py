@@ -100,7 +100,11 @@ class ModelEvaluator:
             for reranker in rerankers:
                 search_results = reranker.rerank_pipeline(cur_query, search_results)
 
-            actual_modified_files = self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist()
+
+            if 'actual_modified_files' in df.columns:
+                actual_modified_files = row['actual_modified_files']
+            else:
+                actual_modified_files = self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist()
             evaluation = self.eval_model.evaluate(search_results, actual_modified_files)
             results.append(evaluation)
         return results

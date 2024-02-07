@@ -290,7 +290,6 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
         save_total_limit=2,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        logging_steps=1000,
         fp16=True,
         dataloader_num_workers=args.num_workers,
         report_to="wandb",
@@ -341,6 +340,14 @@ def main(args):
     # TODO add this to params
     BM25_AGGR_STRAT = 'sump'
 
+    if args.eval_folder:
+        eval_path = os.path.join(eval_path, args.eval_folder)
+        if not os.path.exists(eval_path):
+            os.makedirs(eval_path)
+
+    if not os.path.exists(eval_path):
+        os.makedirs(eval_path)
+
     bm25_searcher = BM25Searcher(index_path)
     evaluator = SearchEvaluator(metrics)
     model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
@@ -376,19 +383,19 @@ def main(args):
         model_name += '_gpt_train'
 
 
-    hf_output_dir = os.path.join(repo_path, 'models', model_name)
+    hf_output_dir = os.path.join(repo_path, 'models', args.eval_folder)
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
 
     # create eval directory to store results
-    eval_path = os.path.join(repo_path, 'eval', f'code_{save_model_name}')
-    # check for a eval_folder argument and if it exists, use that as the eval folder
-    if args.eval_folder:
-        eval_path = os.path.join(eval_path, args.eval_folder)
-        if not os.path.exists(eval_path):
-            os.makedirs(eval_path)
-    if not os.path.exists(eval_path):
-        os.makedirs(eval_path)
+    # eval_path = os.path.join(repo_path, 'eval', f'code_{save_model_name}')
+    # # check for a eval_folder argument and if it exists, use that as the eval folder
+    # if args.eval_folder:
+    #     eval_path = os.path.join(eval_path, args.eval_folder)
+    #     if not os.path.exists(eval_path):
+    #         os.makedirs(eval_path)
+    # if not os.path.exists(eval_path):
+    #     os.makedirs(eval_path)
 
 
     # training methods
@@ -396,7 +403,7 @@ def main(args):
 
     if args.do_train:
 
-        cache_path = os.path.join(repo_path, 'cache_hope')
+        cache_path = os.path.join(repo_path, 'cache')
 
         if not os.path.exists(cache_path):
             os.makedirs(cache_path)
@@ -563,6 +570,7 @@ if __name__ == '__main__':
     parser.add_argument('-lr', '--learning_rate', type=float, default=5e-5, help='Learning rate (default: 5e-5)')
     # parser.add_argument('-l', '--load_model', action='store_true', help='Load a pretrained model.')
     parser.add_argument('--run_name', type=str, help='Wandb run name.')
+    parser.add_argument('--notes', type=str, help='Wandb run notes.', default='')
     parser.add_argument('--num_positives', type=int, default=10, help='Number of positive samples per query (default: 10)')
     parser.add_argument('--num_negatives', type=int, default=10, help='Number of negative samples per query (default: 10)')
     parser.add_argument('--train_depth', type=int, default=1000, help='Number of samples to train on (default: 1000)')

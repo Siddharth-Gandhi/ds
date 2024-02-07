@@ -491,7 +491,6 @@ def main(args):
         print("BERT Evaluation with training")
         print(bert_with_training_eval)
         # Assuming bert_with_training_eval and bert_gold_eval are your dicts
-        # wandb.log({"Training Eval": bert_with_training_eval})
 
     if args.eval_gold:
         gold_dir = os.path.join('gold', repo_name)
@@ -538,7 +537,6 @@ def main(args):
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
-        # wandb.log({"Gold Eval": bert_gold_eval})
         wandb.log(bert_gold_eval)
 
     if args.do_combined_train:

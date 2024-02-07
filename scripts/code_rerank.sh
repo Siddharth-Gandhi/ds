@@ -18,8 +18,8 @@ echo "On host $(hostname)"
 nvidia-smi
 
 
-eval_folder="first_wandb"
-notes="first note"
+eval_folder="repr_0.1663"
+notes="reproducing current best 0.1663 MAP result for CodeReranker"
 
 
 # repo_path="2_8/angular_angular"
@@ -89,7 +89,7 @@ python -u src/CodeReranker.py \
     --num_epochs $num_epochs \
     --learning_rate $learning_rate \
     --run_name $eval_folder \
-    --notes $notes \
+    --notes "$notes" \
     --num_positives $num_positives \
     --num_negatives $num_negatives \
     --train_depth $train_depth \

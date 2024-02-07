@@ -6,7 +6,7 @@
 #SBATCH --nodes=1
 #SBATCH --job-name="jupyter"
 #SBATCH --time=24:00:00
-#SBATCH --mem=64GB
+#SBATCH --mem=32GB
 #SBATCH --output=logs/jupyter.log
 #SBATCH --nodelist=boston-1-7
 

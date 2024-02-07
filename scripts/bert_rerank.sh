@@ -87,7 +87,7 @@ python -u src/BERTReranker_v4.py \
     --num_epochs $num_epochs \
     --learning_rate $learning_rate \
     --run_name $eval_folder \
-    --notes $notes \
+    --notes "$notes" \
     --num_positives $num_positives \
     --num_negatives $num_negatives \
     --train_depth $train_depth \
