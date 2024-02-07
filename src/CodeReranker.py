@@ -1,14 +1,16 @@
 import argparse
 import os
+import sys
 from typing import List
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
+
+# from tqdm import tqdm
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -16,27 +18,24 @@ from transformers import (
     TrainingArguments,
 )
 
+# Parser stuff
+from tree_sitter import Language, Parser
+
 from BERTReranker_v4 import BERTReranker
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
-from utils import (  # prepare_triplet_data_from_df,
+from utils import (
     AggregatedSearchResult,
     get_code_df,
     get_combined_df,
     get_recent_df,
     prepare_code_triplets,
-    process_code_df,
     sanity_check_code,
-    sanity_check_triplets,
     set_seed,
 )
 
 # set seed
 set_seed(42)
-
-
-
-
 
 class BERTCodeReranker:
     def __init__(self, parameters):
@@ -158,7 +157,6 @@ class BERTCodeReranker:
             return sum(passage_scores)
         # else:
         raise ValueError(f"Invalid score aggregation method: {self.aggregation_strategy}")
-
 
     def split_into_query_passage_pairs(self, query, aggregated_results):
         # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
@@ -396,8 +394,10 @@ def main(args):
 
     if args.do_train:
 
-        if not os.path.exists(os.path.join(repo_path, 'cache')):
-            os.makedirs(os.path.join(repo_path, 'cache'))
+        cache_path = os.path.join(repo_path, 'cache_hope')
+
+        if not os.path.exists(cache_path):
+            os.makedirs(cache_path)
 
         if args.use_gpt_train:
             gold_dir = os.path.join('gold', repo_name)
@@ -415,45 +415,27 @@ def main(args):
         else:
             recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
             # Step 6: randomly sample 1500 rows from recent_df
+            print(f'Sampling {params["train_commits"]} commits for training out of {len(recent_df)}')
             recent_df = recent_df.sample(params['train_commits'])
-            # triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
-        print(f'Number of commits after sampling: {len(recent_df)}')
 
-        if not args.overwrite_cache and os.path.exists(os.path.join(repo_path, 'cache', 'code_data.parquet')):
-            print('Loading code data from cache...')
-            processed_code_df = pd.read_parquet(os.path.join(repo_path, 'cache', 'code_data.parquet'))
-        else:
-            code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'])
-            print(f'Code dataframe shape: {code_df.shape}')
-            print(code_df.info())
-            # process code_df
-            processed_code_df = process_code_df(code_df, combined_df)
-            processed_code_df.to_parquet(os.path.join(repo_path, 'cache', 'code_data.parquet'))
+        print(f'Number of train commits: {len(recent_df)}')
+
+        code_df_cache = os.path.join(cache_path, 'code_df.parquet')
+        code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, False)
 
         if args.sanity_check:
-            # checking if files for a particular query are all separate
             # (i.e. for a train query, one file does not have both label 0 and 1)
             print('Running sanity check on training data...')
-            processed_code_df = sanity_check_code(processed_code_df)
+            processed_code_df = sanity_check_code(code_df)
             print('Sanity check complete')
-
-
-        # processed_code_df has columns
-        # 1. query (train_query),
-        # 2. commit_id (bm25_search_result_commit_id),
-        # 3. file_path (bm25_search_result_file_path),
-        # 4. file_content (bm25_search_result_file_content),
-        # 5. label (bm25_search_result_label), - whether this file was in the relevant set of train_query or not
 
         print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
         print(processed_code_df.info())
 
-        triplet_cache = os.path.join(repo_path, 'cache', 'diff_code_triplets.parquet')
-        print(f'Triplet cache path: {triplet_cache}')
+        triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
 
         # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
         triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, combined_df ,overwrite=args.overwrite_cache)
-
 
         #### Sampling to keep number of triplets reasonable.
         print(f'Triplet dataframe shape (before sampling): {triplets.shape}')
@@ -470,6 +452,7 @@ def main(args):
         print(f'Triplet dataframe shape (after sampling): {triplets.shape}')
 
         print(triplets.info())
+
         do_training(triplets, code_reranker, hf_output_dir, args)
 
 
@@ -560,6 +543,7 @@ def main(args):
 
 
 if __name__ == '__main__':
+    print('Running CodeReranker.py')
     parser = argparse.ArgumentParser(description='Run BM25 and/or BERT Reranker evaluation.')
     parser.add_argument('--index_path', type=str, help='Path to the index directory.', required=True)
     parser.add_argument('--repo_path', type=str, help='Path to the repository directory.', required=True)

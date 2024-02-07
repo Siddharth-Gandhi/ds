@@ -1,11 +1,9 @@
 import glob
-
-# import json
-# import math
 import os
 import pickle
 import random
 import sys
+from re import search
 
 import numpy as np
 import pandas as pd
@@ -13,9 +11,7 @@ import tiktoken
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
-
-# from turtle import pos
-
+from tree_sitter import Language, Parser
 
 os.environ['TIKTOKEN_CACHE_DIR'] = ""
 ENCODING = 'p50k_base'
@@ -43,7 +39,6 @@ def get_combined_df(repo_dir):
     combined_df = pd.concat(all_dataframes, ignore_index=True)
     combined_df['commit_date'] = (combined_df['commit_date'].astype('int64') / 1e9).astype('int64')
     return combined_df
-
 
 def count_commits(repo_dir):
     combined_df = get_combined_df(repo_dir)
@@ -78,6 +73,8 @@ class SearchResult:
                 continue
             print(f"{i+1:2} {result}")
 
+
+
 class AggregatedSearchResult:
     def __init__(self, file_path, aggregated_score, contributing_results):
         self.file_path = file_path
@@ -90,6 +87,8 @@ class AggregatedSearchResult:
                f"contributing_results={self.contributing_results})"
 
 
+
+
 class AggregatedCommitResult:
     def __init__(self, commit_id, aggregated_score, contributing_results):
         self.commit_id = commit_id
@@ -100,7 +99,6 @@ class AggregatedCommitResult:
         class_name = self.__class__.__name__
         return f"{class_name}(commit_id={self.commit_id!r}, score={self.score}, " \
                f"contributing_results={self.contributing_results})"
-
 
 
 
@@ -123,6 +121,8 @@ class TripletDataset(Dataset):
         attention_mask = encoded_pair['attention_mask'].squeeze(0)
 
         return input_ids, attention_mask, label
+
+
 
 def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_negatives, cache_file, overwrite=False):
     # Check if cache file exists
@@ -198,6 +198,8 @@ def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_
     return data
 
 
+
+
 def sanity_check_triplets(data):
     """
     Perform a sanity check on the triplets data.
@@ -238,6 +240,8 @@ def sanity_check_triplets(data):
 
     print(f"Total number of problems in sanity check of training data: {problems}")
     return data
+
+
 
 
 def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
@@ -284,90 +288,149 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
             print(f'Number of commits after removing gold commits: {len(recent_df)}')
     return recent_df
 
-# def prepare_code_triplets(diff_data, code_reranker, cache_file, overwrite=False):
-#     # given diff_data, the passage column is way too long. We need to split it into passages of length psg_len with stride psg_stride
-#     # then we can create triplets from that
 
-#     # diff_data has columns: commit_id, file_path, query, passage, label
+def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives, combined_df, cache_file, overwrite=False):
 
-#     if cache_file and os.path.exists(cache_file) and not overwrite:
-#         print(f"Loading data from cache file: {cache_file}")
-#         # with open(cache_file, 'rb') as file:
-#         #     return pickle.load(file)
-#         return pd.read_parquet(cache_file)
+    # takes a bunch of train
 
-#     def full_tokenize(s):
-#         return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
-
-#     triplets = []
-
-#     print('Preparing triplets from scratch')
-
-#     for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
-#         # get the input ids
-#         # input_ids = file_content['input_ids'].squeeze()
-#         # get the number of tokens in the file content
-#         file_tokens = full_tokenize(row['passage'])
-#         # query_tokens = full_tokenize(row['query'])
-#         # path_tokens = full_tokenize(row['file_path'])
-#         total_tokens = len(file_tokens)
-
-#         cur_psg_cnt = 0
-#         for cur_start in range(0, total_tokens, code_reranker.psg_stride):
-#             cur_passage = []
-#             # add query tokens and path tokens
-#             # cur_passage.extend(query_tokens)
-#             # cur_passage.extend(path_tokens)
-
-#             # add the file tokens
-#             cur_passage.extend(file_tokens[cur_start:cur_start+code_reranker.psg_len])
-
-#             # now convert cur_passage into a string
-#             cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
-
-
-#             # add the cur_passage to cur_result_passages
-#             triplets.append((row['query'], row['file_path'], cur_passage_decoded, row['label']))
-
-#             cur_psg_cnt += 1
-
-#             if cur_psg_cnt == code_reranker.psg_cnt:
-#                 break
-
-#     # convert to pandas dataframe
-#     triplets = pd.DataFrame(triplets, columns=['query', 'file_path', 'passage', 'label'])
-#     # Write data to cache file
-#     if cache_file:
-#         # with open(cache_file, 'wb') as file:
-#         #     pickle.dump(triplets, file)
-#         #     print(f"Saved data to cache file: {cache_file}")
-#         print(f"Saving data to cache file: {cache_file}")
-#         triplets.to_parquet(cache_file)
-#     return triplets
-
-def prep_line(line):
-        return line.rstrip().lstrip()
-
-def parse_diff(diff):
-    return [
-        line[1:] if line.startswith('+') else line
-        for line in diff.split('\n')
-        if not (line.startswith('-') or len(line) == 0 or (line.startswith('@@') and line.count('@@') > 1))
-        and len(prep_line(line)) > 2
-    ]
-
-def prepare_code_triplets(diff_data, code_reranker, cache_file, combined_df, overwrite=False):
-    print(f'Preparing code triplets from scratch for {len(diff_data)} diffs with psg_len: {code_reranker.psg_len}, psg_stride: {code_reranker.psg_stride}, psg_cnt: {code_reranker.psg_cnt}')
     if cache_file and os.path.exists(cache_file) and not overwrite:
         print(f"Loading data from cache file: {cache_file}")
-        # with open(cache_file, 'rb') as file:
-        #     return pickle.load(file)
         return pd.read_parquet(cache_file)
+
+    code_data = []
+    print(f'Preparing code data from dataframe of size: {len(recent_df)} with search_depth: {search_depth}')
+    total_positives, total_negatives = 0, 0
+    print(recent_df.head())
+    for _, row in tqdm(recent_df.iterrows(), total=len(recent_df)):
+        cur_positives = 0
+        cur_negatives = 0
+        train_original_message = row['original_message']
+        train_commit_message = row['commit_message']
+        actual_files_modified = row['actual_files_modified']
+        train_commit_id = row['commit_id']
+
+        agg_search_results = searcher.pipeline(train_commit_message, row['commit_date'], search_depth, 'sump', sort_contributing_result_by_date=True)
+
+        for agg_result in agg_search_results:
+            most_recent_search_result = agg_result.contributing_results[0] # get the most recent version at the time of train query
+            search_result_file_path = most_recent_search_result.file_path
+            search_result_commit_id = most_recent_search_result.commit_id
+            search_result_current_file_content = combined_df[(combined_df['commit_id'] == search_result_commit_id) & (combined_df['file_path'] == search_result_file_path)]['cur_file_content'].values[0]
+            # search_result_current_file_content = 'Empty for now, uncomment #317 in utils'
+            search_result_diff = combined_df[(combined_df['commit_id'] == search_result_commit_id) & (combined_df['file_path'] == search_result_file_path)]['diff'].values[0]
+
+            if search_result_file_path in actual_files_modified and cur_positives < num_positives:
+                # this is a positive sample
+                code_data.append((train_commit_id, train_commit_message, train_original_message, search_result_file_path, search_result_commit_id, search_result_current_file_content, search_result_diff, 1))
+                cur_positives += 1
+                total_positives += 1
+            elif search_result_file_path not in actual_files_modified and cur_negatives < num_negatives:
+                # this is a negative sample
+                code_data.append((train_commit_id, train_commit_message, train_original_message, search_result_file_path, search_result_commit_id, search_result_current_file_content, search_result_diff, 0))
+                cur_negatives += 1
+                total_negatives += 1
+
+            if cur_positives == num_positives and cur_negatives == num_negatives:
+                break
+
+        # if _ == 3:
+        # break
+
+    code_df = pd.DataFrame(code_data, columns=['train_commit_id', 'train_query', 'train_original_message', 'SR_file_path', 'SR_commit_id', 'SR_file_content', 'SR_diff' ,'label'])
+
+    # print distribution of labels
+    print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
+    denom = total_positives + total_negatives
+    print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
+
+
+    if cache_file:
+        print(f"Saving data to cache file: {cache_file}")
+        code_df.to_parquet(cache_file)
+
+    return code_df
+
+
+def sanity_check_code(data):
+    problems = 0
+    for i, row in tqdm(data.iterrows(), total=len(data)):
+        val = data[(data['train_query'] == row['train_query']) & (data['SR_commit_id'] == row['SR_commit_id']) & (data['SR_file_path'] == row['SR_file_path'])]['label'].values[0]
+        try:
+            if row['label'] == 0:
+                assert val == 0
+            else:
+                assert val == 1
+        except AssertionError:
+            print(f"Assertion failed at index {i}: {row}")
+            # break  # Optional: break after the first failure, remove if you want to see all failures
+            # remove the row with label 0
+
+            if row['label'] == 0:
+                problems += 1
+                # data.drop(i, inplace=True)
+                data = data.drop(i)
+                # print(f"Dropped row at index {i}")
+
+    print(f"Total number of problems in sanity check of training data: {problems}")
+    return data
+
+
+def prepare_code_triplets(code_df, code_reranker, cache_file, combined_df, overwrite=False):
+    print(f'Preparing code triplets from scratch for {len(code_df)} diffs with psg_len: {code_reranker.psg_len}, psg_stride: {code_reranker.psg_stride}, psg_cnt: {code_reranker.psg_cnt}')
+
+    if cache_file and os.path.exists(cache_file) and not overwrite:
+        print(f"Loading data from cache file: {cache_file}")
+        return pd.read_parquet(cache_file)
+
+    JS_LANGUAGE = Language('src/parser/my-languages.so', 'javascript')
+    parser = Parser()
+    parser.set_language(JS_LANGUAGE)
+
+
+
+    def prep_line(line):
+        return line.rstrip().lstrip()
+
+    def parse_diff(diff):
+        return [
+            line[1:] if line.startswith('+') else line
+            for line in diff.split('\n')
+            if not (line.startswith('-') or len(line) == 0 or (line.startswith('@@') and line.count('@@') > 1))
+            and len(prep_line(line)) > 2
+        ]
+
+    # def parse_diff2(diff):
+    #     return [
+    #         line[1:] if (line.startswith('+') or line.startswith('-')) else line
+    #         for line in diff.split('\n')
+    #         if not (len(line) == 0 or (line.startswith('@@') and line.count('@@') > 1))
+    #     ]
 
     def full_tokenize(s):
         return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
 
-
+    def extract_function_texts(node, source_code):
+        function_texts = []
+        # Check if the node represents a function declaration
+        if node.type == 'function_declaration':
+            start_byte = node.start_byte
+            end_byte = node.end_byte
+            function_texts.append(source_code[start_byte:end_byte].decode('utf8'))
+        # Check for variable declarations that might include function expressions or arrow functions
+        elif node.type == 'variable_declaration':
+            for child in node.children:
+                if child.type == 'variable_declarator':
+                    init_node = child.child_by_field_name('init')
+                    if init_node and (init_node.type in ['function', 'arrow_function', 'function_expression']):
+                        start_byte = node.start_byte
+                        end_byte = node.end_byte
+                        function_texts.append(source_code[start_byte:end_byte].decode('utf8'))
+                        break  # Assuming one function per variable declaration for simplicity
+        # Recursively process all child nodes
+        else:
+            for child in node.children:
+                function_texts.extend(extract_function_texts(child, source_code))
+        return function_texts
 
     def count_matching_lines(passage_lines, diff_lines):
         # Create a 2D array to store the lengths of the longest common subsequences
@@ -385,42 +448,80 @@ def prepare_code_triplets(diff_data, code_reranker, cache_file, combined_df, ove
 
     triplets = []
 
-    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
-        file_tokens = full_tokenize(row['passage'])
-        total_tokens = len(file_tokens)
-        cur_diff = combined_df[(combined_df['commit_id'] == row['commit_id']) & (combined_df['file_path'] == row['file_path'])]['diff'].values[0]
+    for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
+        # file_tokens = full_tokenize(row['SR_file_content'])
+        # total_tokens = len(file_tokens)
+        # cur_diff = combined_df[(combined_df['commit_id'] == row['SR_commit_id']) & (combined_df['file_path'] == row['SR_file_path'])]['diff'].values[0]
+        cur_diff = row['SR_diff']
+
+
+
+        # Convert the source code to bytes for tree-sitter
+        source_code_bytes = bytes(row['SR_file_content'], "utf8")
+
+        # Parse the code
+        tree = parser.parse(source_code_bytes)
+
+        # Extract function texts
+        root_node = tree.root_node
+        function_texts = extract_function_texts(root_node, source_code_bytes)
+
+        # Print or return the list of full function texts
+
         if pd.isna(cur_diff):
-            # if diff is NA/NaN
+            # if diff is NA/NaN, then skip this row
+            # possible when commit removes or renames this file or maybe god decided to remove the diff
             continue
+
+        # cur_diff_lines = parse_diff2(cur_diff)
         cur_diff_lines = parse_diff(cur_diff)
+
+        # diff_tokens = full_tokenize(''.join(cur_diff_lines))
+        # total_tokens = len(diff_tokens)
+
+
+
         cur_triplets = []
-        for cur_start in range(0, total_tokens, code_reranker.psg_stride):
-            cur_passage = []
 
-            cur_passage.extend(file_tokens[cur_start:cur_start+code_reranker.psg_len])
+        for func in function_texts:
 
-            # now convert cur_passage into a string
-            cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
-
-            cur_passage_lines = cur_passage_decoded.split('\n')
+            cur_func_lines = func.split('\n')
 
             # remove lines with less than 2 characters
-            cur_passage_lines = [line for line in cur_passage_lines if len(prep_line(line)) > 2]
+            cur_func_lines = [line for line in cur_func_lines if len(prep_line(line)) > 2]
+            # common_lines = set(cur_func_lines).intersection(set(cur_diff_lines))
+            common_line_count = count_matching_lines(cur_func_lines, cur_diff_lines)
+            cur_triplets.append((common_line_count, (row['train_query'], row['SR_file_path'], func, row['label'])))
 
-            # check if there are lines matching the diff lines
-            # if there are, then we can add this directly to the triplets
-            # common_lines = set(cur_passage_lines).intersection(set(cur_diff_lines))
-            common_line_count = count_matching_lines(cur_passage_lines, cur_diff_lines)
 
-            # add the cur_passage to cur_result_passages
-            cur_triplets.append((common_line_count, (row['query'], row['file_path'], cur_passage_decoded, row['label'])))
+        # for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+        #     cur_passage = []
 
-        # sort the cur_triplets by the number of common lines
+        #     cur_passage.extend(diff_tokens[cur_start:cur_start+code_reranker.psg_len])
+
+        #     # now convert cur_passage into a string
+        #     cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+
+        #     # cur_passage_lines = cur_passage_decoded.split('\n')
+
+        #     # remove lines with less than 2 characters
+        #     # cur_passage_lines = [line for line in cur_passage_lines if len(prep_line(line)) > 2]
+
+        #     # check if there are lines matching the diff lines
+        #     # if there are, then we can add this directly to the triplets
+        #     # common_lines = set(cur_passage_lines).intersection(set(cur_diff_lines))
+        #     # common_line_count = count_matching_lines(cur_passage_lines, cur_diff_lines)
+
+        #     # add the cur_passage to cur_result_passages
+        #     # cur_triplets.append((common_line_count, (row['train_query'], row['SR_file_path'], cur_passage_decoded, row['label'])))
+        #     triplets.append((row['train_query'], row['SR_file_path'], cur_passage_decoded, row['label']))
+
+        # # sort the cur_triplets by the number of common lines
         cur_triplets.sort(key=lambda x: x[0], reverse=True)
 
-        # now we want to filter cur_triplets to have all tuplets with x[0] > 3 to be in order and shuffle the rest
+        # # now we want to filter cur_triplets to have all tuplets with x[0] > 3 to be in order and shuffle the rest
 
-        # now add the top code_reranker.psg_cnt to triplets
+        # # now add the top code_reranker.psg_cnt to triplets
         for triplet in cur_triplets[:code_reranker.psg_cnt]:
             # print(f"Found {triplet[0]} matching lines for diff in cur_passage at index")
             triplets.append(triplet[1])
@@ -437,96 +538,3 @@ def prepare_code_triplets(diff_data, code_reranker, cache_file, combined_df, ove
     return triplets
 
 
-def sanity_check_code(data):
-    problems = 0
-    for i, row in tqdm(data.iterrows(), total=len(data)):
-        try:
-            if row['label'] == 0:
-                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 0
-            else:
-                assert data[(data['query'] == row['query']) & (data['commit_id'] == row['commit_id']) & (data['file_path'] == row['file_path'])]['label'].values[0] == 1
-        except AssertionError:
-            print(f"Assertion failed at index {i}: {row}")
-            # break  # Optional: break after the first failure, remove if you want to see all failures
-            # remove the row with label 0
-
-            if row['label'] == 0:
-                problems += 1
-                # data.drop(i, inplace=True)
-                data = data.drop(i)
-                # print(f"Dropped row at index {i}")
-
-    print(f"Total number of problems in sanity check of training data: {problems}")
-    return data
-
-def process_code_df(diff_data, df):
-    # given diff_data, we want to use commit_id and file_path to get the diff from the df
-
-    # first we need to get the diff from the df
-    # we can use the commit_id and file_path to get the diff
-    res_df = []
-    null_rows = 0
-    # for _, row in diff_data.iterrows():
-    for _, row in tqdm(diff_data.iterrows(), total=len(diff_data)):
-        commit_id = row['commit_id']
-        file_path = row['file_path']
-        # get the diff from the df
-        diff = df[(df['commit_id'] == commit_id) & (df['file_path'] == file_path)]['cur_file_content']
-        # check if diff is NA/NaN
-        if diff.isnull().values.any():
-            # if it is, then we can just skip this row
-            null_rows += 1
-            continue
-        diff = diff.values[0]
-
-        res_df.append((commit_id, file_path, row['query'], diff, row['label']))
-
-    res_df = pd.DataFrame(res_df, columns=['commit_id', 'file_path', 'query', 'passage', 'label'])
-    # make query and passage into strings and label into int
-    res_df['query'] = res_df['query'].astype(str)
-    res_df['passage'] = res_df['passage'].astype(str)
-    res_df['label'] = res_df['label'].astype(int)
-    print(f"Number of null rows: {null_rows}")
-    return res_df
-
-def get_code_df(df, searcher, search_depth, num_positives, num_negatives):
-    code_data = []
-    print(f'Preparing code data from dataframe of size: {len(df)} with search_depth: {search_depth}')
-    # for _, row in df.iterrows():
-    total_positives, total_negatives = 0, 0
-    for _, row in tqdm(df.iterrows(), total=len(df)):
-        cur_positives = 0
-        cur_negatives = 0
-        commit_message = row['commit_message']
-        actual_files_modified = row['actual_files_modified']
-
-        agg_search_results = searcher.pipeline(commit_message, row['commit_date'], search_depth, 'sump', sort_contributing_result_by_date=True)
-
-        for agg_result in agg_search_results:
-            most_recent_search_result = agg_result.contributing_results[0]
-            file_path = most_recent_search_result.file_path
-            commit_id = most_recent_search_result.commit_id
-
-            if file_path in actual_files_modified and cur_positives < num_positives:
-                # this is a positive sample
-                code_data.append((commit_message, file_path, commit_id, 1))
-                cur_positives += 1
-                total_positives += 1
-            elif file_path not in actual_files_modified and cur_negatives < num_negatives:
-                # this is a negative sample
-                code_data.append((commit_message, file_path, commit_id, 0))
-                cur_negatives += 1
-                total_negatives += 1
-
-            if cur_positives == num_positives and cur_negatives == num_negatives:
-                break
-
-    # convert to pandas dataframe
-    # data = pd.DataFrame(data, columns=['query', 'passage', 'label'])
-    code_df = pd.DataFrame(code_data, columns=['query', 'file_path', 'commit_id', 'label'])
-    # print distribution of labels
-    print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
-    # print percentage of positives and negatives
-    denom = total_positives + total_negatives
-    print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
-    return code_df

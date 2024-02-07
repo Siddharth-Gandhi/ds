@@ -3,13 +3,13 @@
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
-#SBATCH --cpus-per-gpu=8
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 #SBATCH --time=24:00:00
+#SBATCH --cpus-per-gpu=8
 #SBATCH --gpus=1
 
-
 # Activate the conda environment
+
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ds
 
@@ -37,7 +37,7 @@ n=100 # number of samples to evaluate on
 model_path="microsoft/codebert-base"
 # model_path="microsoft/graphcodebert-base"
 
-eval_folder="less_neg_less_psg_more_stride"
+eval_folder="no_train"
 
 
 # overwrite_cache=False # whether to overwrite the cache
@@ -45,13 +45,13 @@ batch_size=32 # batch size for inference
 num_epochs=10 # number of epochs to train
 learning_rate=5e-5 # learning rate for training
 num_positives=10 # number of positive samples per query
-num_negatives=5 # number of negative samples per querys
+num_negatives=10 # number of negative samples per querys
 train_depth=1000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
 train_commits=1000 # number of commits to train on (train + val)
-psg_cnt=10 # number of commits to use for psg generation
+psg_cnt=25 # number of commits to use for psg generation
 psg_len=350
-psg_stride=300
+psg_stride=250
 aggregation_strategy="sump" # aggregation strategy for bert reranker
 rerank_depth=100 # depth to go while reranking
 openai_model="gpt4" # openai model to use
@@ -97,12 +97,13 @@ python -u src/CodeReranker.py \
     --openai_model $openai_model \
     --eval_folder $eval_folder \
     --do_eval \
-    --use_gpt_train \
     --eval_gold \
-    --sanity_check \
     --bert_best_model $bert_best_model \
     --do_train \
+    --sanity_check \
+    --use_gpt_train \
     --overwrite_cache \
+
     # --ignore_gold_in_training \
 
 
