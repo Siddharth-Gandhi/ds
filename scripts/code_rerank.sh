@@ -18,8 +18,8 @@ echo "On host $(hostname)"
 nvidia-smi
 
 
-eval_folder="repr_0.1663"
-notes="reproducing current best 0.1663 MAP result for CodeReranker"
+eval_folder="[diff]_repr_0.1663"
+notes="reproducing 0.1663 run - diff only"
 
 
 # repo_path="2_8/angular_angular"

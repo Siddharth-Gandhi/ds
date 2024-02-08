@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 from typing import List
 
 # import numpy as np
@@ -180,9 +181,9 @@ class BERTCodeReranker:
             # warning these asserts are useless since we are using NaNs
             assert file_content is not None, f'file_content is None for commit_id: {commit_id}, file_path: {file_path}'
             assert file_path is not None, f'file_path is None for commit_id: {commit_id}'
-            assert query is not None, f'query is None'
+            assert query is not None, 'query is None'
 
-            query_tokens = full_tokenize(query)
+            # query_tokens = full_tokenize(query)
             path_tokens = full_tokenize(file_path)
 
             if pd.isna(file_content):
@@ -337,13 +338,15 @@ def main(args):
     K = args.k
     n = args.n
     # combined_df = get_combined_df(repo_path)
-    # TODO add this to params
     BM25_AGGR_STRAT = 'sump'
+
+    # create eval directory to store results
+    eval_path = os.path.join(repo_path, 'eval', 'coderr')
 
     if args.eval_folder:
         eval_path = os.path.join(eval_path, args.eval_folder)
-        if not os.path.exists(eval_path):
-            os.makedirs(eval_path)
+        # if not os.path.exists(eval_path):
+        #     os.makedirs(eval_path)
 
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
@@ -387,23 +390,12 @@ def main(args):
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
 
-    # create eval directory to store results
-    # eval_path = os.path.join(repo_path, 'eval', f'code_{save_model_name}')
-    # # check for a eval_folder argument and if it exists, use that as the eval folder
-    # if args.eval_folder:
-    #     eval_path = os.path.join(eval_path, args.eval_folder)
-    #     if not os.path.exists(eval_path):
-    #         os.makedirs(eval_path)
-    # if not os.path.exists(eval_path):
-    #     os.makedirs(eval_path)
 
 
     # training methods
-
-
     if args.do_train:
 
-        cache_path = os.path.join(repo_path, 'cache')
+        cache_path = os.path.join(repo_path, 'cache', args.eval_folder)
 
         if not os.path.exists(cache_path):
             os.makedirs(cache_path)
@@ -429,8 +421,9 @@ def main(args):
 
         print(f'Number of train commits: {len(recent_df)}')
 
-        code_df_cache = os.path.join(cache_path, 'code_df.parquet')
-        code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, False)
+        code_df_cache = os.path.join(repo_path, 'cache', 'repr_0.1663', 'code_df.parquet') # TODO: remove hardcoding and keep code_df common in parent
+        code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, args.overwrite_cache)
+
 
         if args.sanity_check:
             # (i.e. for a train query, one file does not have both label 0 and 1)
@@ -444,11 +437,12 @@ def main(args):
         triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
 
         # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
-        triplets = prepare_code_triplets(processed_code_df, code_reranker, triplet_cache, combined_df ,overwrite=args.overwrite_cache)
+        triplets = prepare_code_triplets(processed_code_df, code_reranker, mode='diff_content', cache_file=triplet_cache ,overwrite=args.overwrite_cache)
 
         #### Sampling to keep number of triplets reasonable.
         print(f'Triplet dataframe shape (before sampling): {triplets.shape}')
         # triplets = triplets.sample(min(100000, triplet_size), random_state=42)
+
         # keep all triplets with label 1 and equal number of triplets with label 0 sampled randomly
         # Filter out all rows with label 1
         df_label_1 = triplets[triplets['label'] == 1]
@@ -458,8 +452,6 @@ def main(args):
         df_label_0_sample = triplets[triplets['label'] == 0].sample(n=n_label_1)
         # Concatenate the two DataFrames
         triplets = pd.concat([df_label_1, df_label_0_sample])
-
-        triplets = triplets.sample(10)
 
         print(f'Triplet dataframe shape (after sampling): {triplets.shape}')
 
