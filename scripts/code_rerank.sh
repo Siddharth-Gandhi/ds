@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=cr
+#SBATCH --job-name=4X_rand
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -7,7 +7,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gpus=1
-#SBATCH --nodelist=boston-1-7
+#SBATCH --nodelist=boston-2-35
 
 # Activate the conda environment
 
@@ -18,8 +18,9 @@ echo "On host $(hostname)"
 nvidia-smi
 
 
-eval_folder="[diff]_repr_0.1663"
-notes="reproducing 0.1663 run - diff only"
+eval_folder="4X_random_split"
+notes="training on random splits"
+triplet_mode="sliding_window"
 
 
 # repo_path="2_8/angular_angular"
@@ -53,7 +54,7 @@ num_positives=10 # number of positive samples per query
 num_negatives=10 # number of negative samples per querys
 train_depth=1000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
-train_commits=1000 # number of commits to train on (train + val)
+train_commits=1500 # number of commits to train on (train + val)
 psg_cnt=25 # number of commits to use for psg generation
 psg_len=350
 psg_stride=250
@@ -63,6 +64,8 @@ openai_model="gpt4" # openai model to use
 # bert_best_model="${repo_path}/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 bert_best_model="data/combined_commit_train/best_model"
+
+best_model_path="data/2_7/facebook_react/models/repr_0.1663/best_model"
 
 # repo_paths=(
 #     "data/2_7/apache_spark"
@@ -105,12 +108,14 @@ python -u src/CodeReranker.py \
     --eval_folder $eval_folder \
     --do_eval \
     --eval_gold \
-    --bert_best_model $bert_best_model \
     --sanity_check \
     --use_gpt_train \
     --do_train \
+    --triplet_mode $triplet_mode \
+    --bert_best_model $bert_best_model \
 
 
+    # --best_model_path $best_model_path \
     # --overwrite_cache \
 
     # --ignore_gold_in_training \

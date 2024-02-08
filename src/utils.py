@@ -244,7 +244,7 @@ def sanity_check_triplets(data):
 
 
 
-def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
+def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False, skip_midpoint_filter=False):
     # Prepare the data for training
     print('Preparing training data...')
     # Step 1: Filter out only the columns we need
@@ -255,9 +255,13 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False):
     grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
 
     # Step 3: Determine midpoint and filter dataframe
-    midpoint_date = np.median(grouped_df['commit_date'])
-    recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
-    print(f'Number of commits after midpoint date: {len(recent_df)}')
+    if not skip_midpoint_filter:
+        midpoint_date = np.median(grouped_df['commit_date'])
+        recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
+        print(f'Number of commits after midpoint date: {len(recent_df)}')
+    else:
+        recent_df = grouped_df
+        print(f'Skipping midpoint filter, number of commits: {len(recent_df)}')
 
     # Step 4: Filter out commits with less than average length commit messages
     average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
@@ -371,6 +375,9 @@ def sanity_check_code(data):
     return data
 
 def prepare_code_triplets(code_df, code_reranker, mode, cache_file, overwrite=False):
+    if not mode:
+        raise ValueError(f"Mode: {mode} must be specified for preparing code triplets")
+
     print(f"Preparing code triplets with mode {mode} for {len(code_df)} rows.")
     if cache_file and os.path.exists(cache_file) and not overwrite:
         print(f"Loading data from cache file: {cache_file}")
@@ -378,8 +385,8 @@ def prepare_code_triplets(code_df, code_reranker, mode, cache_file, overwrite=Fa
 
     if mode == 'sliding_window':
         triplets = prepare_sliding_window_triplets(code_df, code_reranker)
-    # elif mode == 'parse_functions':
-    #     triplets = prepare_function_triplets(code_df, code_reranker)
+    elif mode == 'parse_functions':
+        triplets = prepare_function_triplets(code_df, code_reranker)
     elif mode == 'diff_content':
         triplets = prepare_diff_content_triplets(code_df, code_reranker)
     else:
@@ -390,12 +397,14 @@ def prepare_code_triplets(code_df, code_reranker, mode, cache_file, overwrite=Fa
         print(f"Saving data to cache file: {cache_file}")
         triplets_df.to_parquet(cache_file)
 
+    print(triplets_df.head(5))
+
     return triplets_df
 
 
 
 def prepare_sliding_window_triplets(code_df, code_reranker):
-
+    print('Preparing triplets randomly split with sliding window')
     #### Helper functions ####
     def full_tokenize(s):
         return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
@@ -478,7 +487,7 @@ def prepare_sliding_window_triplets(code_df, code_reranker):
 
 
 def prepare_diff_content_triplets(code_df, code_reranker):
-
+    print('Preparing triplets split by diff content')
     #### Helper functions ####
 
     def full_tokenize(s):
@@ -500,7 +509,7 @@ def prepare_diff_content_triplets(code_df, code_reranker):
 
     for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
         cur_diff = row['SR_diff']
-        if cur_diff is None:
+        if cur_diff is None or pd.isna(cur_diff):
             # NOTE: for cases where status is added probably or if diff was not able to be stored (encoding issue, etc)
             # THIS WILL LEAD TO A FEW POSITIVES MISSING - don't freak out, it's normal, I checked ;)
             continue
@@ -521,6 +530,115 @@ def prepare_diff_content_triplets(code_df, code_reranker):
     # now add the top code_reranker.psg_cnt to triplets
     return triplets
 
+def prepare_function_triplets(code_df, code_reranker):
+    print('Preparing triplets split by function')
+    #### Helper Functions ####
+    def prep_line(line):
+        return line.rstrip().lstrip()
+
+    def parse_diff(diff):
+        return [
+            line[1:] if line.startswith('+') else line
+            for line in diff.split('\n')
+            if not (line.startswith('-') or len(line) == 0 or (line.startswith('@@') and line.count('@@') > 1))
+            and len(prep_line(line)) > 2
+        ]
+
+    def full_tokenize(s):
+        return code_reranker.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
+
+    def extract_function_texts(node, source_code):
+        function_texts = []
+        # Check if the node represents a function declaration
+        if node.type == 'function_declaration':
+            start_byte = node.start_byte
+            end_byte = node.end_byte
+            function_texts.append(source_code[start_byte:end_byte].decode('utf8'))
+        # Check for variable declarations that might include function expressions or arrow functions
+        elif node.type == 'variable_declaration':
+            for child in node.children:
+                if child.type == 'variable_declarator':
+                    init_node = child.child_by_field_name('init')
+                    if init_node and (init_node.type in ['function', 'arrow_function', 'function_expression']):
+                        start_byte = node.start_byte
+                        end_byte = node.end_byte
+                        function_texts.append(source_code[start_byte:end_byte].decode('utf8'))
+                        break  # Assuming one function per variable declaration for simplicity
+        # Recursively process all child nodes
+        else:
+            for child in node.children:
+                function_texts.extend(extract_function_texts(child, source_code))
+        return function_texts
+
+    def count_matching_lines(passage_lines, diff_lines):
+        # Create a 2D array to store the lengths of the longest common subsequences
+        dp = [[0] * (len(diff_lines) + 1) for _ in range(len(passage_lines) + 1)]
+
+        # Fill the dp array
+        for i in range(1, len(passage_lines) + 1):
+            for j in range(1, len(diff_lines) + 1):
+                if prep_line(passage_lines[i - 1]) == prep_line(diff_lines[j - 1]):
+                    dp[i][j] = dp[i - 1][j - 1] + 1
+                else:
+                    dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
+
+        return dp[-1][-1]
+
+    #### end of helper functions ####
+
+    JS_LANGUAGE = Language('src/parser/my-languages.so', 'javascript')
+    parser = Parser()
+    parser.set_language(JS_LANGUAGE)
+
+    triplets = []
+
+    for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
+        file_content = row['SR_file_content']
+        cur_diff = row['SR_diff']
+
+        if cur_diff is None:
+            continue
+
+        # Convert the source code to bytes for tree-sitter
+        source_code_bytes = bytes(file_content, "utf8")
+
+        # Parse the code
+        tree = parser.parse(source_code_bytes)
+
+        # Extract function texts
+        root_node = tree.root_node
+        function_texts = extract_function_texts(root_node, source_code_bytes)
+
+        cur_diff_lines = parse_diff(cur_diff)
+        cur_triplets = []
+
+        for func in function_texts:
+            cur_func_lines = func.split('\n')
+
+            # remove lines with less than 2 characters
+            cur_func_lines = [line for line in cur_func_lines if len(prep_line(line)) > 2]
+            # common_lines = set(cur_func_lines).intersection(set(cur_diff_lines))
+            common_line_count = count_matching_lines(cur_func_lines, cur_diff_lines)
+            cur_triplets.append((common_line_count, (row['train_query'], row['SR_file_path'], func, row['label'])))
+
+        # # sort the cur_triplets by the number of common lines
+        cur_triplets.sort(key=lambda x: x[0], reverse=True)
+
+        # # now we want to filter cur_triplets to have all tuplets with x[0] > 3 to be in order and shuffle the rest
+
+        # # now add the top code_reranker.psg_cnt to triplets
+        for triplet in cur_triplets[:code_reranker.psg_cnt]:
+            query, file_path, function, label = triplet[1]
+            function_tokenized = full_tokenize(function)
+            total_tokens = len(function_tokenized)
+
+            for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+                cur_passage = []
+                cur_passage.extend(function_tokenized[cur_start:cur_start+code_reranker.psg_len])
+                cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+                triplets.append((query, file_path, cur_passage_decoded, label))
+
+    return triplets
 
 
 
