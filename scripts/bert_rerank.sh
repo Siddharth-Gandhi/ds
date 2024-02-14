@@ -130,3 +130,16 @@ echo "Job completed"
 # repo_path="2_8/ansible_ansible"
 # repo_path="2_7/moby_moby"
 # repo_path="2_7/jupyter_notebook"
+
+# (
+#     "apache_spark"
+#     "apache_kafka"
+#     "facebook_react"
+#     "angular_angular"
+#     "django_django"
+#     "pytorch_pytorch"
+#     "julialang_julia"
+#     "ruby_ruby"
+#     "huggingface_transformers"
+#     "redis_redis"
+# )

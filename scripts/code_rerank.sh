@@ -18,9 +18,11 @@ echo "On host $(hostname)"
 nvidia-smi
 
 
-eval_folder="4X_random_split"
-notes="training on random splits"
-triplet_mode="sliding_window"
+eval_folder="combined_diffs"
+notes="combined gold train (10 repos) with diff only"
+# triplet_mode="parse_functions"
+# triplet_mode="sliding_window"
+triplet_mode="diff_content"
 
 
 # repo_path="2_8/angular_angular"
@@ -73,13 +75,13 @@ best_model_path="data/2_7/facebook_react/models/repr_0.1663/best_model"
 #     "data/2_7/facebook_react"
 #     "data/2_8/angular_angular"
 #     "data/2_8/django_django"
-    # "data/2_8/pytorch_pytorch"
-    # "data/2_7/pandas-dev_pandas"
-    # "data/2_7/julialang_julia"
-    # "data/2_7/ruby_ruby"
-    # "data/2_8/ansible_ansible"
-    # "data/2_7/moby_moby"
-    # "data/2_7/jupyter_notebook"
+#     "data/2_8/pytorch_pytorch"
+#     "data/2_7/pandas-dev_pandas"
+#     "data/2_7/julialang_julia"
+#     "data/2_7/ruby_ruby"
+#     "data/2_8/ansible_ansible"
+#     "data/2_7/moby_moby"
+#     "data/2_7/jupyter_notebook"
 # )
 
 python -u src/CodeReranker.py \

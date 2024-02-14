@@ -304,6 +304,7 @@ def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives,
     code_data = []
     print(f'Preparing code data from dataframe of size: {len(recent_df)} with search_depth: {search_depth}')
     total_positives, total_negatives = 0, 0
+    print(recent_df.info())
     for _, row in tqdm(recent_df.iterrows(), total=len(recent_df)):
         cur_positives = 0
         cur_negatives = 0
