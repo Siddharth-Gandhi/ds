@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=4X_rand
+#SBATCH --job-name=comb_diff
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -36,6 +36,8 @@ repo_path="data/2_7/facebook_react"
 # repo_path="2_8/pytorch_pytorch"
 # repo_path="2_9/huggingface_transformers"
 # repo_path="2_9/redis_redis"
+
+code_df_cache="data/merged_code_df/multi_code_df.parquet"
 
 
 index_path="${repo_path}/index_commit_tokenized"
@@ -115,6 +117,7 @@ python -u src/CodeReranker.py \
     --do_train \
     --triplet_mode $triplet_mode \
     --bert_best_model $bert_best_model \
+    --code_df_cache $code_df_cache \
 
 
     # --best_model_path $best_model_path \

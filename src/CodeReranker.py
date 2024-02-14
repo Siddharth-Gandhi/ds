@@ -253,34 +253,31 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
     # merge columns file_path and passage into one column called passage
     triplet_data['passage'] = triplet_data['file_path'] + ' ' + triplet_data['passage']
 
-    # if args.sanity_check:
-    #     print('Running sanity check on training data...')
-    #     triplet_data = sanity_check(triplet_data)
-    # Step 7: convert triplet_data to HuggingFace Dataset
+    # Step 1: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
     triplet_data['label'] = triplet_data['label'].astype(float)
     train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
     train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
     val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
-    # Step 8: tokenize the data
+    # Step 2: tokenize the data
     tokenized_train_dataset = train_hf_dataset.map(tokenize_hf, batched=True)
     tokenized_val_dataset = val_hf_dataset.map(tokenize_hf, batched=True)
 
-    # Step 9: set format for pytorch
+    # Step 3: set format for pytorch
     tokenized_train_dataset = tokenized_train_dataset.remove_columns(['query', 'passage', 'file_path'])
     tokenized_val_dataset = tokenized_val_dataset.remove_columns(['query', 'passage', 'file_path'])
 
-    # rename label column to labels
+    # Step 4: rename label column to labels
     tokenized_train_dataset = tokenized_train_dataset.rename_column('label', 'labels')
     tokenized_val_dataset = tokenized_val_dataset.rename_column('label', 'labels')
 
-    # set format to pytorch
+    # Step 5: set format to pytorch
     tokenized_train_dataset = tokenized_train_dataset.with_format('torch')
     tokenized_val_dataset = tokenized_val_dataset.with_format('torch')
     print('Training dataset features:')
     print(tokenized_train_dataset.features)
 
-    # Step 10: set up training arguments
+    # Step 6: set up training arguments
     train_args = TrainingArguments(
         output_dir=hf_output_dir,
         evaluation_strategy='epoch',
@@ -304,7 +301,7 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
     #     tokenized_train_dataset = small_train_dataset
     #     tokenized_val_dataset = small_val_dataset
 
-    # Step 11: set up trainer
+    # Step 7: set up trainer
     trainer = Trainer(
         model = reranker.model,
         args = train_args,
@@ -313,10 +310,10 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
         # compute_metrics=compute_metrics,
     )
 
-    # Step 12: train the model
+    # Step 8: train the model
     trainer.train()
 
-    # Step 13: save the model
+    # Step 9: save the model
     best_model_path = os.path.join(hf_output_dir, 'best_model')
     trainer.save_model(best_model_path)
     print(f'Saved model to {best_model_path}')
@@ -345,8 +342,6 @@ def main(args):
 
     if args.eval_folder:
         eval_path = os.path.join(eval_path, args.eval_folder)
-        # if not os.path.exists(eval_path):
-        #     os.makedirs(eval_path)
 
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
@@ -439,8 +434,10 @@ def main(args):
 
 
         print(f'Number of train commits: {len(recent_df)}')
-
-        code_df_cache = os.path.join(repo_path, 'cache', args.eval_folder, 'code_df.parquet')
+        if args.code_df_cache:
+            code_df_cache = args.code_df_cache
+        else:
+            code_df_cache = os.path.join(repo_path, 'cache', args.eval_folder, 'code_df.parquet')
         code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, args.overwrite_cache)
 
 
@@ -608,6 +605,7 @@ if __name__ == '__main__':
     parser.add_argument('--eval_folder', type=str, help='Folder name to store evaluation files.')
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT data for training.')
     parser.add_argument('--triplet_mode', choices=['parse_functions', 'sliding_window', 'diff_content'], default='', help='Mode for preparing triplets (default: diff_code)')
+    parser.add_argument('--code_df_cache', type=str, help='Path to the code dataframe cache file.')
     args = parser.parse_args()
     run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes)
     # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
