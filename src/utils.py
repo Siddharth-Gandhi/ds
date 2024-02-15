@@ -3,7 +3,7 @@ import os
 import pickle
 import random
 import sys
-from re import search
+from re import A, search
 
 import numpy as np
 import pandas as pd
@@ -11,6 +11,7 @@ import tiktoken
 import torch
 from torch.utils.data import Dataset
 from tqdm import tqdm
+from transformers import AutoTokenizer
 from tree_sitter import Language, Parser
 
 os.environ['TIKTOKEN_CACHE_DIR'] = ""
@@ -293,9 +294,10 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False, sk
     return recent_df
 
 
-def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives, combined_df, cache_file, overwrite=False):
+def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives, combined_df, cache_file, overwrite=False, debug=False):
 
     # takes a bunch of train
+    print(f'In get_code_df with search_depth: {search_depth} and num_positives: {num_positives} and num_negatives: {num_negatives} and cache_file: {cache_file} and overwrite: {overwrite}')
 
     if cache_file and os.path.exists(cache_file) and not overwrite:
         print(f"Loading data from cache file: {cache_file}")
@@ -320,24 +322,28 @@ def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives,
             search_result_file_path = most_recent_search_result.file_path
             search_result_commit_id = most_recent_search_result.commit_id
             search_result_current_file_content = combined_df[(combined_df['commit_id'] == search_result_commit_id) & (combined_df['file_path'] == search_result_file_path)]['cur_file_content'].values[0]
+            search_result_previous_file_content = combined_df[(combined_df['commit_id'] == search_result_commit_id) & (combined_df['file_path'] == search_result_file_path)]['previous_file_content'].values[0]
             # search_result_current_file_content = 'Empty for now, uncomment #317 in utils'
             search_result_diff = combined_df[(combined_df['commit_id'] == search_result_commit_id) & (combined_df['file_path'] == search_result_file_path)]['diff'].values[0]
 
             if search_result_file_path in actual_files_modified and cur_positives < num_positives:
                 # this is a positive sample
-                code_data.append((train_commit_id, train_commit_message, train_original_message, search_result_file_path, search_result_commit_id, search_result_current_file_content, search_result_diff, 1))
+                code_data.append((train_commit_id, train_commit_message, train_original_message, search_result_file_path, search_result_commit_id, search_result_current_file_content, search_result_previous_file_content, search_result_diff, 1))
                 cur_positives += 1
                 total_positives += 1
             elif search_result_file_path not in actual_files_modified and cur_negatives < num_negatives:
                 # this is a negative sample
-                code_data.append((train_commit_id, train_commit_message, train_original_message, search_result_file_path, search_result_commit_id, search_result_current_file_content, search_result_diff, 0))
+                code_data.append((train_commit_id, train_commit_message, train_original_message, search_result_file_path, search_result_commit_id, search_result_current_file_content, search_result_previous_file_content, search_result_diff, 0))
                 cur_negatives += 1
                 total_negatives += 1
 
             if cur_positives == num_positives and cur_negatives == num_negatives:
                 break
 
-    code_df = pd.DataFrame(code_data, columns=['train_commit_id', 'train_query', 'train_original_message', 'SR_file_path', 'SR_commit_id', 'SR_file_content', 'SR_diff' ,'label'])
+        if debug:
+            break
+
+    code_df = pd.DataFrame(code_data, columns=['train_commit_id', 'train_query', 'train_original_message', 'SR_file_path', 'SR_commit_id', 'SR_file_content', 'SR_previous_file_content', 'SR_diff' ,'label'])
 
     # print distribution of labels
     print(f"Total positives: {total_positives}, Total negatives: {total_negatives}")
@@ -374,6 +380,10 @@ def sanity_check_code(data):
 
     print(f"Total number of problems in sanity check of training data: {problems}")
     return data
+
+
+def prep_line(line):
+    return line.rstrip().lstrip()
 
 def parse_diff_remove_minus(diff):
     return [
@@ -413,7 +423,7 @@ def full_tokenize(s, tokenizer):
 def count_matching_lines(passage_lines, diff_lines):
     # Create a 2D array to store the lengths of the longest common subsequences
     dp = [[0] * (len(diff_lines) + 1) for _ in range(len(passage_lines) + 1)]
-    
+
     # Fill the dp array
     for i in range(1, len(passage_lines) + 1):
         for j in range(1, len(diff_lines) + 1):
@@ -421,10 +431,10 @@ def count_matching_lines(passage_lines, diff_lines):
                 dp[i][j] = dp[i - 1][j - 1] + 1
             else:
                 dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
-    
+
     return dp[-1][-1]
 
-def prepare_code_triplets(code_df, code_reranker, mode, cache_file, overwrite=False):
+def prepare_code_triplets(code_df, args, mode, cache_file, overwrite=False):
     if not mode:
         raise ValueError(f"Mode: {mode} must be specified for preparing code triplets")
 
@@ -434,13 +444,13 @@ def prepare_code_triplets(code_df, code_reranker, mode, cache_file, overwrite=Fa
         return pd.read_parquet(cache_file)
 
     if mode == 'sliding_window':
-        triplets = prepare_sliding_window_triplets(code_df, code_reranker)
+        triplets = prepare_sliding_window_triplets(code_df, args)
     elif mode == 'parse_functions':
-        triplets = prepare_function_triplets(code_df, code_reranker)
+        triplets = prepare_function_triplets(code_df, args)
     elif mode == 'diff_content':
-        triplets = prepare_diff_content_triplets(code_df, code_reranker)
+        triplets = prepare_diff_content_triplets(code_df, args)
     elif mode == 'diff_subsplit':
-      triplets = prepare_split_diff_triplets(code_df, code_reranker)
+      triplets = prepare_split_diff_triplets(code_df, args)
     else:
         raise ValueError(f"Unsupported mode: {mode}")
 
@@ -455,36 +465,43 @@ def prepare_code_triplets(code_df, code_reranker, mode, cache_file, overwrite=Fa
 
 
 
-def prepare_sliding_window_triplets(code_df, code_reranker):
+def prepare_sliding_window_triplets(code_df, args):
     print('Preparing triplets randomly split with sliding window')
     #### Helper functions ####
     #### End of helper functions ####
 
     triplets = []
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
-        file_tokens = full_tokenize(row['SR_file_content'], code_reranker.tokenizer)
+        if args.use_previous_file:
+            file_tokens = full_tokenize(row['SR_previous_file_content'], tokenizer)
+        else:
+            file_tokens = full_tokenize(row['SR_file_content'], tokenizer)
         total_tokens = len(file_tokens)
         cur_diff = row['SR_diff']
         cur_triplets = []
-        if cur_diff is None:
+        if cur_diff is None or pd.isna(cur_diff):
             # NOTE: for cases where status is added probably or if diff was not able to be stored (encoding issue, etc)
             # THIS WILL LEAD TO A FEW POSITIVES MISSING - don't freak out, it's normal, I checked ;)
             continue
 
         # Process the diffs to removee @@ stuff
-        cur_diff_lines = parse_diff_remove_minus(cur_diff) # split into lines and remove deletions, only additions remaining
+        if args.use_previous_file:
+            cur_diff_lines = full_parse_diffs(cur_diff)
+        else:
+            cur_diff_lines = parse_diff_remove_minus(cur_diff) # split into lines and remove deletions, only additions remaining
 
         # get the diff tokens
         total_tokens = len(file_tokens)
 
-        for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+        for cur_start in range(0, total_tokens, args.psg_stride):
             cur_passage = []
 
             # get tokens for current passage
-            cur_passage.extend(file_tokens[cur_start:cur_start+code_reranker.psg_len])
+            cur_passage.extend(file_tokens[cur_start:cur_start+args.psg_len])
 
             # now convert current passage tokens back into a string
-            cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+            cur_passage_decoded = tokenizer.decode(cur_passage)
 
             # for ranking acc. to number of common lines with diff, split on \n
             cur_passage_lines = cur_passage_decoded.split('\n')
@@ -501,22 +518,25 @@ def prepare_sliding_window_triplets(code_df, code_reranker):
         # # sort the cur_triplets by the number of common lines
         cur_triplets.sort(key=lambda x: x[0], reverse=True)
 
-        # now add the top code_reranker.psg_cnt to triplets
-        for triplet in cur_triplets[:code_reranker.psg_cnt]:
+        # now add the top args.psg_cnt to triplets
+        for triplet in cur_triplets[:args.psg_cnt]:
             # print(f"Found {triplet[0]} matching lines for diff in cur_passage at index")
             triplets.append(triplet[1])
+
+        if args.debug:
+            break
     return triplets
 
 
 
 
-def prepare_diff_content_triplets(code_df, code_reranker):
+def prepare_diff_content_triplets(code_df, args):
     print('Preparing triplets split by diff content')
     #### Helper functions ####
     #### end of helper functions ####
 
     triplets = []
-
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
         cur_diff = row['SR_diff']
         if cur_diff is None or pd.isna(cur_diff):
@@ -524,23 +544,23 @@ def prepare_diff_content_triplets(code_df, code_reranker):
             # THIS WILL LEAD TO A FEW POSITIVES MISSING - don't freak out, it's normal, I checked ;)
             continue
         cur_diff_lines = full_parse_diffs(cur_diff) # keep both insertions and deletions
-        diff_tokens = full_tokenize(''.join(cur_diff_lines), code_reranker.tokenizer)
+        diff_tokens = full_tokenize(''.join(cur_diff_lines), tokenizer)
         total_tokens = len(diff_tokens)
-        for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+        for cur_start in range(0, total_tokens, args.psg_stride):
             cur_passage = []
 
-            cur_passage.extend(diff_tokens[cur_start:cur_start+code_reranker.psg_len])
+            cur_passage.extend(diff_tokens[cur_start:cur_start+args.psg_len])
 
             # now convert cur_passage into a string
-            cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+            cur_passage_decoded = tokenizer.decode(cur_passage)
 
             # add the cur_passage to cur_result_passages
             triplets.append((row['train_query'], row['SR_file_path'], cur_passage_decoded, row['label']))
 
-    # now add the top code_reranker.psg_cnt to triplets
+    # now add the top args.psg_cnt to triplets
     return triplets
 
-def prepare_split_diff_triplets(code_df, code_reranker):
+def prepare_split_diff_triplets(code_df, args):
     print('Preparing triplets split by diff content (further subplit at @@)')
     #### Helper functions ####
     #### end of helper functions ####
@@ -553,32 +573,31 @@ def prepare_split_diff_triplets(code_df, code_reranker):
             # NOTE: for cases where status is added probably or if diff was not able to be stored (encoding issue, etc)
             # THIS WILL LEAD TO A FEW POSITIVES MISSING - don't freak out, it's normal, I checked ;)
             continue
-        diff_split_list = full_parse_diffs_split(diff) # keep both insertions and deletions
+        diff_split_list = full_parse_diffs_split(cur_diff) # keep both insertions and deletions
         for diff_split in diff_split_list:
-          # diff_tokens = full_tokenize('\n'.join(diff_split), code_reranker.tokenizer)
+          # diff_tokens = full_tokenize('\n'.join(diff_split), tokenizer)
           # total_tokens = len(diff_tokens)
-          # for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+          # for cur_start in range(0, total_tokens, args.psg_stride):
           #     cur_passage = []
-  
-          #     cur_passage.extend(diff_tokens[cur_start:cur_start+code_reranker.psg_len])
-  
+
+          #     cur_passage.extend(diff_tokens[cur_start:cur_start+args.psg_len])
+
           #     # now convert cur_passage into a string
-          #     cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
-  
+          #     cur_passage_decoded = tokenizer.decode(cur_passage)
+
           #     # add the cur_passage to cur_result_passages
           triplets.append((row['train_query'], row['SR_file_path'], '\n'.join(diff_split), row['label']))
-          break
 
-    # now add the top code_reranker.psg_cnt to triplets
+    # now add the top args.psg_cnt to triplets
     return triplets
 
 
 
 
-def prepare_function_triplets(code_df, code_reranker):
+def prepare_function_triplets(code_df, args):
     print('Preparing triplets split by function')
     #### Helper Functions ####
-
+    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     def extract_function_texts(node, source_code):
         function_texts = []
         # Check if the node represents a function declaration
@@ -614,7 +633,7 @@ def prepare_function_triplets(code_df, code_reranker):
         file_content = row['SR_file_content']
         cur_diff = row['SR_diff']
 
-        if cur_diff is None:
+        if cur_diff is None or pd.isna(cur_diff) or file_content is None or pd.isna(file_content):
             continue
 
         # Convert the source code to bytes for tree-sitter
@@ -627,7 +646,7 @@ def prepare_function_triplets(code_df, code_reranker):
         root_node = tree.root_node
         function_texts = extract_function_texts(root_node, source_code_bytes)
 
-        cur_diff_lines = parse_diffparse_diff_remove_minus(cur_diff)
+        cur_diff_lines = parse_diff_remove_minus(cur_diff)
         cur_triplets = []
 
         for func in function_texts:
@@ -644,16 +663,16 @@ def prepare_function_triplets(code_df, code_reranker):
 
         # # now we want to filter cur_triplets to have all tuplets with x[0] > 3 to be in order and shuffle the rest
 
-        # # now add the top code_reranker.psg_cnt to triplets
-        for triplet in cur_triplets[:code_reranker.psg_cnt]:
+        # # now add the top args.psg_cnt to triplets
+        for triplet in cur_triplets[:args.psg_cnt]:
             query, file_path, function, label = triplet[1]
-            function_tokenized = full_tokenize(function, code_reranker.tokenizer)
+            function_tokenized = full_tokenize(function, tokenizer)
             total_tokens = len(function_tokenized)
 
-            for cur_start in range(0, total_tokens, code_reranker.psg_stride):
+            for cur_start in range(0, total_tokens, args.psg_stride):
                 cur_passage = []
-                cur_passage.extend(function_tokenized[cur_start:cur_start+code_reranker.psg_len])
-                cur_passage_decoded = code_reranker.tokenizer.decode(cur_passage)
+                cur_passage.extend(function_tokenized[cur_start:cur_start+args.psg_len])
+                cur_passage_decoded = tokenizer.decode(cur_passage)
                 triplets.append((query, file_path, cur_passage_decoded, label))
 
     return triplets

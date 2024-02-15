@@ -407,9 +407,10 @@ def main(args):
             gold_df = pd.read_parquet(gold_train_file)
             # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
             gold_df = gold_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
+            recent_df = gold_df
 
             # triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
-        # else: # TODO uncomment to remove 4X train
+        else: # TODO uncomment to remove 4X train
             recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training, skip_midpoint_filter=True)
             # Step 6: randomly sample 1500 rows from recent_df
             # print(f'Sampling {params["train_commits"]} commits for training out of {len(recent_df)}')
@@ -438,7 +439,7 @@ def main(args):
             code_df_cache = args.code_df_cache
         else:
             code_df_cache = os.path.join(repo_path, 'cache', args.eval_folder, 'code_df.parquet')
-        code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, args.overwrite_cache)
+        code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, args.overwrite_cache, debug=args.debug)
 
 
         if args.sanity_check:
@@ -453,7 +454,7 @@ def main(args):
         triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
 
         # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
-        triplets = prepare_code_triplets(processed_code_df, code_reranker, mode=args.triplet_mode, cache_file=triplet_cache ,overwrite=args.overwrite_cache)
+        triplets = prepare_code_triplets(processed_code_df, args, mode=args.triplet_mode, cache_file=triplet_cache ,overwrite=args.overwrite_cache)
 
         #### Sampling to keep number of triplets reasonable.
         print(f'Triplet dataframe shape (before sampling): {triplets.shape}')
@@ -604,8 +605,9 @@ if __name__ == '__main__':
     parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
     parser.add_argument('--eval_folder', type=str, help='Folder name to store evaluation files.')
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT data for training.')
-    parser.add_argument('--triplet_mode', choices=['parse_functions', 'sliding_window', 'diff_content'], default='', help='Mode for preparing triplets (default: diff_code)')
+    parser.add_argument('--triplet_mode', choices=['parse_functions', 'sliding_window', 'diff_content', 'diff_subsplit'], default='', help='Mode for preparing triplets (default: diff_code)')
     parser.add_argument('--code_df_cache', type=str, help='Path to the code dataframe cache file.')
+    parser.add_argument('--use_previous_file', action='store_true', help='Use the previous file for training.')
     args = parser.parse_args()
     run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes)
     # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']

@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=comb_diff
+#SBATCH --job-name=x_graph
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -16,13 +16,16 @@ conda activate ds
 
 echo "On host $(hostname)"
 nvidia-smi
+export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="combined_diffs"
-notes="combined gold train (10 repos) with diff only"
+eval_folder="X_graphcodebert"
+notes="Just with graphcodebert instead of codebert"
 # triplet_mode="parse_functions"
-# triplet_mode="sliding_window"
-triplet_mode="diff_content"
+triplet_mode="sliding_window"
+# triplet_mode="diff_content"
+# triplet_mode="diff_subsplit"
+
 
 
 # repo_path="2_8/angular_angular"
@@ -37,7 +40,8 @@ repo_path="data/2_7/facebook_react"
 # repo_path="2_9/huggingface_transformers"
 # repo_path="2_9/redis_redis"
 
-code_df_cache="data/merged_code_df/multi_code_df.parquet"
+# code_df_cache="data/merged_code_df/multi_code_df.parquet"
+code_df_cache="data/2_7/facebook_react/cache/repr_0.1663/code_df.parquet"
 
 
 index_path="${repo_path}/index_commit_tokenized"
@@ -69,7 +73,7 @@ openai_model="gpt4" # openai model to use
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 bert_best_model="data/combined_commit_train/best_model"
 
-best_model_path="data/2_7/facebook_react/models/repr_0.1663/best_model"
+# best_model_path="data/2_7/facebook_react/models/repr_0.1663/best_model"
 
 # repo_paths=(
 #     "data/2_7/apache_spark"
@@ -119,15 +123,14 @@ python -u src/CodeReranker.py \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
 
+    # --use_previous_file \
+    # --debug
+
 
     # --best_model_path $best_model_path \
     # --overwrite_cache \
-
     # --ignore_gold_in_training \
-
-
     # --do_combined \
-    # --best_model_path $best_model_path \
     # --repo_paths "${repo_paths[@]}" \
 
 
