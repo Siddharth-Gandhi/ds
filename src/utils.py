@@ -474,8 +474,13 @@ def prepare_sliding_window_triplets(code_df, args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
         if args.use_previous_file:
+            print('hi' * 1000)
+            if row['SR_previous_file_content'] is None or pd.isna(row['SR_previous_file_content']):
+                continue
             file_tokens = full_tokenize(row['SR_previous_file_content'], tokenizer)
         else:
+            if row['SR_file_content'] is None or pd.isna(row['SR_file_content']):
+                continue
             file_tokens = full_tokenize(row['SR_file_content'], tokenizer)
         total_tokens = len(file_tokens)
         cur_diff = row['SR_diff']
@@ -623,15 +628,38 @@ def prepare_function_triplets(code_df, args):
 
     #### end of helper functions ####
 
-    JS_LANGUAGE = Language('src/parser/my-languages.so', 'javascript')
+    # only consider csharp, go, java, javascript, python, ruby, php
+    VALID_EXTENSIONS = ['.java', '.js', '.py', '.rb', '.php', '.go', '.cs']
+
+    # extension to language mapping
+    EXT_TO_LANG = {
+        '.java': 'java',
+        '.js': 'javascript',
+        '.py': 'python',
+        '.rb': 'ruby',
+        '.php': 'php',
+        '.go': 'go',
+        '.cs': 'csharp'
+    }
+
+    # JS_LANGUAGE = Language('src/parser/my-languages.so', 'javascript')
     parser = Parser()
-    parser.set_language(JS_LANGUAGE)
+    # parser.set_language(JS_LANGUAGE)
 
     triplets = []
 
     for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
         file_content = row['SR_file_content']
         cur_diff = row['SR_diff']
+
+        cur_file_path = row['SR_file_path']
+        ext = os.path.splitext(cur_file_path)[1]
+        if ext not in VALID_EXTENSIONS:
+            continue
+
+        LANG = Language('src/parser/my-languages.so', EXT_TO_LANG[ext])
+        parser.set_language(LANG)
+
 
         if cur_diff is None or pd.isna(cur_diff) or file_content is None or pd.isna(file_content):
             continue

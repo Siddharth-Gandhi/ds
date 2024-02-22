@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=x_graph
+#SBATCH --job-name=bce
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -7,7 +7,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
 #SBATCH --gpus=1
-#SBATCH --nodelist=boston-2-35
+#SBATCH --nodelist=boston-1-7
 
 # Activate the conda environment
 
@@ -19,8 +19,8 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="X_graphcodebert"
-notes="Just with graphcodebert instead of codebert"
+eval_folder="bce"
+notes="bce"
 # triplet_mode="parse_functions"
 triplet_mode="sliding_window"
 # triplet_mode="diff_content"
@@ -73,7 +73,7 @@ openai_model="gpt4" # openai model to use
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 bert_best_model="data/combined_commit_train/best_model"
 
-# best_model_path="data/2_7/facebook_react/models/repr_0.1663/best_model"
+best_model_path="data/2_7/facebook_react/models/bce/best_model"
 
 # repo_paths=(
 #     "data/2_7/apache_spark"
@@ -90,7 +90,7 @@ bert_best_model="data/combined_commit_train/best_model"
 #     "data/2_7/jupyter_notebook"
 # )
 
-python -u src/CodeReranker.py \
+python -u src/bce.py \
     --repo_path $repo_path \
     --index_path $index_path \
     --k $k \
@@ -114,20 +114,20 @@ python -u src/CodeReranker.py \
     --rerank_depth $rerank_depth \
     --openai_model $openai_model \
     --eval_folder $eval_folder \
-    --do_eval \
     --eval_gold \
-    --sanity_check \
     --use_gpt_train \
-    --do_train \
     --triplet_mode $triplet_mode \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
+    --best_model_path $best_model_path \
 
+    # --do_eval \
+    # --do_train \
     # --use_previous_file \
     # --debug
 
 
-    # --best_model_path $best_model_path \
+    # --sanity_check \
     # --overwrite_cache \
     # --ignore_gold_in_training \
     # --do_combined \

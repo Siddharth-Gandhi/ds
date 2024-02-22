@@ -42,7 +42,7 @@ class BERTCodeReranker:
     def __init__(self, parameters):
         self.parameters = parameters
         self.model_name = parameters['model_name']
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1, problem_type='regression')
+        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=2)
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() and parameters['use_gpu'] else "cpu")
         self.model.to(self.device)
@@ -138,7 +138,14 @@ class BERTCodeReranker:
 
                 # Get scores from the model
                 outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-                scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
+
+                outputs = outputs.logits
+                outputs = torch.softmax(outputs, dim=1)
+
+                # get the score of being relevant aka label 1
+                outputs = outputs[:, 1]
+                scores.extend(outputs.detach().cpu().numpy())
+                # scores.extend(outputs.detach().cpu().numpy().squeeze(-1))
         return scores
 
     def aggregate_scores(self, passage_scores):
@@ -255,7 +262,7 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
 
     # Step 1: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
-    triplet_data['label'] = triplet_data['label'].astype(float)
+    # triplet_data['label'] = triplet_data['label'].astype(float) #TODO: remove for num_labels=1
     train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
     train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
     val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
@@ -471,6 +478,7 @@ def main(args):
         triplets = pd.concat([df_label_1, df_label_0_sample])
 
         print(f'Triplet dataframe shape (after sampling): {triplets.shape}')
+        # change label to int
 
         print(triplets.info())
 
@@ -483,7 +491,7 @@ def main(args):
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
         print(f'Loading model from {cur_best_model_path}...')
-        code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
+        code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=2)
         code_reranker.model.to(code_reranker.device)
         # rerankers = [bert_reranker, code_reranker]
 
