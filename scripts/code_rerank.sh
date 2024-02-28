@@ -2,10 +2,10 @@
 #SBATCH --job-name=bce
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
-#SBATCH --nodes=1
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
+#SBATCH --nodes=1
 #SBATCH --gpus=1
 #SBATCH --nodelist=boston-1-7
 
@@ -19,11 +19,11 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="bce"
+eval_folder="combined_diff_both_sump"
 notes="bce"
 # triplet_mode="parse_functions"
-triplet_mode="sliding_window"
-# triplet_mode="diff_content"
+# triplet_mode="sliding_window"
+triplet_mode="diff_content"
 # triplet_mode="diff_subsplit"
 
 
@@ -42,6 +42,8 @@ repo_path="data/2_7/facebook_react"
 
 # code_df_cache="data/merged_code_df/multi_code_df.parquet"
 code_df_cache="data/2_7/facebook_react/cache/repr_0.1663/code_df.parquet"
+triplet_cache_path="data/2_7/facebook_react/cache/combined_diffs/diff_code_triplets.parquet"
+
 
 
 index_path="${repo_path}/index_commit_tokenized"
@@ -66,14 +68,21 @@ train_commits=1500 # number of commits to train on (train + val)
 psg_cnt=25 # number of commits to use for psg generation
 psg_len=350
 psg_stride=250
-aggregation_strategy="sump" # aggregation strategy for bert reranker
+# aggregation_strategy="sump" # aggregation strategy for bert reranker
+aggregation_strategy="sump" # aggregation strategy for both bert reranker and codebert reranker
 rerank_depth=100 # depth to go while reranking
 openai_model="gpt4" # openai model to use
 # bert_best_model="${repo_path}/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 bert_best_model="data/combined_commit_train/best_model"
 
-best_model_path="data/2_7/facebook_react/models/bce/best_model"
+# best_model_path="data/2_7/facebook_react/models/bce/best_model"
+best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
+# best_model_path="data/2_7/facebook_react/models/X_function_split/best_model"
+# best_model_path="data/2_7/facebook_react/models/combined_random/best_model"
+
+
+
 
 # repo_paths=(
 #     "data/2_7/apache_spark"
@@ -90,7 +99,7 @@ best_model_path="data/2_7/facebook_react/models/bce/best_model"
 #     "data/2_7/jupyter_notebook"
 # )
 
-python -u src/bce.py \
+python -u src/CodeReranker.py \
     --repo_path $repo_path \
     --index_path $index_path \
     --k $k \
@@ -120,12 +129,12 @@ python -u src/bce.py \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
     --best_model_path $best_model_path \
-
     # --do_eval \
     # --do_train \
+    # --triplet_cache_path $triplet_cache_path \
+
     # --use_previous_file \
     # --debug
-
 
     # --sanity_check \
     # --overwrite_cache \

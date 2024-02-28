@@ -39,7 +39,8 @@ from utils import (
 set_seed(42)
 
 class BERTCodeReranker:
-    def __init__(self, parameters):
+    def __init__(self, parameters, combined_df):
+        self.combined_df = combined_df
         self.parameters = parameters
         self.model_name = parameters['model_name']
         self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1, problem_type='regression')
@@ -165,6 +166,10 @@ class BERTCodeReranker:
             return self.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
         query_passage_pairs = []
         per_result_contribution = []
+        if self.combined_df is not None:
+            combined_df = self.combined_df
+
+
         for agg_result in aggregated_results:
             agg_result.contributing_results.sort(key=lambda res: res.commit_date, reverse=True)
             # get most recent file version
@@ -174,6 +179,8 @@ class BERTCodeReranker:
             commit_id = most_recent_search_result.commit_id
             # get the file content from combined_df
             file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['cur_file_content'].values[0]
+
+            # file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['previous_file_content'].values[0]
 
             # now need to split this file content into psg_cnt passages
             # first tokenize the file content
@@ -216,8 +223,8 @@ class BERTCodeReranker:
                 # add the cur_passage to cur_result_passages
                 cur_result_passages.append(cur_passage_decoded)
 
-                if len(cur_result_passages) == self.psg_cnt:
-                    break
+                # if len(cur_result_passages) == self.psg_cnt:
+                #     break
 
             # now add the query, passage pairs to query_passage_pairs
             per_result_contribution.append(len(cur_result_passages))
@@ -369,7 +376,7 @@ def main(args):
         'psg_stride': args.psg_stride
     }
 
-    code_reranker = BERTCodeReranker(params)
+    code_reranker = BERTCodeReranker(params, combined_df)
     # rerankers = [bert_reranker, code_reranker]
     save_model_name = params['model_name'].replace('/', '_')
     # hf_output_dir = os.path.join(repo_path, 'models', f'code_{save_model_name}_model_output')
@@ -626,7 +633,7 @@ if __name__ == '__main__':
     bert_params = {
         'model_name': args.model_path,
         'psg_cnt': 5,
-        'aggregation_strategy': args.aggregation_strategy,
+        'aggregation_strategy': 'sump',
         'batch_size': args.batch_size,
         'use_gpu': args.use_gpu,
         'rerank_depth': 250,

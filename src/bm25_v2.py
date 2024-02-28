@@ -52,11 +52,12 @@ class BM25Searcher:
 
             # Filter hits by query date
             for hit in current_hits:
-                if int(json.loads(hit.raw)["commit_date"]) < query_date:
+                loaded_obj = json.loads(hit.raw)
+                if int(loaded_obj["commit_date"]) < query_date:
                     filtered_hits.append(
-                        SearchResult(hit.docid, json.loads(hit.raw)['file_path'], hit.score,
-                                     int(json.loads(hit.raw)["commit_date"]),
-                                     reverse_tokenize(json.loads(hit.raw)['contents']))
+                        SearchResult(hit.docid, loaded_obj['file_path'], hit.score,
+                                     int(loaded_obj["commit_date"]),
+                                     reverse_tokenize(loaded_obj['contents']))
                     )
                 if len(filtered_hits) == ranking_depth:
                     break  # We have enough results

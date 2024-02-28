@@ -181,6 +181,7 @@ class BERTCodeReranker:
             commit_id = most_recent_search_result.commit_id
             # get the file content from combined_df
             file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['cur_file_content'].values[0]
+            # file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['previous_file_content'].values[0]
 
             # now need to split this file content into psg_cnt passages
             # first tokenize the file content
@@ -461,7 +462,10 @@ def main(args):
         triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
 
         # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
-        triplets = prepare_code_triplets(processed_code_df, args, mode=args.triplet_mode, cache_file=triplet_cache ,overwrite=args.overwrite_cache)
+        if args.triplet_cache_path:
+            triplets = pd.read_parquet(args.triplet_cache_path)
+        else:
+            triplets = prepare_code_triplets(processed_code_df, args, mode=args.triplet_mode, cache_file=triplet_cache ,overwrite=args.overwrite_cache)
 
         #### Sampling to keep number of triplets reasonable.
         print(f'Triplet dataframe shape (before sampling): {triplets.shape}')
@@ -616,6 +620,7 @@ if __name__ == '__main__':
     parser.add_argument('--triplet_mode', choices=['parse_functions', 'sliding_window', 'diff_content', 'diff_subsplit'], default='', help='Mode for preparing triplets (default: diff_code)')
     parser.add_argument('--code_df_cache', type=str, help='Path to the code dataframe cache file.')
     parser.add_argument('--use_previous_file', action='store_true', help='Use the previous file for training.')
+    parser.add_argument('--triplet_cache_path', type=str, help='Path to the triplet cache file.')
     args = parser.parse_args()
     run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes)
     # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
