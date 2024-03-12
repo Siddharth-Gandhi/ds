@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=bce
 #SBATCH --output=logs/code_rerank/output_%A.log
-#SBATCH --partition=gpu
+#SBATC
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
