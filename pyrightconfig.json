@@ -5,6 +5,9 @@
         "gold",
         "logs",
         "wandb",
-        "smalldata"
+        "smalldata",
+        "models",
+        "results",
+        "cache"
     ]
 }

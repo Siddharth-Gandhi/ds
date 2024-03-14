@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+from email import policy
 from typing import List
 
 import numpy as np
@@ -75,9 +76,6 @@ class BERTReranker:
         query: The issue query string.
         aggregated_results: A list of AggregatedSearchResult objects from BM25 search.
         """
-        # aggregated_results = aggregated_results[:self.rerank_depth] # already done in the pipeline
-        # print(f'Reranking {len(aggregated_results)} results')
-
         self.model.eval()
 
         # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
@@ -127,54 +125,26 @@ class BERTReranker:
 
         return aggregated_results
 
-    # def get_scores(self, dataloader, model):
-    #     scores = []
-    #     with torch.no_grad():
-    #         for batch in dataloader:
-    #             # Unpack the batch and move it to GPU
-    #             b_input_ids, b_attention_mask = batch
-    #             b_input_ids = b_input_ids.to(self.device)
-    #             b_attention_mask = b_attention_mask.to(self.device)
-
-    #             # Get scores from the model
-    #             outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-    #             scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
-    #     return scores
-
     def get_scores(self, dataloader, model) -> List[np.ndarray]:
         scores = []
-        if self.train_mode == 'regression':
-            with torch.no_grad():
-                for batch in dataloader:
-                    # Unpack the batch and move it to GPU
-                    b_input_ids, b_attention_mask = batch
-                    b_input_ids = b_input_ids.to(self.device)
-                    b_attention_mask = b_attention_mask.to(self.device)
+        with torch.no_grad():
+            for batch in dataloader:
+                # Unpack the batch and move it to GPU
+                b_input_ids, b_attention_mask = batch
+                b_input_ids = b_input_ids.to(self.device)
+                b_attention_mask = b_attention_mask.to(self.device)
 
+                outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+                if self.train_mode == 'regression':
                     # Get scores from the model
-                    outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
                     scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
-        elif self.train_mode == 'classification':
-            scores = []
-            with torch.no_grad():
-                for batch in dataloader:
-                    # Unpack the batch and move it to GPU
-                    b_input_ids, b_attention_mask = batch
-                    b_input_ids = b_input_ids.to(self.device)
-                    b_attention_mask = b_attention_mask.to(self.device)
-
-                    # Get scores from the model
-                    outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-
+                elif self.train_mode == 'classification':
                     outputs = outputs.logits
                     outputs = torch.softmax(outputs, dim=1)
 
                     # get the score of being relevant aka label 1
                     outputs = outputs[:, 1]
                     scores.extend(outputs.detach().cpu().numpy())
-                    # scores.extend(outputs.detach().cpu().numpy().squeeze(-1))
-        else:
-            raise ValueError(f"Invalid train_mode: {self.train_mode}")
         return scores
 
     def aggregate_scores(self, passage_scores):
@@ -258,6 +228,8 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
     # convert triplet_data to HuggingFace Dataset
     if args.train_mode == 'regression':
         triplet_data['label'] = triplet_data['label'].astype(float)
+
+
     train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
     train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
     val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
@@ -300,10 +272,10 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
     small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
     small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
 
-    # if args.debug:
-    #     print('Running in debug mode, using small datasets')
-    #     tokenized_train_dataset = small_train_dataset
-    #     tokenized_val_dataset = small_val_dataset
+    if args.debug:
+        print('Running in debug mode, using small datasets')
+        tokenized_train_dataset = small_train_dataset
+        tokenized_val_dataset = small_val_dataset
 
     # Step 11: set up trainer
     trainer = Trainer(
@@ -343,13 +315,12 @@ def main(args):
 
 
     # create eval directory to store results
-    eval_path = os.path.join(data_path, 'eval')
+    # eval_path = os.path.join(data_path, 'eval')
+    eval_path = os.path.join('out', repo_name, 'bert_reranker', args.eval_folder)
 
     # check for a eval_folder argument and if it exists, use that as the eval folder
-    if args.eval_folder:
-        eval_path = os.path.join(eval_path, args.eval_folder)
-        if not os.path.exists(eval_path):
-            os.makedirs(eval_path)
+    # if args.eval_folder:
+    #     eval_path = os.path.join(eval_path, args.eval_folder)
 
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
@@ -379,19 +350,23 @@ def main(args):
 
     bert_reranker = BERTReranker(params, train_mode=args.train_mode)
     rerankers = [bert_reranker]
-    save_model_name = params['model_name'].replace('/', '_')
+    # save_model_name = params['model_name'].replace('/', '_')
 
-    if not os.path.exists(os.path.join(data_path, 'models')):
-        os.makedirs(os.path.join(data_path, 'models'))
+    # if not os.path.exists(os.path.join(data_path, 'models')):
+    #     os.makedirs(os.path.join(data_path, 'models'))
 
-    model_name = f'{save_model_name}_bertrr'
-    if args.use_gpt_train:
-        model_name += '_gpt_train'
+    # model_name = f'{save_model_name}_bertrr'
+    # if args.use_gpt_train:
+    #     model_name += '_gpt_train'
 
 
-    hf_output_dir = os.path.join(data_path, 'models', model_name)
-    best_model_path = os.path.join(hf_output_dir, 'best_model')
+    # hf_output_dir = os.path.join(data_path, 'models', model_name)
+    hf_output_dir = os.path.join('models', repo_name, 'bert_reranker', args.eval_folder)
 
+    # best_model_path = os.path.join(hf_output_dir, 'best_model')
+
+    if not os.path.exists(hf_output_dir):
+        os.makedirs(hf_output_dir)
 
     if args.do_train:
         if args.use_gpt_train:
@@ -404,20 +379,27 @@ def main(args):
                 raise ValueError(f'Gold train file {gold_train_file} does not exist, please run openai_transform.py first')
 
             recent_df = pd.read_parquet(gold_train_file)
-            # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
+            # ! rename column commit_message to original_message and transformed_message_gpt4 to commit_message
             recent_df = recent_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
         else:
             recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
-            # Step 6: randomly sample 1500 rows from recent_df
-            recent_df = recent_df.sample(params['train_commits'])
-        triplet_cache = os.path.join(data_path, 'cache', 'triplet_data_cache.pkl')
+            # Step 6: randomly sample params['train_commits'] commits for training or if less than that, use all commits
+            if len(recent_df) < params['train_commits']:
+                print(f'Number of commits in train_df: {len(recent_df)}')
+                print(f'Using all commits for training')
+                recent_df = recent_df.sample(len(recent_df))
+            else:
+                recent_df = recent_df.sample(params['train_commits'])
+
+        cache_folder = os.path.join('cache', repo_name, 'bert_reranker', args.eval_folder)
+        if not os.path.exists(cache_folder):
+            os.makedirs(cache_folder)
+        triplet_cache = args.triplet_cache_path or os.path.join(cache_folder, 'triplet_data_cache.pkl')
+
         print(f'Number of commits in train_df: {len(recent_df)}')
-        # sys.exit(0)
 
         # Step 7: Prepare triplet data
-        if not os.path.exists(os.path.join(data_path, 'cache')):
-            os.makedirs(os.path.join(data_path, 'cache'))
-        # TODO: filter eval commits from here
+
         triplet_data = prepare_triplet_data_from_df(recent_df, bm25_searcher, search_depth=params['train_depth'], num_positives=params['num_positives'], num_negatives=params['num_negatives'], cache_file=triplet_cache, overwrite=args.overwrite_cache)
 
         do_training(triplet_data, bert_reranker, hf_output_dir, args)
@@ -450,7 +432,10 @@ def main(args):
 
     # load the best model from args.best_model_path for do_eval and eval_gold
     if args.do_eval or args.eval_gold:
-        cur_best_model_path = args.best_model_path or best_model_path
+        if not args.best_model_path:
+            # print(f'WARNING: No best model path provided, using default path {best_model_path}')
+            raise ValueError('Best model path not provided, please provide a path to the best model')
+        cur_best_model_path = args.best_model_path #  or best_model_path
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
         print(f'Loading model from {cur_best_model_path}...')
@@ -465,7 +450,7 @@ def main(args):
 
 
     if args.do_eval:
-        bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
+        bert_with_training_output_path = os.path.join(eval_path, 'bert_rerank_commit.txt')
         # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
         gold_dir = os.path.join('gold', repo_name)
@@ -477,6 +462,8 @@ def main(args):
             raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
         print(f'Model: {args.openai_model}')
         gold_df = pd.read_parquet(gold_data_path)
+
+        # ! not renaming transformed message into query so works
         bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
         print("BERT Evaluation with training")
         print(bert_with_training_eval)
@@ -504,18 +491,9 @@ def main(args):
         print(gold_df.info())
 
 
-
-        # # get results after training
-        # if not os.path.exists(best_model_path):
-        #     raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
-        # print(f'Evaluating model from {best_model_path}...')
-        # bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
-        # bert_reranker.model.to(bert_reranker.device)
-        # rerankers = [bert_reranker]
-
         # get gold eval with reranking
         print('Running BERT on gold data...')
-        bert_gold_output_path = os.path.join(eval_path, f'bert_v2_{args.openai_model}_gold.txt')
+        bert_gold_output_path = os.path.join(eval_path, f'bert_rerank_gold.txt')
         bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
 
         print("BERT Gold Evaluation")
@@ -561,9 +539,10 @@ if __name__ == '__main__':
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
     parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT transformed training data.')
-    parser.add_argument('--eval_folder', type=str, help='Folder to store evaluation results for a particular experiment.')
+    parser.add_argument('--eval_folder', type=str, help='Folder to store evaluation results for a particular experiment.', required=True)
     parser.add_argument('--notes', type=str, help='Notes for the run.', default='')
     parser.add_argument('--train_mode', choices=['regression', 'classification'], default='classification', help='Training mode for the model (default: classification')
+    parser.add_argument('--triplet_cache_path', type=str, help='Path to the triplet data cache file.')
     args = parser.parse_args()
     if not args.debug:
         run = wandb.init(project='ds2', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
@@ -578,5 +557,10 @@ if __name__ == '__main__':
         run.define_metric('R@10', summary='max') # type: ignore
         run.define_metric('R@100', summary='max') # type: ignore
         run.define_metric('R@1000', summary='max') # type: ignore
+
+        # save the file scripts/bert_rerank.sh to wandb
+        # wandb.save('bert_rerank.sh', policy='now')
+        wandb.save('src/*', policy='now')
+        wandb.save('scripts/bert_rerank.sh', policy='now')
     print(args)
     main(args)

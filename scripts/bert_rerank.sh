@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=be_reg_fb
+#SBATCH --job-name=4xb_reg_fb
 #SBATCH --output=logs/bert_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -17,8 +17,8 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="combined_bert_reg_eval"
-notes="combined train with eval"
+eval_folder="4x_bert_reg_fb"
+notes="4x (non-gpt) bert train mode regression, train data = fb only"
 
 
 # data_path="2_7/apache_spark"
@@ -68,7 +68,7 @@ num_positives=10 # number of positive samples per query
 num_negatives=10 # number of negative samples per querys
 train_depth=1000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
-train_commits=1000 # number of commits to train on (train + val)
+train_commits=2000 # number of commits to train on (train + val)
 psg_cnt=5 # number of commits to use for psg generation
 aggregation_strategy="sump" # aggregation strategy for bert reranker
 # use_gpu=True # whether to use gpu or not
@@ -77,7 +77,7 @@ rerank_depth=250 # depth to go while reranking
 # do_eval=True # whether to evaluate or not
 openai_model="gpt4" # openai model to use
 # best_model_path="data/combined_commit_train/best_model"
-best_model_path="/home/ssg2/ssg2/ds/data/combined_gpt_train/combined_bce_train/best_model"
+# best_model_path="/home/ssg2/ssg2/ds/data/combined_gpt_train/combined_bce_train/best_model"
 
 
 python -u src/BERTReranker_v4.py \
@@ -102,16 +102,16 @@ python -u src/BERTReranker_v4.py \
     --rerank_depth $rerank_depth \
     --openai_model $openai_model \
     --eval_folder $eval_folder \
-    --repo_paths "${repo_paths[@]}" \
     --eval_gold \
     --no_bm25 \
-    --use_gpt_train \
     --do_eval \
     --do_train \
-    # --train_mode $train_mode \
+    --train_mode $train_mode \
 
 
+    # --use_gpt_train \
     # --do_combined_train \
+    # --repo_paths "${repo_paths[@]}" \
     # --sanity_check \
     # --best_model_path $best_model_path \
     # --overwrite_cache \

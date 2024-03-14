@@ -1,5 +1,8 @@
 merged_code_df/
 wandb/
+models/
+cache/
+results/
 */parser
 parser/
 test_trainer/
