@@ -1,13 +1,13 @@
 #!/bin/bash
-#SBATCH --job-name=bce
+#SBATCH --job-name=diff_reg
 #SBATCH --output=logs/code_rerank/output_%A.log
-#SBATC
+#SBATCH --partition=gpu
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
 #SBATCH --nodes=1
 #SBATCH --gpus=1
-#SBATCH --nodelist=boston-1-7
+#SBATCH --nodelist=boston-2-35
 
 # Activate the conda environment
 
@@ -19,8 +19,8 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="combined_diff_both_sump"
-notes="bce"
+eval_folder="diff_combined_reg"
+notes="reg"
 # triplet_mode="parse_functions"
 # triplet_mode="sliding_window"
 triplet_mode="diff_content"
@@ -28,25 +28,25 @@ triplet_mode="diff_content"
 
 
 
-# repo_path="2_8/angular_angular"
-# repo_path="2_7/apache_spark"
-# repo_path="2_7/apache_kafka"
-repo_path="data/2_7/facebook_react"
-# repo_path="2_8/django_django"
-# repo_path="smalldata/ftr"
-# repo_path="2_7/julialang_julia"
-# repo_path="2_7/ruby_ruby"
-# repo_path="2_8/pytorch_pytorch"
-# repo_path="2_9/huggingface_transformers"
-# repo_path="2_9/redis_redis"
+# data_path="2_8/angular_angular"
+# data_path="2_7/apache_spark"
+# data_path="2_7/apache_kafka"
+data_path="data/2_7/facebook_react"
+# data_path="2_8/django_django"
+# data_path="smalldata/ftr"
+# data_path="2_7/julialang_julia"
+# data_path="2_7/ruby_ruby"
+# data_path="2_8/pytorch_pytorch"
+# data_path="2_9/huggingface_transformers"
+# data_path="2_9/redis_redis"
 
-# code_df_cache="data/merged_code_df/multi_code_df.parquet"
-code_df_cache="data/2_7/facebook_react/cache/repr_0.1663/code_df.parquet"
-triplet_cache_path="data/2_7/facebook_react/cache/combined_diffs/diff_code_triplets.parquet"
+code_df_cache="data/merged_code_df/multi_code_df.parquet"
+# code_df_cache="data/2_7/facebook_react/cache/repr_0.1663/code_df.parquet"
+# triplet_cache_path="data/2_7/facebook_react/cache/combined_diffs/diff_code_triplets.parquet"
 
 
 
-index_path="${repo_path}/index_commit_tokenized"
+index_path="${data_path}/index_commit_tokenized"
 k=1000 # initial ranker depth
 n=100 # number of samples to evaluate on
 # no_bm25=False # whether to use bm25 or not
@@ -58,7 +58,7 @@ model_path="microsoft/codebert-base"
 
 # overwrite_cache=False # whether to overwrite the cache
 batch_size=32 # batch size for inference
-num_epochs=10 # number of epochs to train
+num_epochs=20 # number of epochs to train
 learning_rate=5e-5 # learning rate for training
 num_positives=10 # number of positive samples per query
 num_negatives=10 # number of negative samples per querys
@@ -69,15 +69,15 @@ psg_cnt=25 # number of commits to use for psg generation
 psg_len=350
 psg_stride=250
 # aggregation_strategy="sump" # aggregation strategy for bert reranker
-aggregation_strategy="sump" # aggregation strategy for both bert reranker and codebert reranker
+aggregation_strategy="maxp" # aggregation strategy for both bert reranker and codebert reranker
 rerank_depth=100 # depth to go while reranking
 openai_model="gpt4" # openai model to use
-# bert_best_model="${repo_path}/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
+# bert_best_model="${data_path}/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 bert_best_model="data/combined_commit_train/best_model"
-
+train_mode="regression"
 # best_model_path="data/2_7/facebook_react/models/bce/best_model"
-best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
+# best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
 # best_model_path="data/2_7/facebook_react/models/X_function_split/best_model"
 # best_model_path="data/2_7/facebook_react/models/combined_random/best_model"
 
@@ -100,7 +100,7 @@ best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
 # )
 
 python -u src/CodeReranker.py \
-    --repo_path $repo_path \
+    --data_path $data_path \
     --index_path $index_path \
     --k $k \
     --n $n \
@@ -128,13 +128,17 @@ python -u src/CodeReranker.py \
     --triplet_mode $triplet_mode \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
-    --best_model_path $best_model_path \
-    # --do_eval \
-    # --do_train \
+    --do_eval \
+    --do_train \
+    --train_mode $train_mode \
     # --triplet_cache_path $triplet_cache_path \
 
     # --use_previous_file \
     # --debug
+    # --best_model_path $best_model_path \
+
+
+
 
     # --sanity_check \
     # --overwrite_cache \
@@ -153,10 +157,10 @@ echo "Job completed"
 
 
 
-# repo_path="2_8/pytorch_pytorch" ???????
-# repo_path="2_7/pandas-dev_pandas" ???????
-# repo_path="2_7/julialang_julia"
-# repo_path="2_7/ruby_ruby"
-# repo_path="2_8/ansible_ansible"
-# repo_path="2_7/moby_moby"
-# repo_path="2_7/jupyter_notebook"
+# data_path="2_8/pytorch_pytorch" ???????
+# data_path="2_7/pandas-dev_pandas" ???????
+# data_path="2_7/julialang_julia"
+# data_path="2_7/ruby_ruby"
+# data_path="2_8/ansible_ansible"
+# data_path="2_7/moby_moby"
+# data_path="2_7/jupyter_notebook"

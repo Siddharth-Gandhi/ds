@@ -3,6 +3,7 @@ import os
 import sys
 from typing import List
 
+import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
@@ -31,10 +32,18 @@ from utils import (
 set_seed(42)
 
 class BERTReranker:
-    def __init__(self, parameters):
+    def __init__(self, parameters, train_mode):
         self.parameters = parameters
         self.model_name = parameters['model_name']
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1, problem_type='regression')
+        self.train_mode = train_mode
+        if train_mode == 'regression':
+            print('Using regression model')
+            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1, problem_type='regression')
+        elif train_mode == 'classification':
+            print('Using classification model')
+            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=2)
+        else:
+            raise ValueError(f"Invalid train_mode: {train_mode}")
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         self.device = torch.device("cuda" if torch.cuda.is_available() and parameters['use_gpu'] else "cpu")
         self.model.to(self.device)
@@ -118,18 +127,54 @@ class BERTReranker:
 
         return aggregated_results
 
-    def get_scores(self, dataloader, model):
-        scores = []
-        with torch.no_grad():
-            for batch in dataloader:
-                # Unpack the batch and move it to GPU
-                b_input_ids, b_attention_mask = batch
-                b_input_ids = b_input_ids.to(self.device)
-                b_attention_mask = b_attention_mask.to(self.device)
+    # def get_scores(self, dataloader, model):
+    #     scores = []
+    #     with torch.no_grad():
+    #         for batch in dataloader:
+    #             # Unpack the batch and move it to GPU
+    #             b_input_ids, b_attention_mask = batch
+    #             b_input_ids = b_input_ids.to(self.device)
+    #             b_attention_mask = b_attention_mask.to(self.device)
 
-                # Get scores from the model
-                outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-                scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
+    #             # Get scores from the model
+    #             outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+    #             scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
+    #     return scores
+
+    def get_scores(self, dataloader, model) -> List[np.ndarray]:
+        scores = []
+        if self.train_mode == 'regression':
+            with torch.no_grad():
+                for batch in dataloader:
+                    # Unpack the batch and move it to GPU
+                    b_input_ids, b_attention_mask = batch
+                    b_input_ids = b_input_ids.to(self.device)
+                    b_attention_mask = b_attention_mask.to(self.device)
+
+                    # Get scores from the model
+                    outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+                    scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
+        elif self.train_mode == 'classification':
+            scores = []
+            with torch.no_grad():
+                for batch in dataloader:
+                    # Unpack the batch and move it to GPU
+                    b_input_ids, b_attention_mask = batch
+                    b_input_ids = b_input_ids.to(self.device)
+                    b_attention_mask = b_attention_mask.to(self.device)
+
+                    # Get scores from the model
+                    outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
+
+                    outputs = outputs.logits
+                    outputs = torch.softmax(outputs, dim=1)
+
+                    # get the score of being relevant aka label 1
+                    outputs = outputs[:, 1]
+                    scores.extend(outputs.detach().cpu().numpy())
+                    # scores.extend(outputs.detach().cpu().numpy().squeeze(-1))
+        else:
+            raise ValueError(f"Invalid train_mode: {self.train_mode}")
         return scores
 
     def aggregate_scores(self, passage_scores):
@@ -193,13 +238,26 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
     print('Label distribution:')
     print(triplet_data['label'].value_counts())
 
+    # make label distribution more balanced
+    df_label_1 = triplet_data[triplet_data['label'] == 1]
+
+    n_label_1 = len(df_label_1)
+
+    df_label_0_sample = triplet_data[triplet_data['label'] == 0].sample(n=n_label_1, random_state=42)
+
+    triplet_data = pd.concat([df_label_1, df_label_0_sample])
+
+    print('Sampled Label distribution:')
+    print(triplet_data['label'].value_counts())
+
     if args.sanity_check:
         print('Running sanity check on training data...')
         triplet_data = sanity_check(triplet_data)
 
     # Step 7: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
-    triplet_data['label'] = triplet_data['label'].astype(float)
+    if args.train_mode == 'regression':
+        triplet_data['label'] = triplet_data['label'].astype(float)
     train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
     train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
     val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
@@ -236,16 +294,16 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
         logging_steps=1000,
         fp16=True,
         dataloader_num_workers=args.num_workers,
-        report_to='wandb',
+        report_to='wandb' if not args.debug else "none",
         )
 
     small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
     small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
 
-    if args.debug:
-        print('Running in debug mode, using small datasets')
-        tokenized_train_dataset = small_train_dataset
-        tokenized_val_dataset = small_val_dataset
+    # if args.debug:
+    #     print('Running in debug mode, using small datasets')
+    #     tokenized_train_dataset = small_train_dataset
+    #     tokenized_val_dataset = small_val_dataset
 
     # Step 11: set up trainer
     trainer = Trainer(
@@ -273,19 +331,19 @@ def main(args):
     if torch.cuda.is_available():
         print(torch.cuda.get_device_name(torch.cuda.current_device()))
     metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'R@1', 'R@10', 'R@100', 'R@1000']
-    repo_path = args.repo_path
-    repo_name = repo_path.split('/')[-1]
+    data_path = args.data_path
+    repo_name = data_path.split('/')[-1]
     index_path = args.index_path
     # TODO remove K and n everywhere
     K = args.k
     n = args.n
-    combined_df = get_combined_df(repo_path)
+    combined_df = get_combined_df(data_path)
     # TODO add this to params
     BM25_AGGR_STRAT = 'sump'
 
 
     # create eval directory to store results
-    eval_path = os.path.join(repo_path, 'eval')
+    eval_path = os.path.join(data_path, 'eval')
 
     # check for a eval_folder argument and if it exists, use that as the eval folder
     if args.eval_folder:
@@ -301,22 +359,6 @@ def main(args):
     model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
 
     # Reranking with BERT
-    # params = {
-    #     'model_name': 'microsoft/codebert-base',
-    #     'psg_cnt': 5,
-    #     'aggregation_strategy': 'sump',
-    #     'batch_size': 16,
-    #     'use_gpu': True,
-    #     'rerank_depth': 250,
-    #     'num_epochs': 3,
-    #     'lr': 5e-5,
-    #     'num_positives': 10,
-    #     'num_negatives': 10,
-    #     'train_depth': 1000,
-    #     'num_workers': 8,
-    #     'train_commits': 1500,
-    # }
-
     params = {
         'model_name': args.model_path,
         'psg_cnt': args.psg_cnt,
@@ -335,96 +377,23 @@ def main(args):
     }
 
 
-    if not args.no_bm25:
-        print('Running BM25...')
-        bm25_output_path = os.path.join(eval_path, 'bm25_baseline_metrics.txt')
-        # print(f'BM25 output path: {bm25_output_path}')
-        # bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], )
-        gold_dir = os.path.join('gold', repo_name)
-        if not os.path.exists(gold_dir):
-            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
-        # check if gold data exists
-        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
-        if not os.path.exists(gold_data_path):
-            raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
-        print(f'Model: {args.openai_model}')
-        gold_df = pd.read_parquet(gold_data_path)
-        bm25_baseline_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
-        print("BM25 Baseline Evaluation")
-        print(bm25_baseline_eval)
-
-    bert_reranker = BERTReranker(params)
+    bert_reranker = BERTReranker(params, train_mode=args.train_mode)
     rerankers = [bert_reranker]
     save_model_name = params['model_name'].replace('/', '_')
-    if not os.path.exists(os.path.join(repo_path, 'models')):
-        os.makedirs(os.path.join(repo_path, 'models'))
+
+    if not os.path.exists(os.path.join(data_path, 'models')):
+        os.makedirs(os.path.join(data_path, 'models'))
 
     model_name = f'{save_model_name}_bertrr'
     if args.use_gpt_train:
         model_name += '_gpt_train'
 
 
-    hf_output_dir = os.path.join(repo_path, 'models', model_name)
+    hf_output_dir = os.path.join(data_path, 'models', model_name)
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
-    # training methods
-
-
-    # if args.eval_before_training:
-    #     # get results without training first
-    #     print('Evaluating model before training...')
-    #     bert_without_trainint_output_path = os.path.join(eval_path, 'bert_without_training.txt')
-    #     bert_without_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_without_trainint_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
-    #     print("BERT Evaluation without training")
-    #     print(bert_without_training_eval)
 
     if args.do_train:
-        # # Prepare the data for training
-        # print('Preparing training data...')
-        # # Step 1: Filter out only the columns we need
-        # filtered_df = combined_df[['commit_date', 'commit_message', 'commit_id', 'file_path', 'diff']]
-
-        # # Step 2: Group by commit_id
-        # grouped_df = filtered_df.groupby(['commit_id', 'commit_date', 'commit_message'])['file_path'].apply(list).reset_index()
-        # grouped_df.rename(columns={'file_path': 'actual_files_modified'}, inplace=True)
-
-        # # Step 3: Determine midpoint and filter dataframe
-        # midpoint_date = np.median(grouped_df['commit_date'])
-        # recent_df = grouped_df[grouped_df['commit_date'] > midpoint_date]
-        # print(f'Number of commits after midpoint date: {len(recent_df)}')
-
-        # # Step 4: Filter out commits with less than average length commit messages
-        # average_commit_len = recent_df['commit_message'].str.split().str.len().mean()
-        # # filter out commits with less than average length
-        # recent_df = recent_df[recent_df['commit_message'].str.split().str.len() > average_commit_len] # type: ignore
-        # print(f'Number of commits after filtering by commit message length: {len(recent_df)}')
-
-        # # Step 5: Remove test commits from recent_df
-
-        # gold_dir = os.path.join('gold', repo_name)
-        # gold_commit_file = os.path.join(gold_dir, f'{repo_name}_gpt4_gold_commit_ids.txt')
-
-
-        # if not os.path.exists(gold_commit_file):
-        #     print(f'Gold commit file {gold_commit_file} does not exist.')
-        #     if args.ignore_gold_in_training:
-        #         print('Skipping, gold commits could be in training...')
-        #     else:
-        #         print('Exiting...')
-        #         sys.exit(1)
-        # else:
-        #     gold_commits = pd.read_csv(gold_commit_file, header=None, names=['commit_id']).commit_id.tolist()
-
-        #     print(f'Found {len(gold_commits)} gold commits for {repo_name}')
-
-        #     print('Removing gold commits from training data...')
-        #     recent_df = recent_df[~recent_df['commit_id'].isin(gold_commits)]
-        #     print(f'Number of commits after removing gold commits: {len(recent_df)}')
-
-        # # Step 6: randomly sample 1500 rows from recent_df
-        # recent_df = recent_df.sample(params['train_commits'])
-        # print(f'Number of commits after sampling: {len(recent_df)}')
-
         if args.use_gpt_train:
             gold_dir = os.path.join('gold', repo_name)
             if not os.path.exists(gold_dir):
@@ -437,22 +406,46 @@ def main(args):
             recent_df = pd.read_parquet(gold_train_file)
             # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
             recent_df = recent_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
-            triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
         else:
             recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
             # Step 6: randomly sample 1500 rows from recent_df
             recent_df = recent_df.sample(params['train_commits'])
-            triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
+        triplet_cache = os.path.join(data_path, 'cache', 'triplet_data_cache.pkl')
         print(f'Number of commits in train_df: {len(recent_df)}')
         # sys.exit(0)
 
         # Step 7: Prepare triplet data
-        if not os.path.exists(os.path.join(repo_path, 'cache')):
-            os.makedirs(os.path.join(repo_path, 'cache'))
+        if not os.path.exists(os.path.join(data_path, 'cache')):
+            os.makedirs(os.path.join(data_path, 'cache'))
         # TODO: filter eval commits from here
         triplet_data = prepare_triplet_data_from_df(recent_df, bm25_searcher, search_depth=params['train_depth'], num_positives=params['num_positives'], num_negatives=params['num_negatives'], cache_file=triplet_cache, overwrite=args.overwrite_cache)
 
         do_training(triplet_data, bert_reranker, hf_output_dir, args)
+    elif args.do_combined_train:
+            print("Performing combined training on multiple repositories...")
+            print(f'Found {len(args.repo_paths)} repositories: {args.repo_paths}')
+            combined_triplet_data = pd.DataFrame()
+            for data_path in args.repo_paths:
+                if args.use_gpt_train:
+                    triplet_cache = os.path.join(data_path, 'cache', 'gpt_triplet_data_cache.pkl')
+                else:
+                    triplet_cache = os.path.join(data_path, 'cache', 'triplet_data_cache.pkl')
+                if os.path.exists(triplet_cache):
+                    repo_triplet_data = pd.read_pickle(triplet_cache)
+                    combined_triplet_data = pd.concat([combined_triplet_data, repo_triplet_data], ignore_index=True)
+                else:
+                    print(f"Warning: Triplet cache not found for {data_path}, skipping this repository.")
+
+            if combined_triplet_data.empty:
+                raise ValueError("No triplet data found in the specified repositories.")
+
+            print(f'Shape of combined triplet data: {combined_triplet_data.shape}')
+
+            combined_hf_output_dir = os.path.join('data', 'combined_commit_train' if not args.use_gpt_train else 'combined_gpt_train', args.eval_folder)
+            if not os.path.exists(combined_hf_output_dir):
+                os.makedirs(combined_hf_output_dir)
+
+            do_training(combined_triplet_data, bert_reranker, combined_hf_output_dir, args)
 
 
     # load the best model from args.best_model_path for do_eval and eval_gold
@@ -461,20 +454,17 @@ def main(args):
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
         print(f'Loading model from {cur_best_model_path}...')
-        bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
+        if args.train_mode == 'regression':
+            print('Using regression model')
+            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.model_path, num_labels=1, problem_type='regression')
+        elif args.train_mode == 'classification':
+            print('Using classification model')
+            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.model_path, num_labels=2)
         bert_reranker.model.to(bert_reranker.device)
         rerankers = [bert_reranker]
 
 
     if args.do_eval:
-        # # get results after training
-        # if not os.path.exists(best_model_path):
-        #     raise ValueError(f'Best model path {best_model_path} does not exist, please train the model first')
-        # print(f'Evaluating model from {best_model_path}...')
-        # bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(best_model_path, num_labels=1, problem_type='regression')
-        # bert_reranker.model.to(bert_reranker.device)
-        # rerankers = [bert_reranker]
-
         bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
         # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
 
@@ -513,14 +503,7 @@ def main(args):
         print(f'Found gold data for {repo_name} with shape {gold_df.shape} at {gold_data_path}')
         print(gold_df.info())
 
-        # run BM25 on gold data first
 
-        if not args.no_bm25:
-            print('Running BM25 on gold data...')
-            bm25_gold_output_path = os.path.join(eval_path, f'bm25_v2_{args.openai_model}_gold_metrics.txt')
-            bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
-            print("BM25 Gold Evaluation")
-            print(bm25_gold_eval)
 
         # # get results after training
         # if not os.path.exists(best_model_path):
@@ -537,33 +520,8 @@ def main(args):
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
-        wandb.log(bert_gold_eval)
-
-    if args.do_combined_train:
-        print("Performing combined training on multiple repositories...")
-        print(f'Found {len(args.repo_paths)} repositories: {args.repo_paths}')
-        combined_triplet_data = pd.DataFrame()
-        for repo_path in args.repo_paths:
-            if args.use_gpt_train:
-                triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
-            else:
-                triplet_cache = os.path.join(repo_path, 'cache', 'triplet_data_cache.pkl')
-            if os.path.exists(triplet_cache):
-                repo_triplet_data = pd.read_pickle(triplet_cache)
-                combined_triplet_data = pd.concat([combined_triplet_data, repo_triplet_data], ignore_index=True)
-            else:
-                print(f"Warning: Triplet cache not found for {repo_path}, skipping this repository.")
-
-        if combined_triplet_data.empty:
-            raise ValueError("No triplet data found in the specified repositories.")
-
-        print(f'Shape of combined triplet data: {combined_triplet_data.shape}')
-
-        combined_hf_output_dir = os.path.join('data', 'combined_commit_train' if not args.use_gpt_train else 'combined_gpt_train')
-        if not os.path.exists(combined_hf_output_dir):
-            os.makedirs(combined_hf_output_dir)
-
-        do_training(combined_triplet_data, bert_reranker, combined_hf_output_dir, args)
+        if not args.debug:
+            wandb.log(bert_gold_eval)
 
 
 
@@ -571,7 +529,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run BM25 and/or BERT Reranker evaluation.')
     parser.add_argument('--index_path', type=str, help='Path to the index directory.', required=True)
-    parser.add_argument('--repo_path', type=str, help='Path to the repository directory.', required=True)
+    parser.add_argument('--data_path', type=str, help='Path to the repository directory.', required=True)
     parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
     parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
     parser.add_argument('--no_bm25', action='store_true', help='Do not run BM25.')
@@ -605,18 +563,20 @@ if __name__ == '__main__':
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT transformed training data.')
     parser.add_argument('--eval_folder', type=str, help='Folder to store evaluation results for a particular experiment.')
     parser.add_argument('--notes', type=str, help='Notes for the run.', default='')
+    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='classification', help='Training mode for the model (default: classification')
     args = parser.parse_args()
-    run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes)
-    # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
-    run.define_metric('MAP', summary='max')
-    run.define_metric('P@1', summary='max')
-    run.define_metric('P@10', summary='max')
-    run.define_metric('P@20', summary='max')
-    run.define_metric('P@30', summary='max')
-    run.define_metric('MRR', summary='max')
-    run.define_metric('R@1', summary='max')
-    run.define_metric('R@10', summary='max')
-    run.define_metric('R@100', summary='max')
-    run.define_metric('R@1000', summary='max')
+    if not args.debug:
+        run = wandb.init(project='ds2', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
+        # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
+        run.define_metric('MAP', summary='max') # type: ignore
+        run.define_metric('P@1', summary='max') # type: ignore
+        run.define_metric('P@10', summary='max') # type: ignore
+        run.define_metric('P@20', summary='max') # type: ignore
+        run.define_metric('P@30', summary='max') # type: ignore
+        run.define_metric('MRR', summary='max') # type: ignore
+        run.define_metric('R@1', summary='max') # type: ignore
+        run.define_metric('R@10', summary='max') # type: ignore
+        run.define_metric('R@100', summary='max') # type: ignore
+        run.define_metric('R@1000', summary='max') # type: ignore
     print(args)
     main(args)

@@ -1,0 +1,10 @@
+{
+    "exclude": [
+        "data",
+        "repos",
+        "gold",
+        "logs",
+        "wandb",
+        "smalldata"
+    ]
+}

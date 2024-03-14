@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import tiktoken
 import torch
+from git import Repo, exc
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer
@@ -18,6 +19,10 @@ os.environ['TIKTOKEN_CACHE_DIR'] = ""
 ENCODING = 'p50k_base'
 enc = tiktoken.get_encoding(ENCODING)
 assert enc.decode(enc.encode("hello world")) == "hello world"
+
+class Args:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
 
 def print_random_commit_message(df):
     print(df['commit_message'].sample().values[0])
@@ -49,6 +54,8 @@ def count_commits(repo_dir):
 def reverse_tokenize(text):
     return enc.decode(list(map(int, text.split(' '))))
 
+def get_avg_metrics(results):
+    return {metric: round(np.mean([result[metric] for result in results]), 4) for metric in results[0]}
 
 class SearchResult:
     def __init__(self, commit_id, file_path, score, commit_date, commit_message):
@@ -293,6 +300,24 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False, sk
             print(f'Number of commits after removing gold commits: {len(recent_df)}')
     return recent_df
 
+
+
+
+def get_file_at_commit_from_git(repo, file_path, commit_id, from_parent=False):
+    # Access the specified commit
+    try:
+        # Initialize the Repo object
+        # The '^' symbol is used to refer to the commit immediately before the specified commit_id
+        # Concatenate the commit_id with '^' and the file_path with a ':' separator
+        if from_parent:
+            file_content_at_commit = repo.git.show(f"{commit_id}^:{file_path}")
+        else:
+            file_content_at_commit = repo.git.show(f"{commit_id}:{file_path}")
+
+        return file_content_at_commit
+    except exc.GitCommandError:
+        # Return an empty string if the file does not exist in the commit
+        return ""
 
 def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives, combined_df, cache_file, overwrite=False, debug=False):
 

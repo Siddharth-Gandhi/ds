@@ -83,6 +83,10 @@ class BM25Searcher:
             #     aggregated_score = results[0].score
             elif aggregation_method == 'avgp':
                 aggregated_score = np.mean([result.score for result in results])
+            elif aggregation_method == 'recentp':
+                # sort results by date and take the score of the most recent one
+                results.sort(key=lambda result: result.commit_date, reverse=True)
+                aggregated_score = results[0].score
             else:
                 raise ValueError(f"Unknown aggregation method {aggregation_method}")
 

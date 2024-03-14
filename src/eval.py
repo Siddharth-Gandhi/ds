@@ -3,6 +3,8 @@ import os
 import numpy as np
 from tqdm import tqdm
 
+from code_models import CodeReranker
+
 
 class SearchEvaluator:
     def __init__(self, metrics):
@@ -92,13 +94,16 @@ class ModelEvaluator:
 
         return recent_df.drop_duplicates(subset='commit_id').sample(n=n, replace=False, random_state=self.seed)
 
-    def evaluate_df(self, df, k=1000, aggregation_strategy=None, rerankers=None):
+    def evaluate_df(self, df, k, aggregation_strategy, rerankers):
         results = []
         for _, row in tqdm(df.iterrows(), total=df.shape[0]):
             cur_query = row['commit_message']
             search_results = self.model.pipeline(cur_query, row['commit_date'], ranking_depth=k, aggregation_method=aggregation_strategy)
             for reranker in rerankers:
-                search_results = reranker.rerank_pipeline(cur_query, search_results)
+                if isinstance(reranker, CodeReranker):
+                    search_results = reranker.rerank_pipeline(cur_query, search_results, row['commit_id'])
+                else:
+                    search_results = reranker.rerank_pipeline(cur_query, search_results)
 
 
             if 'actual_modified_files' in df.columns:

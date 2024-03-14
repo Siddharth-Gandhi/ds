@@ -3,14 +3,13 @@ import os
 import sys
 from typing import List
 
-# import numpy as np
+import git
+import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
-
-# from tqdm import tqdm
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -21,7 +20,9 @@ from transformers import (
 import wandb
 from BERTReranker_v4 import BERTReranker
 from bm25_v2 import BM25Searcher
+from code_models import CodeReranker
 from eval import ModelEvaluator, SearchEvaluator
+from splitter import *
 from utils import (
     AggregatedSearchResult,
     get_code_df,
@@ -32,219 +33,8 @@ from utils import (
     set_seed,
 )
 
-# Parser stuff
-
-
 # set seed
 set_seed(42)
-
-# class BERTCodeReranker:
-#     def __init__(self, parameters, combined_df):
-#         self.combined_df = combined_df
-#         self.parameters = parameters
-#         self.model_name = parameters['model_name']
-#         self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1, problem_type='regression')
-#         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-#         self.device = torch.device("cuda" if torch.cuda.is_available() and parameters['use_gpu'] else "cpu")
-#         self.model.to(self.device)
-
-#         print(f'Using device: {self.device}')
-
-#         # print GPU info
-#         if torch.cuda.is_available() and parameters['use_gpu']:
-#             print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-#             print(f'GPU Device Count: {torch.cuda.device_count()}')
-#             print(f"GPU Memory Usage: {torch.cuda.memory_allocated(0) / 1024 ** 2:.2f} MB")
-
-
-#         self.psg_len = parameters['psg_len']
-#         self.psg_cnt = parameters['psg_cnt'] # how many contributing_results to use per file for reranking
-#         self.psg_stride = parameters.get('psg_stride', self.psg_len)
-#         self.aggregation_strategy = parameters['aggregation_strategy'] # how to aggregate the scores of the psg_cnt contributing_results
-#         self.batch_size = parameters['batch_size'] # batch size for reranking efficiently
-#         self.rerank_depth = parameters['rerank_depth']
-#         self.max_seq_length = self.tokenizer.model_max_length # max sequence length for the model
-
-#         print(f"Initialized Code File BERT reranker with parameters: {parameters}")
-
-#     def rerank(self, query, aggregated_results: List[AggregatedSearchResult]):
-#         """
-#         Rerank the BM25 aggregated search results using BERT model scores.
-
-#         query: The issue query string.
-#         aggregated_results: A list of AggregatedSearchResult objects from BM25 search.
-#         """
-#         # aggregated_results = aggregated_results[:self.rerank_depth] # already done in the pipeline
-#         # print(f'Reranking {len(aggregated_results)} results')
-
-#         self.model.eval()
-
-#         query_passage_pairs, per_result_contribution = self.split_into_query_passage_pairs(query, aggregated_results)
-
-
-#         # for agg_result in aggregated_results:
-#         #     query_passage_pairs.extend(
-#         #         (query, result.commit_message)
-#         #         for result in agg_result.contributing_results[: self.psg_cnt]
-#         #     )
-
-#         if not query_passage_pairs:
-#             print('WARNING: No query passage pairs to rerank, returning original results from previous stage')
-#             print(query, aggregated_results, self.psg_cnt)
-#             return aggregated_results
-
-#         # tokenize the query passage pairs
-#         encoded_pairs = [self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True) for query, passage in query_passage_pairs]
-
-#         # create tensors for the input ids, attention masks
-#         input_ids = torch.stack([encoded_pair['input_ids'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
-#         attention_masks = torch.stack([encoded_pair['attention_mask'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
-
-#         # Create a dataloader for feeding the data to the model
-#         dataset = TensorDataset(input_ids, attention_masks)
-#         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False) # shuffle=False very important for reconstructing the results back into the original order
-
-#         scores = self.get_scores(dataloader, self.model)
-
-#         score_index = 0
-#         # Now assign the scores to the aggregated results by mapping the scores to the contributing results
-#         for i, agg_result in enumerate(aggregated_results):
-#             # Each aggregated result gets a slice of the scores equal to the number of contributing results it has which should be min(psg_cnt, len(contributing_results))
-#             assert score_index < len(scores), f'score_index {score_index} is greater than or equal to scores length {len(scores)}'
-#             end_index = score_index + per_result_contribution[i] # only use psg_cnt contributing_results
-#             cur_passage_scores = scores[score_index:end_index]
-#             score_index = end_index
-
-
-#             # Aggregate the scores for the current aggregated result
-#             agg_score = self.aggregate_scores(cur_passage_scores)
-#             agg_result.score = agg_score  # Assign the aggregated score
-
-#         assert score_index == len(scores), f'score_index {score_index} does not equal scores length {len(scores)}, indices probably not working correctly'
-
-#         # Sort by the new aggregated score
-#         aggregated_results.sort(key=lambda res: res.score, reverse=True)
-
-#         return aggregated_results
-
-#     def get_scores(self, dataloader, model):
-#         scores = []
-#         with torch.no_grad():
-#             for batch in dataloader:
-#                 # Unpack the batch and move it to GPU
-#                 b_input_ids, b_attention_mask = batch
-#                 b_input_ids = b_input_ids.to(self.device)
-#                 b_attention_mask = b_attention_mask.to(self.device)
-
-#                 # Get scores from the model
-#                 outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-#                 scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
-#         return scores
-
-#     def aggregate_scores(self, passage_scores):
-#         """
-#         Aggregate passage scores based on the specified strategy.
-#         """
-#         if len(passage_scores) == 0:
-#             return 0.0
-
-#         if self.aggregation_strategy == 'firstp':
-#             return passage_scores[0]
-#         if self.aggregation_strategy == 'maxp':
-#             return max(passage_scores)
-#         if self.aggregation_strategy == 'avgp':
-#             return sum(passage_scores) / len(passage_scores)
-#         if self.aggregation_strategy == 'sump':
-#             return sum(passage_scores)
-#         # else:
-#         raise ValueError(f"Invalid score aggregation method: {self.aggregation_strategy}")
-
-#     def split_into_query_passage_pairs(self, query, aggregated_results):
-#         # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
-#         def full_tokenize(s):
-#             return self.tokenizer.encode_plus(s, max_length=None, truncation=False, return_tensors='pt', add_special_tokens=True, return_attention_mask=False, return_token_type_ids=False)['input_ids'].squeeze().tolist()
-#         query_passage_pairs = []
-#         per_result_contribution = []
-#         if self.combined_df is not None:
-#             combined_df = self.combined_df
-
-
-#         for agg_result in aggregated_results:
-#             agg_result.contributing_results.sort(key=lambda res: res.commit_date, reverse=True)
-#             # get most recent file version
-#             most_recent_search_result = agg_result.contributing_results[0]
-#             # get the file_path and commit_id
-#             file_path = most_recent_search_result.file_path
-#             commit_id = most_recent_search_result.commit_id
-#             # get the file content from combined_df
-#             file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['cur_file_content'].values[0]
-
-#             # file_content = combined_df[(combined_df['commit_id'] == commit_id) & (combined_df['file_path'] == file_path)]['previous_file_content'].values[0]
-
-#             # now need to split this file content into psg_cnt passages
-#             # first tokenize the file content
-
-#             # warning these asserts are useless since we are using NaNs
-#             assert file_content is not None, f'file_content is None for commit_id: {commit_id}, file_path: {file_path}'
-#             assert file_path is not None, f'file_path is None for commit_id: {commit_id}'
-#             assert query is not None, 'query is None'
-
-#             # query_tokens = full_tokenize(query)
-#             path_tokens = full_tokenize(file_path)
-
-#             if pd.isna(file_content):
-#                 # if file_content is NaN, then we can just set file_content to empty string
-#                 print(f'WARNING: file_content is NaN for commit_id: {commit_id}, file_path: {file_path}, setting file_content to empty string')
-#                 file_content = ''
-
-#             file_tokens = full_tokenize(file_content)
-
-
-#             # now split the file content into psg_cnt passages
-#             cur_result_passages = []
-#             # get the input ids
-#             # input_ids = file_content['input_ids'].squeeze()
-#             # get the number of tokens in the file content
-#             total_tokens = len(file_tokens)
-
-#             for cur_start in range(0, total_tokens, self.psg_stride):
-#                 cur_passage = []
-#                 # add query tokens and path tokens
-#                 # cur_passage.extend(query_tokens)
-#                 cur_passage.extend(path_tokens)
-
-#                 # add the file tokens
-#                 cur_passage.extend(file_tokens[cur_start:cur_start+self.psg_len])
-
-#                 # now convert cur_passage into a string
-#                 cur_passage_decoded = self.tokenizer.decode(cur_passage)
-
-#                 # add the cur_passage to cur_result_passages
-#                 cur_result_passages.append(cur_passage_decoded)
-
-#                 # if len(cur_result_passages) == self.psg_cnt:
-#                 #     break
-
-#             # now add the query, passage pairs to query_passage_pairs
-#             per_result_contribution.append(len(cur_result_passages))
-#             query_passage_pairs.extend((query, passage) for passage in cur_result_passages)
-#         return query_passage_pairs, per_result_contribution
-
-#     def rerank_pipeline(self, query, aggregated_results):
-#         if len(aggregated_results) == 0:
-#             return aggregated_results
-#         top_results = aggregated_results[:self.rerank_depth]
-#         bottom_results = aggregated_results[self.rerank_depth:]
-#         reranked_results = self.rerank(query, top_results)
-#         min_top_score = reranked_results[-1].score
-#         # now adjust the scores of bottom_results
-#         for i, result in enumerate(bottom_results):
-#             result.score = min_top_score - i - 1
-#         # combine the results
-#         reranked_results.extend(bottom_results)
-#         assert(len(reranked_results) == len(aggregated_results))
-#         return reranked_results
-
 
 def do_training(triplet_data, reranker, hf_output_dir, args):
     def tokenize_hf(example):
@@ -258,12 +48,17 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
 
     # merge columns file_path and passage into one column called passage
     # triplet_data['passage'] = triplet_data['file_path'] + ' ' + triplet_data['passage']
-    triplet_data['passage'] = triplet_data['passage'] # no file path, just confusion
+
+
+    triplet_data['passage'] = triplet_data['passage'] # ! no file path as that just leads to confusion
 
 
     # Step 1: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
-    triplet_data['label'] = triplet_data['label'].astype(float)
+    if args.train_mode == 'regression':
+        # ! important for regression
+        triplet_data['label'] = triplet_data['label'].astype(float)
+
     train_df, val_df = train_test_split(triplet_data, test_size=0.2, random_state=42, stratify=triplet_data['label'])
     train_hf_dataset = HFDataset.from_pandas(train_df, split='train') # type: ignore
     val_hf_dataset = HFDataset.from_pandas(val_df, split='validation') # type: ignore
@@ -298,7 +93,7 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
         per_device_eval_batch_size=args.batch_size,
         fp16=True,
         dataloader_num_workers=args.num_workers,
-        report_to="wandb",
+        report_to="wandb", # type: ignore
         )
 
     # small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
@@ -336,17 +131,18 @@ def main(args):
         print(torch.cuda.get_device_name(torch.cuda.current_device()))
     # metrics = ['MAP', 'P@10', 'P@100', 'P@1000', 'MRR', 'Recall@100', 'Recall@1000']
     metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'R@1', 'R@10', 'R@100', 'R@1000']
-    repo_path = args.repo_path
-    repo_name = repo_path.split('/')[-1]
+    data_path = args.data_path
+    repo_name = data_path.split('/')[-1]
+    github_repo_path = os.path.join('repos', repo_name) # ! important
     index_path = args.index_path
-    # TODO remove K and n everywhere
     K = args.k
     n = args.n
-    # combined_df = get_combined_df(repo_path)
+    combined_df = get_combined_df(data_path)
+    github_repo = git.Repo(github_repo_path) # type: ignore
     BM25_AGGR_STRAT = 'sump'
 
     # create eval directory to store results
-    eval_path = os.path.join(repo_path, 'eval', 'coderr')
+    eval_path = os.path.join(data_path, 'eval', 'coderr')
 
     if args.eval_folder:
         eval_path = os.path.join(eval_path, args.eval_folder)
@@ -377,19 +173,23 @@ def main(args):
         'psg_stride': args.psg_stride
     }
 
-    code_reranker = BERTCodeReranker(params, combined_df)
+    tokenizer = AutoTokenizer.from_pretrained(params['model_name'])
+
+    split_strategy = TokenizedLineSplitStrategy(tokenizer=tokenizer, psg_len=args.psg_len, psg_stride=args.psg_stride)
+
+    code_reranker = CodeReranker(params, github_repo, args.code_reranker_mode, args.train_mode, split_strategy)
     # rerankers = [bert_reranker, code_reranker]
     save_model_name = params['model_name'].replace('/', '_')
-    # hf_output_dir = os.path.join(repo_path, 'models', f'code_{save_model_name}_model_output')
-    if not os.path.exists(os.path.join(repo_path, 'models')):
-        os.makedirs(os.path.join(repo_path, 'models'))
+    # hf_output_dir = os.path.join(data_path, 'models', f'code_{save_model_name}_model_output')
+    if not os.path.exists(os.path.join(data_path, 'models')):
+        os.makedirs(os.path.join(data_path, 'models'))
 
     model_name = f'{save_model_name}_coderr'
     if args.use_gpt_train:
         model_name += '_gpt_train'
 
 
-    hf_output_dir = os.path.join(repo_path, 'models', args.eval_folder)
+    hf_output_dir = os.path.join(data_path, 'models', args.eval_folder)
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
 
@@ -398,27 +198,27 @@ def main(args):
     # training methods
     if args.do_train:
 
-        cache_path = os.path.join(repo_path, 'cache', args.eval_folder)
+        cache_path = os.path.join(data_path, 'cache', args.eval_folder)
 
         if not os.path.exists(cache_path):
             os.makedirs(cache_path)
 
-        if args.use_gpt_train:
-            gold_dir = os.path.join('gold', repo_name)
-            if not os.path.exists(gold_dir):
-                raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
+        gold_dir = os.path.join('gold', repo_name)
+        if not os.path.exists(gold_dir):
+            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
 
-            gold_train_file = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_train.parquet')
-            if not os.path.exists(gold_train_file):
-                raise ValueError(f'Gold train file {gold_train_file} does not exist, please run openai_transform.py first')
+        gold_train_file = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_train.parquet')
+        if not os.path.exists(gold_train_file):
+            raise ValueError(f'Gold train file {gold_train_file} does not exist, please run openai_transform.py first')
 
-            gold_df = pd.read_parquet(gold_train_file)
-            # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
-            gold_df = gold_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
-            recent_df = gold_df
+        gold_df = pd.read_parquet(gold_train_file)
+        # rename column commit_message to original_message and transformed_message_gpt4 to commit_message
+        gold_df = gold_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
+        recent_df = gold_df
 
-            # triplet_cache = os.path.join(repo_path, 'cache', 'gpt_triplet_data_cache.pkl')
-        else: # TODO uncomment to remove 4X train
+            # triplet_cache = os.path.join(data_path, 'cache', 'gpt_triplet_data_cache.pkl')
+        # else: # TODO uncomment to remove 4X train
+        if not args.use_gpt_train:
             recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training, skip_midpoint_filter=True)
             # Step 6: randomly sample 1500 rows from recent_df
             # print(f'Sampling {params["train_commits"]} commits for training out of {len(recent_df)}')
@@ -446,7 +246,7 @@ def main(args):
         if args.code_df_cache:
             code_df_cache = args.code_df_cache
         else:
-            code_df_cache = os.path.join(repo_path, 'cache', args.eval_folder, 'code_df.parquet')
+            code_df_cache = os.path.join(data_path, 'cache', args.eval_folder, 'code_df.parquet')
         code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, args.overwrite_cache, debug=args.debug)
 
         processed_code_df = code_df
@@ -459,7 +259,10 @@ def main(args):
         print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
         print(processed_code_df.info())
 
-        triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
+        if args.triplet_cache_path:
+            triplet_cache = args.triplet_cache_path
+        else:
+            triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
 
         # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
         triplets = prepare_code_triplets(processed_code_df, args, mode=args.triplet_mode, cache_file=triplet_cache ,overwrite=args.overwrite_cache)
@@ -474,7 +277,7 @@ def main(args):
         # Count the number of label 1 rows
         n_label_1 = len(df_label_1)
         # Randomly sample an equal number of rows with label 0
-        df_label_0_sample = triplets[triplets['label'] == 0].sample(n=n_label_1)
+        df_label_0_sample = triplets[triplets['label'] == 0].sample(n=n_label_1, random_state=42)
         # Concatenate the two DataFrames
         triplets = pd.concat([df_label_1, df_label_0_sample])
 
@@ -491,13 +294,16 @@ def main(args):
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
         print(f'Loading model from {cur_best_model_path}...')
-        code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
+        if args.train_mode == 'classification':
+            code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=2)
+        elif args.train_mode == 'regression':
+            code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
         code_reranker.model.to(code_reranker.device)
         # rerankers = [bert_reranker, code_reranker]
 
         if args.bert_best_model is not None:
             print(f'Loading BERT model from {args.bert_best_model}...')
-            bert_reranker = BERTReranker(bert_params)
+            bert_reranker = BERTReranker(bert_params, train_mode = 'regression')
             bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.bert_best_model, num_labels=1, problem_type='regression')
             bert_reranker.model.to(bert_reranker.device)
             rerankers = [bert_reranker, code_reranker]
@@ -574,9 +380,9 @@ def main(args):
 
 if __name__ == '__main__':
     print('Running CodeReranker.py')
-    parser = argparse.ArgumentParser(description='Run BM25 and/or BERT Reranker evaluation.')
+    parser = argparse.ArgumentParser(description='Train/Eval/Run CodeReranker model for files and patches')
     parser.add_argument('--index_path', type=str, help='Path to the index directory.', required=True)
-    parser.add_argument('--repo_path', type=str, help='Path to the repository directory.', required=True)
+    parser.add_argument('--data_path', type=str, help='Path to the data folder with .parquet files.', required=True)
     parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
     parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
     # parser.add_argument('--no_bm25', action='store_true', help='Do not run BM25.')
@@ -616,21 +422,24 @@ if __name__ == '__main__':
     parser.add_argument('--triplet_mode', choices=['parse_functions', 'sliding_window', 'diff_content', 'diff_subsplit'], default='', help='Mode for preparing triplets (default: diff_code)')
     parser.add_argument('--code_df_cache', type=str, help='Path to the code dataframe cache file.')
     parser.add_argument('--use_previous_file', action='store_true', help='Use the previous file for training.')
+    parser.add_argument('--code_reranker_mode', choices=['file', 'patch'], default='file', help='Mode for code reranker (default: file)')
+    parser.add_argument('--triplet_cache_path', type=str, help='Path to the triplet cache file.')
+    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='classification', help='Mode for training (default: classification)')
     args = parser.parse_args()
-    run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes)
+    run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
     # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
-    run.define_metric('MAP', summary='max')
-    run.define_metric('P@1', summary='max')
-    run.define_metric('P@10', summary='max')
-    run.define_metric('P@20', summary='max')
-    run.define_metric('P@30', summary='max')
-    run.define_metric('MRR', summary='max')
-    run.define_metric('R@1', summary='max')
-    run.define_metric('R@10', summary='max')
-    run.define_metric('R@100', summary='max')
-    run.define_metric('R@1000', summary='max')
+    run.define_metric('MAP', summary='max') # type: ignore
+    run.define_metric('P@1', summary='max') # type: ignore
+    run.define_metric('P@10', summary='max') # type: ignore
+    run.define_metric('P@20', summary='max') # type: ignore
+    run.define_metric('P@30', summary='max') # type: ignore
+    run.define_metric('MRR', summary='max') # type: ignore
+    run.define_metric('R@1', summary='max') # type: ignore
+    run.define_metric('R@10', summary='max') # type: ignore
+    run.define_metric('R@100', summary='max') # type: ignore
+    run.define_metric('R@1000', summary='max') # type: ignore
     print(args)
-    combined_df = get_combined_df(args.repo_path)
+    combined_df = get_combined_df(args.data_path)
     bert_params = {
         'model_name': args.model_path,
         'psg_cnt': 5,
