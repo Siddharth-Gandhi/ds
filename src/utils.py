@@ -3,17 +3,18 @@ import os
 import pickle
 import random
 import sys
-from re import A, search
+from re import search
 
 import numpy as np
 import pandas as pd
 import tiktoken
 import torch
-from git import Repo, exc
+from git import Repo, exc  # type: ignore
 from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer
-from tree_sitter import Language, Parser
+
+from splitter import *
 
 os.environ['TIKTOKEN_CACHE_DIR'] = ""
 ENCODING = 'p50k_base'
@@ -50,7 +51,6 @@ def count_commits(repo_dir):
     combined_df = get_combined_df(repo_dir)
     return combined_df.commit_id.nunique()
 
-
 def reverse_tokenize(text):
     return enc.decode(list(map(int, text.split(' '))))
 
@@ -81,8 +81,6 @@ class SearchResult:
                 continue
             print(f"{i+1:2} {result}")
 
-
-
 class AggregatedSearchResult:
     def __init__(self, file_path, aggregated_score, contributing_results):
         self.file_path = file_path
@@ -93,9 +91,6 @@ class AggregatedSearchResult:
         class_name = self.__class__.__name__
         return f"{class_name}(file_path={self.file_path!r}, score={self.score}, " \
                f"contributing_results={self.contributing_results})"
-
-
-
 
 class AggregatedCommitResult:
     def __init__(self, commit_id, aggregated_score, contributing_results):
@@ -108,7 +103,16 @@ class AggregatedCommitResult:
         return f"{class_name}(commit_id={self.commit_id!r}, score={self.score}, " \
                f"contributing_results={self.contributing_results})"
 
+# Patch code reranker
+class PatchResult:
+    def __init__(self, file_path, passage, score):
+        self.file_path = file_path
+        self.score = score
+        self.passage = passage
 
+    def __repr__(self):
+        class_name = self.__class__.__name__
+        return f'{class_name}(file_path={self.file_path}, passage={self.passage}, score={self.score})'
 
 class TripletDataset(Dataset):
     def __init__(self, data, tokenizer, max_seq_length):
@@ -129,8 +133,6 @@ class TripletDataset(Dataset):
         attention_mask = encoded_pair['attention_mask'].squeeze(0)
 
         return input_ids, attention_mask, label
-
-
 
 def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_negatives, cache_file, overwrite=False):
     # Check if cache file exists
@@ -205,8 +207,26 @@ def prepare_triplet_data_from_df(df, searcher, search_depth, num_positives, num_
     print(f"Percentage of positives: {total_positives / denom}, Percentage of negatives: {total_negatives / denom}")
     return data
 
+def sanity_check_bertreranker(data):
+    problems = 0
+    for i, row in tqdm(data.iterrows(), total=len(data)):
+        try:
+            if row['label'] == 0:
+                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 0
+            else:
+                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 1
+        except AssertionError:
+            print(f"Assertion failed at index {i}: {row}")
+            # break  # Optional: break after the first failure, remove if you want to see all failures
+            # remove the row with label 0
 
+            if row['label'] == 0:
+                problems += 1
+                data.drop(i, inplace=True)
+                print(f"Dropped row at index {i}")
 
+    print(f"Total number of problems in sanity check of training data: {problems}")
+    return data
 
 def sanity_check_triplets(data):
     """
@@ -248,9 +268,6 @@ def sanity_check_triplets(data):
 
     print(f"Total number of problems in sanity check of training data: {problems}")
     return data
-
-
-
 
 def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False, skip_midpoint_filter=False):
     # Prepare the data for training
@@ -300,9 +317,6 @@ def get_recent_df(combined_df, repo_name=None, ignore_gold_in_training=False, sk
             print(f'Number of commits after removing gold commits: {len(recent_df)}')
     return recent_df
 
-
-
-
 def get_file_at_commit_from_git(repo, file_path, commit_id, from_parent=False):
     # Access the specified commit
     try:
@@ -318,6 +332,13 @@ def get_file_at_commit_from_git(repo, file_path, commit_id, from_parent=False):
     except exc.GitCommandError:
         # Return an empty string if the file does not exist in the commit
         return ""
+
+def balance_labels(triplet_data):
+    df_label_1 = triplet_data[triplet_data['label'] == 1]
+    n_label_1 = len(df_label_1)
+    df_label_0_sample = triplet_data[triplet_data['label'] == 0].sample(n=n_label_1, random_state=42)
+    triplet_data = pd.concat([df_label_1, df_label_0_sample])
+    return triplet_data
 
 def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives, combined_df, cache_file, overwrite=False, debug=False):
 
@@ -382,7 +403,6 @@ def get_code_df(recent_df, searcher, search_depth, num_positives, num_negatives,
 
     return code_df
 
-
 def sanity_check_code(data):
     problems = 0
     for i, row in tqdm(data.iterrows(), total=len(data)):
@@ -405,7 +425,6 @@ def sanity_check_code(data):
 
     print(f"Total number of problems in sanity check of training data: {problems}")
     return data
-
 
 def prep_line(line):
     return line.rstrip().lstrip()
@@ -489,7 +508,7 @@ def prepare_code_triplets(code_df, args, mode, cache_file, overwrite=False):
     return triplets_df
 
 
-
+# probably all useless
 def prepare_sliding_window_triplets(code_df, args):
     print('Preparing triplets randomly split with sliding window')
     #### Helper functions ####
@@ -557,38 +576,50 @@ def prepare_sliding_window_triplets(code_df, args):
             break
     return triplets
 
-
-
-
 def prepare_diff_content_triplets(code_df, args):
     print('Preparing triplets split by diff content')
     #### Helper functions ####
     #### end of helper functions ####
 
     triplets = []
-    tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    splitter = PassageSplitter(DiffSplitStrategy())
     for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
         cur_diff = row['SR_diff']
         if cur_diff is None or pd.isna(cur_diff):
             # NOTE: for cases where status is added probably or if diff was not able to be stored (encoding issue, etc)
             # THIS WILL LEAD TO A FEW POSITIVES MISSING - don't freak out, it's normal, I checked ;)
             continue
-        cur_diff_lines = full_parse_diffs(cur_diff) # keep both insertions and deletions
-        diff_tokens = full_tokenize(''.join(cur_diff_lines), tokenizer)
-        total_tokens = len(diff_tokens)
-        for cur_start in range(0, total_tokens, args.psg_stride):
-            cur_passage = []
-
-            cur_passage.extend(diff_tokens[cur_start:cur_start+args.psg_len])
-
-            # now convert cur_passage into a string
-            cur_passage_decoded = tokenizer.decode(cur_passage)
-
-            # add the cur_passage to cur_result_passages
-            triplets.append((row['train_query'], row['SR_file_path'], cur_passage_decoded, row['label']))
-
+        previous_file_content = row['SR_previous_file_content']
+        passages = splitter.split_passages(file_content=previous_file_content, diff=cur_diff)
+        for psg in passages:
+            triplets.append((row['train_query'], row['SR_file_path'], psg.passage, row['label']))
     # now add the top args.psg_cnt to triplets
     return triplets
+
+    # triplets = []
+    # tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+    # for _, row in tqdm(code_df.iterrows(), total=len(code_df)):
+    #     cur_diff = row['SR_diff']
+    #     if cur_diff is None or pd.isna(cur_diff):
+    #         # NOTE: for cases where status is added probably or if diff was not able to be stored (encoding issue, etc)
+    #         # THIS WILL LEAD TO A FEW POSITIVES MISSING - don't freak out, it's normal, I checked ;)
+    #         continue
+    #     cur_diff_lines = full_parse_diffs(cur_diff) # keep both insertions and deletions
+    #     diff_tokens = full_tokenize(''.join(cur_diff_lines), tokenizer)
+    #     total_tokens = len(diff_tokens)
+    #     for cur_start in range(0, total_tokens, args.psg_stride):
+    #         cur_passage = []
+
+    #         cur_passage.extend(diff_tokens[cur_start:cur_start+args.psg_len])
+
+    #         # now convert cur_passage into a string
+    #         cur_passage_decoded = tokenizer.decode(cur_passage)
+
+    #         # add the cur_passage to cur_result_passages
+    #         triplets.append((row['train_query'], row['SR_file_path'], cur_passage_decoded, row['label']))
+
+    # # now add the top args.psg_cnt to triplets
+    # return triplets
 
 def prepare_split_diff_triplets(code_df, args):
     print('Preparing triplets split by diff content (further subplit at @@)')
@@ -621,10 +652,8 @@ def prepare_split_diff_triplets(code_df, args):
     # now add the top args.psg_cnt to triplets
     return triplets
 
-
-
-
 def prepare_function_triplets(code_df, args):
+    from tree_sitter import Language, Parser
     print('Preparing triplets split by function')
     #### Helper Functions ####
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)

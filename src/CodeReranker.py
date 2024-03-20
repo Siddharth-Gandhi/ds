@@ -1,4 +1,5 @@
 import argparse
+import gc
 import os
 import sys
 from typing import List
@@ -9,7 +10,6 @@ import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, TensorDataset
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -18,13 +18,13 @@ from transformers import (
 )
 
 import wandb
-from BERTReranker_v4 import BERTReranker
+from BERTReranker import BERTReranker
 from bm25_v2 import BM25Searcher
-from code_models import CodeReranker
 from eval import ModelEvaluator, SearchEvaluator
+from models import CodeReranker
 from splitter import *
 from utils import (
-    AggregatedSearchResult,
+    balance_labels,
     get_code_df,
     get_combined_df,
     get_recent_df,
@@ -35,6 +35,8 @@ from utils import (
 
 # set seed
 set_seed(42)
+gc.collect() # These commands help you when you face CUDA OOM error
+torch.cuda.empty_cache()
 
 def do_training(triplet_data, reranker, hf_output_dir, args):
     def tokenize_hf(example):
@@ -85,24 +87,26 @@ def do_training(triplet_data, reranker, hf_output_dir, args):
         output_dir=hf_output_dir,
         evaluation_strategy='epoch',
         save_strategy='epoch',
+        logging_strategy='epoch',
         num_train_epochs=args.num_epochs,
+        learning_rate=args.learning_rate,
         metric_for_best_model='eval_loss',
         load_best_model_at_end=True,
-        save_total_limit=2,
+        save_total_limit=1,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
         fp16=True,
         dataloader_num_workers=args.num_workers,
-        report_to="wandb", # type: ignore
+        report_to='wandb' if not args.debug else "none" # type: ignore
         )
 
-    # small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
-    # small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
+    small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
+    small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
 
-    # if args.debug:
-    #     print('Running in debug mode, using small datasets')
-    #     tokenized_train_dataset = small_train_dataset
-    #     tokenized_val_dataset = small_val_dataset
+    if args.debug:
+        print('Running in debug mode, using small datasets')
+        tokenized_train_dataset = small_train_dataset
+        tokenized_val_dataset = small_val_dataset
 
     # Step 7: set up trainer
     trainer = Trainer(
@@ -142,10 +146,11 @@ def main(args):
     BM25_AGGR_STRAT = 'sump'
 
     # create eval directory to store results
-    eval_path = os.path.join(data_path, 'eval', 'coderr')
+    # eval_path = os.path.join(data_path, 'eval', 'coderr')
 
-    if args.eval_folder:
-        eval_path = os.path.join(eval_path, args.eval_folder)
+    save_name = f'code_reranker_{args.code_reranker_mode}'
+
+    eval_path = os.path.join('out', repo_name, save_name, args.eval_folder)
 
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
@@ -178,18 +183,10 @@ def main(args):
     split_strategy = TokenizedLineSplitStrategy(tokenizer=tokenizer, psg_len=args.psg_len, psg_stride=args.psg_stride)
 
     code_reranker = CodeReranker(params, github_repo, args.code_reranker_mode, args.train_mode, split_strategy)
-    # rerankers = [bert_reranker, code_reranker]
-    save_model_name = params['model_name'].replace('/', '_')
-    # hf_output_dir = os.path.join(data_path, 'models', f'code_{save_model_name}_model_output')
-    if not os.path.exists(os.path.join(data_path, 'models')):
-        os.makedirs(os.path.join(data_path, 'models'))
 
-    model_name = f'{save_model_name}_coderr'
-    if args.use_gpt_train:
-        model_name += '_gpt_train'
-
-
-    hf_output_dir = os.path.join(data_path, 'models', args.eval_folder)
+    hf_output_dir = os.path.join('models', repo_name, save_name, args.eval_folder)
+    if not os.path.exists(hf_output_dir):
+        os.makedirs(hf_output_dir)
     best_model_path = os.path.join(hf_output_dir, 'best_model')
 
 
@@ -198,8 +195,8 @@ def main(args):
     # training methods
     if args.do_train:
 
-        cache_path = os.path.join(data_path, 'cache', args.eval_folder)
-
+        # cache_path = os.path.join(data_path, 'cache', args.eval_folder)
+        cache_path = os.path.join('cache', repo_name, save_name, args.eval_folder)
         if not os.path.exists(cache_path):
             os.makedirs(cache_path)
 
@@ -216,37 +213,35 @@ def main(args):
         gold_df = gold_df.rename(columns={'commit_message': 'original_message', f'transformed_message_{args.openai_model}': 'commit_message'})
         recent_df = gold_df
 
-            # triplet_cache = os.path.join(data_path, 'cache', 'gpt_triplet_data_cache.pkl')
         # else: # TODO uncomment to remove 4X train
         if not args.use_gpt_train:
-            recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training, skip_midpoint_filter=True)
-            # Step 6: randomly sample 1500 rows from recent_df
-            # print(f'Sampling {params["train_commits"]} commits for training out of {len(recent_df)}')
-            # recent_df = recent_df.sample(params['train_commits'])
+            recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training)
+            # Step 6: randomly sample params['train_commits'] commits for training or if less than that, use all commits
+            if len(recent_df) < params['train_commits']:
+                print(f'Number of commits in train_df: {len(recent_df)}')
+                print(f'Using all commits for training')
+                recent_df = recent_df.sample(len(recent_df))
+            else:
+                recent_df = recent_df.sample(params['train_commits'])
 
-            # remove commits from recent_df that are in gold_df
-            recent_df = recent_df[~recent_df['commit_id'].isin(gold_df['commit_id'])]
-
-            assert gold_df['commit_id'].unique().tolist() not in recent_df['commit_id'].unique().tolist(), 'Gold commits are present in recent_df'
-
-            # random sample 1500 commits
-            recent_df = recent_df.sample(params['train_commits'], random_state=42)
-
-            # add a column original_message to recent_df which is the same as commit_message
-            recent_df['original_message'] = recent_df['commit_message']
-
-            # merge gold_df and recent_df
-            recent_df = pd.concat([gold_df, recent_df])
+            #! merging gold df and rest from combined df
+            # recent_df = get_recent_df(combined_df=combined_df, repo_name=repo_name, ignore_gold_in_training=args.ignore_gold_in_training, skip_midpoint_filter=True)
+            # # remove commits from recent_df that are in gold_df
+            # recent_df = recent_df[~recent_df['commit_id'].isin(gold_df['commit_id'])]
+            # assert gold_df['commit_id'].unique().tolist() not in recent_df['commit_id'].unique().tolist(), 'Gold commits are present in recent_df'
+            # # random sample 1500 commits
+            # recent_df = recent_df.sample(params['train_commits'], random_state=42)
+            # # add a column original_message to recent_df which is the same as commit_message
+            # recent_df['original_message'] = recent_df['commit_message']
+            # # merge gold_df and recent_df
+            # recent_df = pd.concat([gold_df, recent_df])
 
 
         print(f'Number of unique commits: {len(recent_df["commit_id"].unique())}')
 
 
         print(f'Number of train commits: {len(recent_df)}')
-        if args.code_df_cache:
-            code_df_cache = args.code_df_cache
-        else:
-            code_df_cache = os.path.join(data_path, 'cache', args.eval_folder, 'code_df.parquet')
+        code_df_cache = args.code_df_cache or os.path.join(cache_path, 'code_df.parquet')
         code_df = get_code_df(recent_df, bm25_searcher, params['train_depth'], params['num_positives'], params['num_negatives'], combined_df, code_df_cache, args.overwrite_cache, debug=args.debug)
 
         processed_code_df = code_df
@@ -259,28 +254,18 @@ def main(args):
         print(f'Processed code dataframe shape after sanity check: {processed_code_df.shape}')
         print(processed_code_df.info())
 
-        if args.triplet_cache_path:
-            triplet_cache = args.triplet_cache_path
-        else:
-            triplet_cache = os.path.join(cache_path, 'diff_code_triplets.parquet')
+        triplet_cache = args.triplet_cache_path or os.path.join(cache_path, 'diff_code_triplets.parquet')
 
         # break the file_content (huge) into manageable chunks for BERT based on commonality with diff
         triplets = prepare_code_triplets(processed_code_df, args, mode=args.triplet_mode, cache_file=triplet_cache ,overwrite=args.overwrite_cache)
 
         #### Sampling to keep number of triplets reasonable.
         print(f'Triplet dataframe shape (before sampling): {triplets.shape}')
-        # triplets = triplets.sample(min(100000, triplet_size), random_state=42)
+        if 'diff' not in args.triplet_mode:
+            triplet_size = min(100000, triplets.shape[0])
+            triplets = triplets.sample(triplet_size, random_state=42)
 
-        # keep all triplets with label 1 and equal number of triplets with label 0 sampled randomly
-        # Filter out all rows with label 1
-        df_label_1 = triplets[triplets['label'] == 1]
-        # Count the number of label 1 rows
-        n_label_1 = len(df_label_1)
-        # Randomly sample an equal number of rows with label 0
-        df_label_0_sample = triplets[triplets['label'] == 0].sample(n=n_label_1, random_state=42)
-        # Concatenate the two DataFrames
-        triplets = pd.concat([df_label_1, df_label_0_sample])
-
+        triplets = balance_labels(triplets)
         print(f'Triplet dataframe shape (after sampling): {triplets.shape}')
 
         print(triplets.info())
@@ -290,6 +275,9 @@ def main(args):
 
     # load the best model from args.best_model_path for do_eval and eval_gold
     if args.do_eval or args.eval_gold:
+        if args.best_model_path is None:
+            print(f'WARNING: No best model path provided, using {best_model_path}')
+            # raise ValueError('Please provide the path to the best model')
         cur_best_model_path = args.best_model_path or best_model_path
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
@@ -299,7 +287,6 @@ def main(args):
         elif args.train_mode == 'regression':
             code_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
         code_reranker.model.to(code_reranker.device)
-        # rerankers = [bert_reranker, code_reranker]
 
         if args.bert_best_model is not None:
             print(f'Loading BERT model from {args.bert_best_model}...')
@@ -318,12 +305,7 @@ def main(args):
 
     if args.do_eval:
 
-        # bert_with_training_output_path = os.path.join(eval_path, 'bert_code_with_training.txt')
-        # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
-
-        bert_with_training_output_path = os.path.join(eval_path, 'bert_with_training.txt')
-        # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
-
+        bert_with_training_output_path = os.path.join(eval_path, 'commit')
         gold_dir = os.path.join('gold', repo_name)
         if not os.path.exists(gold_dir):
             raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
@@ -333,7 +315,7 @@ def main(args):
             raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
         print(f'Model: {args.openai_model}')
         gold_df = pd.read_parquet(gold_data_path)
-        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
+        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_folder_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
 
         print("BERT Evaluation with training")
         print(bert_with_training_eval)
@@ -357,22 +339,15 @@ def main(args):
         print(f'Found gold data for {repo_name} with shape {gold_df.shape} at {gold_data_path}')
         print(gold_df.info())
 
-        # run BM25 on gold data first
-        # print('Running BM25 on gold data...')
-        # bm25_gold_output_path = os.path.join(eval_path, f'bm25_{args.openai_model}_gold_metrics.txt')
-        # bm25_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bm25_gold_output_path, aggregation_strategy=params['bm25_aggr_strategy'], gold_df=gold_df, overwrite_eval=args.overwrite_eval)
-        # print("BM25 Gold Evaluation")
-        # print(bm25_gold_eval)
-
-
         # get gold eval with reranking
         print('Running BERT on gold data...')
-        bert_gold_output_path = os.path.join(eval_path, f'bert_code_{args.openai_model}_gold.txt')
-        bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
+        bert_gold_output_path = os.path.join(eval_path, 'gold')
+        bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_folder_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
-        wandb.log(bert_gold_eval)
+        if not args.debug:
+            wandb.log(bert_gold_eval)
 
 
 
@@ -417,27 +392,31 @@ if __name__ == '__main__':
     parser.add_argument('--psg_len', type=int, default=250, help='Length of each passage (default: 250)')
     parser.add_argument('--psg_stride', type=int, default=200, help='Stride of each passage (default: 250)')
     parser.add_argument('--ignore_gold_in_training', action='store_true', help='Ignore gold commits in training data.')
-    parser.add_argument('--eval_folder', type=str, help='Folder name to store evaluation files.')
+    parser.add_argument('--eval_folder', type=str, help='Folder name to store evaluation files.', required=True)
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT data for training.')
     parser.add_argument('--triplet_mode', choices=['parse_functions', 'sliding_window', 'diff_content', 'diff_subsplit'], default='', help='Mode for preparing triplets (default: diff_code)')
     parser.add_argument('--code_df_cache', type=str, help='Path to the code dataframe cache file.')
     parser.add_argument('--use_previous_file', action='store_true', help='Use the previous file for training.')
     parser.add_argument('--code_reranker_mode', choices=['file', 'patch'], default='file', help='Mode for code reranker (default: file)')
     parser.add_argument('--triplet_cache_path', type=str, help='Path to the triplet cache file.')
-    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='classification', help='Mode for training (default: classification)')
+    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='regression', help='Mode for training (default: regression)')
     args = parser.parse_args()
-    run = wandb.init(project='ds', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
-    # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
-    run.define_metric('MAP', summary='max') # type: ignore
-    run.define_metric('P@1', summary='max') # type: ignore
-    run.define_metric('P@10', summary='max') # type: ignore
-    run.define_metric('P@20', summary='max') # type: ignore
-    run.define_metric('P@30', summary='max') # type: ignore
-    run.define_metric('MRR', summary='max') # type: ignore
-    run.define_metric('R@1', summary='max') # type: ignore
-    run.define_metric('R@10', summary='max') # type: ignore
-    run.define_metric('R@100', summary='max') # type: ignore
-    run.define_metric('R@1000', summary='max') # type: ignore
+
+    if not args.debug:
+        run = wandb.init(project='ds-code_rerank', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
+        # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
+        run.define_metric('MAP', summary='max') # type: ignore
+        run.define_metric('P@1', summary='max') # type: ignore
+        run.define_metric('P@10', summary='max') # type: ignore
+        run.define_metric('P@20', summary='max') # type: ignore
+        run.define_metric('P@30', summary='max') # type: ignore
+        run.define_metric('MRR', summary='max') # type: ignore
+        run.define_metric('R@1', summary='max') # type: ignore
+        run.define_metric('R@10', summary='max') # type: ignore
+        run.define_metric('R@100', summary='max') # type: ignore
+        run.define_metric('R@1000', summary='max') # type: ignore
+        wandb.save('src/*', policy='now')
+        wandb.save('scripts/code_rerank.sh', policy='now')
     print(args)
     combined_df = get_combined_df(args.data_path)
     bert_params = {

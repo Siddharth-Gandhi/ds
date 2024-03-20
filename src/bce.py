@@ -19,7 +19,7 @@ from transformers import (
 )
 
 import wandb
-from BERTReranker_v4 import BERTReranker
+from BERTReranker import BERTReranker
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
 from utils import (

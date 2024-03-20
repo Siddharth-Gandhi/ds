@@ -1,228 +1,49 @@
 import argparse
+import gc
 import os
 import sys
-from email import policy
-from typing import List
 
 import numpy as np
 import pandas as pd
 import torch
 from datasets import Dataset as HFDataset
 from sklearn.model_selection import train_test_split
-from torch.utils.data import DataLoader, TensorDataset
-from tqdm import tqdm
-from transformers import (
-    AutoModelForSequenceClassification,
-    AutoTokenizer,
-    Trainer,
-    TrainingArguments,
-)
+from transformers import AutoModelForSequenceClassification, Trainer, TrainingArguments
 
 import wandb
 from bm25_v2 import BM25Searcher
 from eval import ModelEvaluator, SearchEvaluator
+from models import BERTReranker
 from utils import (
-    AggregatedSearchResult,
+    balance_labels,
     get_combined_df,
     get_recent_df,
     prepare_triplet_data_from_df,
+    sanity_check_bertreranker,
     set_seed,
 )
 
 # set seed
 set_seed(42)
-
-class BERTReranker:
-    def __init__(self, parameters, train_mode):
-        self.parameters = parameters
-        self.model_name = parameters['model_name']
-        self.train_mode = train_mode
-        if train_mode == 'regression':
-            print('Using regression model')
-            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=1, problem_type='regression')
-        elif train_mode == 'classification':
-            print('Using classification model')
-            self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=2)
-        else:
-            raise ValueError(f"Invalid train_mode: {train_mode}")
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-        self.device = torch.device("cuda" if torch.cuda.is_available() and parameters['use_gpu'] else "cpu")
-        self.model.to(self.device)
-
-        print(f'Using device: {self.device}')
-
-        # print GPU info
-        if torch.cuda.is_available() and parameters['use_gpu']:
-            print(f"Using GPU: {torch.cuda.get_device_name(0)}")
-            print(f'GPU Device Count: {torch.cuda.device_count()}')
-            print(f"GPU Memory Usage: {torch.cuda.memory_allocated(0) / 1024 ** 2:.2f} MB")
-
-
-        # self.psg_len = parameters['psg_len']
-        self.psg_cnt = parameters['psg_cnt'] # how many contributing_results to use per file for reranking
-        # self.psg_stride = parameters.get('psg_stride', self.psg_len)
-        self.aggregation_strategy = parameters['aggregation_strategy'] # how to aggregate the scores of the psg_cnt contributing_results
-        self.batch_size = parameters['batch_size'] # batch size for reranking efficiently
-        self.rerank_depth = parameters['rerank_depth']
-        self.max_seq_length = self.tokenizer.model_max_length # max sequence length for the model
-
-        print(f"Initialized BERT reranker with parameters: {parameters}")
-
-
-    def rerank(self, query, aggregated_results: List[AggregatedSearchResult]):
-        """
-        Rerank the BM25 aggregated search results using BERT model scores.
-
-        query: The issue query string.
-        aggregated_results: A list of AggregatedSearchResult objects from BM25 search.
-        """
-        self.model.eval()
-
-        # Flatten the list of results into a list of (query, passage) pairs but only keep max psg_cnt passages per file
-        query_passage_pairs = []
-        for agg_result in aggregated_results:
-            query_passage_pairs.extend(
-                (query, result.commit_message)
-                for result in agg_result.contributing_results[: self.psg_cnt]
-            )
-
-        if not query_passage_pairs:
-            print('WARNING: No query passage pairs to rerank, returning original results from previous stage')
-            print(query, aggregated_results, self.psg_cnt)
-            return aggregated_results
-
-        # tokenize the query passage pairs
-        encoded_pairs = [self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True) for query, passage in query_passage_pairs]
-
-        # create tensors for the input ids, attention masks
-        input_ids = torch.stack([encoded_pair['input_ids'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
-        attention_masks = torch.stack([encoded_pair['attention_mask'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
-
-        # Create a dataloader for feeding the data to the model
-        dataset = TensorDataset(input_ids, attention_masks)
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False) # shuffle=False very important for reconstructing the results back into the original order
-
-        scores = self.get_scores(dataloader, self.model)
-
-        score_index = 0
-        # Now assign the scores to the aggregated results by mapping the scores to the contributing results
-        for agg_result in aggregated_results:
-            # Each aggregated result gets a slice of the scores equal to the number of contributing results it has which should be min(psg_cnt, len(contributing_results))
-            assert score_index < len(scores), f'score_index {score_index} is greater than or equal to scores length {len(scores)}'
-            end_index = score_index + len(agg_result.contributing_results[: self.psg_cnt]) # only use psg_cnt contributing_results
-            cur_passage_scores = scores[score_index:end_index]
-            score_index = end_index
-
-
-            # Aggregate the scores for the current aggregated result
-            agg_score = self.aggregate_scores(cur_passage_scores)
-            agg_result.score = agg_score  # Assign the aggregated score
-
-        assert score_index == len(scores), f'score_index {score_index} does not equal scores length {len(scores)}, indices probably not working correctly'
-
-        # Sort by the new aggregated score
-        aggregated_results.sort(key=lambda res: res.score, reverse=True)
-
-        return aggregated_results
-
-    def get_scores(self, dataloader, model) -> List[np.ndarray]:
-        scores = []
-        with torch.no_grad():
-            for batch in dataloader:
-                # Unpack the batch and move it to GPU
-                b_input_ids, b_attention_mask = batch
-                b_input_ids = b_input_ids.to(self.device)
-                b_attention_mask = b_attention_mask.to(self.device)
-
-                outputs = model(b_input_ids, token_type_ids=None, attention_mask=b_attention_mask)
-                if self.train_mode == 'regression':
-                    # Get scores from the model
-                    scores.extend(outputs.logits.detach().cpu().numpy().squeeze(-1))
-                elif self.train_mode == 'classification':
-                    outputs = outputs.logits
-                    outputs = torch.softmax(outputs, dim=1)
-
-                    # get the score of being relevant aka label 1
-                    outputs = outputs[:, 1]
-                    scores.extend(outputs.detach().cpu().numpy())
-        return scores
-
-    def aggregate_scores(self, passage_scores):
-        """
-        Aggregate passage scores based on the specified strategy.
-        """
-        if len(passage_scores) == 0:
-            return 0.0
-
-        if self.aggregation_strategy == 'firstp':
-            return passage_scores[0]
-        if self.aggregation_strategy == 'maxp':
-            return max(passage_scores)
-        if self.aggregation_strategy == 'avgp':
-            return sum(passage_scores) / len(passage_scores)
-        if self.aggregation_strategy == 'sump':
-            return sum(passage_scores)
-        # else:
-        raise ValueError(f"Invalid score aggregation method: {self.aggregation_strategy}")
-
-    def rerank_pipeline(self, query, aggregated_results):
-        if len(aggregated_results) == 0:
-            return aggregated_results
-        top_results = aggregated_results[:self.rerank_depth]
-        bottom_results = aggregated_results[self.rerank_depth:]
-        reranked_results = self.rerank(query, top_results)
-        min_top_score = reranked_results[-1].score
-        # now adjust the scores of bottom_results
-        for i, result in enumerate(bottom_results):
-            result.score = min_top_score - i - 1
-        # combine the results
-        reranked_results.extend(bottom_results)
-        assert(len(reranked_results) == len(aggregated_results))
-        return reranked_results
-
-def sanity_check(data):
-    problems = 0
-    for i, row in tqdm(data.iterrows(), total=len(data)):
-        try:
-            if row['label'] == 0:
-                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 0
-            else:
-                assert data[(data['query'] == row['query']) & (data['passage'] == row['passage'])]['label'].values[0] == 1
-        except AssertionError:
-            print(f"Assertion failed at index {i}: {row}")
-            # break  # Optional: break after the first failure, remove if you want to see all failures
-            # remove the row with label 0
-
-            if row['label'] == 0:
-                problems += 1
-                data.drop(i, inplace=True)
-                print(f"Dropped row at index {i}")
-
-    print(f"Total number of problems in sanity check of training data: {problems}")
-    return data
+gc.collect() # These commands help you when you face CUDA OOM error
+torch.cuda.empty_cache()
 
 def do_training(triplet_data, bert_reranker, hf_output_dir, args):
     def tokenize_hf(example):
         return bert_reranker.tokenizer(example['query'], example['passage'], truncation=True, padding='max_length', max_length=bert_reranker.max_seq_length, return_tensors='pt', add_special_tokens=True)
     print('Training the model...')
-    print('Label distribution:')
+    print('Initial Label distribution:')
     print(triplet_data['label'].value_counts())
 
     # make label distribution more balanced
-    df_label_1 = triplet_data[triplet_data['label'] == 1]
+    triplet_data = balance_labels(triplet_data)
 
-    n_label_1 = len(df_label_1)
-
-    df_label_0_sample = triplet_data[triplet_data['label'] == 0].sample(n=n_label_1, random_state=42)
-
-    triplet_data = pd.concat([df_label_1, df_label_0_sample])
-
-    print('Sampled Label distribution:')
+    print('Balanced Label distribution:')
     print(triplet_data['label'].value_counts())
 
     if args.sanity_check:
         print('Running sanity check on training data...')
-        triplet_data = sanity_check(triplet_data)
+        triplet_data = sanity_check_bertreranker(triplet_data)
 
     # Step 7: convert triplet_data to HuggingFace Dataset
     # convert triplet_data to HuggingFace Dataset
@@ -256,17 +77,20 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
     train_args = TrainingArguments(
         output_dir=hf_output_dir,
         evaluation_strategy='epoch',
+        learning_rate=args.learning_rate,
         save_strategy='epoch',
         num_train_epochs=args.num_epochs,
         metric_for_best_model='eval_loss',
         load_best_model_at_end=True,
-        save_total_limit=2,
+        save_total_limit=1,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        logging_steps=1000,
+        # logging_steps=1000,
+        lr_scheduler_type='constant',
+        logging_strategy='epoch',
         fp16=True,
         dataloader_num_workers=args.num_workers,
-        report_to='wandb' if not args.debug else "none",
+        report_to='wandb' if not args.debug else "none", # type: ignore
         )
 
     small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
@@ -310,17 +134,12 @@ def main(args):
     K = args.k
     n = args.n
     combined_df = get_combined_df(data_path)
-    # TODO add this to params
+    # ! important
     BM25_AGGR_STRAT = 'sump'
 
 
     # create eval directory to store results
-    # eval_path = os.path.join(data_path, 'eval')
     eval_path = os.path.join('out', repo_name, 'bert_reranker', args.eval_folder)
-
-    # check for a eval_folder argument and if it exists, use that as the eval folder
-    # if args.eval_folder:
-    #     eval_path = os.path.join(eval_path, args.eval_folder)
 
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
@@ -349,21 +168,11 @@ def main(args):
 
 
     bert_reranker = BERTReranker(params, train_mode=args.train_mode)
-    rerankers = [bert_reranker]
-    # save_model_name = params['model_name'].replace('/', '_')
-
-    # if not os.path.exists(os.path.join(data_path, 'models')):
-    #     os.makedirs(os.path.join(data_path, 'models'))
-
-    # model_name = f'{save_model_name}_bertrr'
-    # if args.use_gpt_train:
-    #     model_name += '_gpt_train'
-
 
     # hf_output_dir = os.path.join(data_path, 'models', model_name)
     hf_output_dir = os.path.join('models', repo_name, 'bert_reranker', args.eval_folder)
 
-    # best_model_path = os.path.join(hf_output_dir, 'best_model')
+    best_model_path = os.path.join(hf_output_dir, 'best_model')
 
     if not os.path.exists(hf_output_dir):
         os.makedirs(hf_output_dir)
@@ -392,7 +201,7 @@ def main(args):
                 recent_df = recent_df.sample(params['train_commits'])
 
         cache_folder = os.path.join('cache', repo_name, 'bert_reranker', args.eval_folder)
-        if not os.path.exists(cache_folder):
+        if not os.path.exists(cache_folder) and not args.triplet_cache_path:
             os.makedirs(cache_folder)
         triplet_cache = args.triplet_cache_path or os.path.join(cache_folder, 'triplet_data_cache.pkl')
 
@@ -412,6 +221,8 @@ def main(args):
                     triplet_cache = os.path.join(data_path, 'cache', 'gpt_triplet_data_cache.pkl')
                 else:
                     triplet_cache = os.path.join(data_path, 'cache', 'triplet_data_cache.pkl')
+
+                triplet_cache = args.triplet_cache_path or triplet_cache
                 if os.path.exists(triplet_cache):
                     repo_triplet_data = pd.read_pickle(triplet_cache)
                     combined_triplet_data = pd.concat([combined_triplet_data, repo_triplet_data], ignore_index=True)
@@ -430,29 +241,24 @@ def main(args):
             do_training(combined_triplet_data, bert_reranker, combined_hf_output_dir, args)
 
 
-    # load the best model from args.best_model_path for do_eval and eval_gold
+    # common settings for evaluation
     if args.do_eval or args.eval_gold:
         if not args.best_model_path:
-            # print(f'WARNING: No best model path provided, using default path {best_model_path}')
-            raise ValueError('Best model path not provided, please provide a path to the best model')
-        cur_best_model_path = args.best_model_path #  or best_model_path
+            print(f'WARNING: No best model path provided, using default path {best_model_path}')
+            # raise ValueError('Best model path not provided, please provide a path to the best model')
+        cur_best_model_path = args.best_model_path or best_model_path
         if not os.path.exists(cur_best_model_path):
             raise ValueError(f'Best model path {cur_best_model_path} does not exist, please train the model first')
         print(f'Loading model from {cur_best_model_path}...')
         if args.train_mode == 'regression':
             print('Using regression model')
-            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.model_path, num_labels=1, problem_type='regression')
+            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=1, problem_type='regression')
         elif args.train_mode == 'classification':
             print('Using classification model')
-            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.model_path, num_labels=2)
+            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(cur_best_model_path, num_labels=2)
         bert_reranker.model.to(bert_reranker.device)
         rerankers = [bert_reranker]
 
-
-    if args.do_eval:
-        bert_with_training_output_path = os.path.join(eval_path, 'bert_rerank_commit.txt')
-        # bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval)
-
         gold_dir = os.path.join('gold', repo_name)
         if not os.path.exists(gold_dir):
             raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
@@ -462,46 +268,34 @@ def main(args):
             raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
         print(f'Model: {args.openai_model}')
         gold_df = pd.read_parquet(gold_data_path)
-
-        # ! not renaming transformed message into query so works
-        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
-        print("BERT Evaluation with training")
-        print(bert_with_training_eval)
-        # Assuming bert_with_training_eval and bert_gold_eval are your dicts
-
-    if args.eval_gold:
-        gold_dir = os.path.join('gold', repo_name)
-        if not os.path.exists(gold_dir):
-            raise ValueError(f'Gold directory {gold_dir} does not exist, please run openai_transform.py first')
-        # check if gold data exists
-        gold_data_path = os.path.join(gold_dir, f'v2_{repo_name}_{args.openai_model}_gold.parquet')
-        if not os.path.exists(gold_data_path):
-            raise ValueError(f'Gold data {gold_data_path} does not exist, please run openai_transform.py first')
-        print(f'Model: {args.openai_model}')
-        gold_df = pd.read_parquet(gold_data_path)
-        # assert all transformed_message_gpt3 are not NaN
-        # rename the column transformed_message_gpt3 to transformed_message_{oai_model}
-        # gold_df = gold_df.rename(columns={'transformed_message_gpt3': f'transformed_message_{args.openai_model}'})
-        assert gold_df[f'transformed_message_{args.openai_model}'].notnull().all()
-        # rename commit_message to original_message
-        gold_df = gold_df.rename(columns={'commit_message': 'original_message'})
-        # rename transformed_message to commit_message
-        gold_df = gold_df.rename(columns={f'transformed_message_{args.openai_model}': 'commit_message'})
         print(f'Found gold data for {repo_name} with shape {gold_df.shape} at {gold_data_path}')
         print(gold_df.info())
 
 
+    if args.do_eval:
+        bert_with_training_output_path = os.path.join(eval_path, 'commit')
+        # ! not renaming transformed message into query so works
+        bert_with_training_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_folder_path=bert_with_training_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, overwrite_eval=args.overwrite_eval, gold_df=gold_df)
+        print("BERT Commit Evaluation")
+        print(bert_with_training_eval)
+        # Assuming bert_with_training_eval and bert_gold_eval are your dicts
+
+    if args.eval_gold:
+        bert_gold_output_path = os.path.join(eval_path, 'gold')
+        assert gold_df[f'transformed_message_{args.openai_model}'].notnull().all()
+        #! rename commit_message to original_message
+        gold_df = gold_df.rename(columns={'commit_message': 'original_message'})
+        #!rename transformed_message to commit_message
+        gold_df = gold_df.rename(columns={f'transformed_message_{args.openai_model}': 'commit_message'})
+
         # get gold eval with reranking
         print('Running BERT on gold data...')
-        bert_gold_output_path = os.path.join(eval_path, f'bert_rerank_gold.txt')
-        bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_file_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
+        bert_gold_eval = model_evaluator.evaluate_sampling(n=n, k=K, output_folder_path=bert_gold_output_path, aggregation_strategy=params['aggregation_strategy'], rerankers=rerankers, gold_df=gold_df, overwrite_eval=args.overwrite_eval)
 
         print("BERT Gold Evaluation")
         print(bert_gold_eval)
         if not args.debug:
             wandb.log(bert_gold_eval)
-
-
 
 
 if __name__ == '__main__':
@@ -510,7 +304,6 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', type=str, help='Path to the repository directory.', required=True)
     parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
     parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
-    parser.add_argument('--no_bm25', action='store_true', help='Do not run BM25.')
     parser.add_argument('-m', '--model_path', type=str, help='Path to the pretrained model.')
     parser.add_argument('-o', '--overwrite_cache', action='store_true', help='Overwrite existing cache files.')
     parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size for training (default: 32)')
@@ -533,7 +326,6 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite_eval', action='store_true', help='Replace evaluation files if they already exist.')
     parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
-    # parser.add_argument('--eval_before_training', action='store_true', help='Evaluate the model before training.')
     parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
     parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
@@ -541,11 +333,11 @@ if __name__ == '__main__':
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT transformed training data.')
     parser.add_argument('--eval_folder', type=str, help='Folder to store evaluation results for a particular experiment.', required=True)
     parser.add_argument('--notes', type=str, help='Notes for the run.', default='')
-    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='classification', help='Training mode for the model (default: classification')
+    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='regression', help='Training mode for the model (default: regression')
     parser.add_argument('--triplet_cache_path', type=str, help='Path to the triplet data cache file.')
     args = parser.parse_args()
     if not args.debug:
-        run = wandb.init(project='ds2', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
+        run = wandb.init(project='ds-bert_rerank', name=args.run_name, reinit=True, config=args, notes=args.notes) # type: ignore
         # metrics = ['MAP', 'P@1', 'P@10', 'P@20', 'P@30', 'MRR', 'Recall@1', 'Recall@10', 'Recall@100', 'Recall@1000']
         run.define_metric('MAP', summary='max') # type: ignore
         run.define_metric('P@1', summary='max') # type: ignore

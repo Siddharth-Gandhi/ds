@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=4xb_reg_fb
+#SBATCH --job-name=test_out
 #SBATCH --output=logs/bert_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -17,8 +17,8 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="4x_bert_reg_fb"
-notes="4x (non-gpt) bert train mode regression, train data = fb only"
+eval_folder="test_out"
+notes="test_out"
 
 
 # data_path="2_7/apache_spark"
@@ -34,7 +34,9 @@ data_path="data/2_7/facebook_react"
 
 # data_path="smalldata/ftr"
 
-train_mode="regression"
+repo_name=$(echo $data_path | rev | cut -d'/' -f1 | rev)
+
+# train_mode="classification"
 
 repo_paths=(
     "data/2_7/apache_spark"
@@ -54,7 +56,6 @@ repo_paths=(
 index_path="${data_path}/index_commit_tokenized"
 k=1000 # initial ranker depth
 n=100 # number of samples to evaluate on
-# no_bm25=False # whether to use bm25 or not
 
 model_path="microsoft/codebert-base"
 # model_path="microsoft/graphcodebert-base"
@@ -62,8 +63,8 @@ model_path="microsoft/codebert-base"
 
 # overwrite_cache=False # whether to overwrite the cache
 batch_size=32 # batch size for inference
-num_epochs=20 # number of epochs to train
-learning_rate=5e-5 # learning rate for training
+num_epochs=8 # number of epochs to train
+learning_rate=1e-5 # learning rate for training
 num_positives=10 # number of positive samples per query
 num_negatives=10 # number of negative samples per querys
 train_depth=1000 # depth to go while generating training data
@@ -79,8 +80,12 @@ openai_model="gpt4" # openai model to use
 # best_model_path="data/combined_commit_train/best_model"
 # best_model_path="/home/ssg2/ssg2/ds/data/combined_gpt_train/combined_bce_train/best_model"
 
+# triplet_cache_path="/home/ssg2/ssg2/ds/cache/facebook_react/bert_reranker/bert_bce_fb/triplet_data_cache.pkl"
+# triplet_cache_path="/home/ssg2/ssg2/ds/cache/facebook_react/bert_reranker/bert_bce_fb/triplet_data_cache.pkl"
+best_model_path="data/combined_commit_train/best_model"
+# best_model_path="models/facebook_react/bert_reranker/4xbert_bce_fb/best_model"
 
-python -u src/BERTReranker_v4.py \
+python -u src/BERTReranker.py \
     --data_path $data_path \
     --index_path $index_path \
     --k $k \
@@ -103,23 +108,24 @@ python -u src/BERTReranker_v4.py \
     --openai_model $openai_model \
     --eval_folder $eval_folder \
     --eval_gold \
-    --no_bm25 \
-    --do_eval \
-    --do_train \
-    --train_mode $train_mode \
+    --use_gpt_train \
+    --best_model_path $best_model_path \
+    # --do_eval \
+    # --do_train \
+    # --train_mode $train_mode \
+    # --triplet_cache_path $triplet_cache_path \
 
 
-    # --use_gpt_train \
+    # --overwrite_eval \
     # --do_combined_train \
     # --repo_paths "${repo_paths[@]}" \
     # --sanity_check \
-    # --best_model_path $best_model_path \
     # --overwrite_cache \
     # --ignore_gold_in_training \
 
 
     # --debug \
-
+find models/$repo_name/"bert_rerank"/$eval_folder -type d -name 'checkpoint*' -exec rm -rf {} +
 echo "Job completed"
 
 

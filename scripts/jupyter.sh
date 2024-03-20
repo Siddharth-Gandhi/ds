@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1
 #SBATCH --job-name="jupyter"
-#SBATCH --time=24:00:00
+#SBATCH --time=48:00:00
 #SBATCH --mem=64GB
 #SBATCH --output=logs/jupyter.log
 #SBATCH --nodelist=boston-1-7

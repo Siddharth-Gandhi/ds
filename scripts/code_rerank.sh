@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=diff_reg
+#SBATCH --job-name=ctest_out
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --mem=32G
@@ -19,8 +19,8 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="diff_combined_reg"
-notes="reg"
+eval_folder="test_out"
+notes="test_out"
 # triplet_mode="parse_functions"
 # triplet_mode="sliding_window"
 triplet_mode="diff_content"
@@ -40,7 +40,12 @@ data_path="data/2_7/facebook_react"
 # data_path="2_9/huggingface_transformers"
 # data_path="2_9/redis_redis"
 
-code_df_cache="data/merged_code_df/multi_code_df.parquet"
+
+# split data path on / and take the last element
+repo_name=$(echo $data_path | rev | cut -d'/' -f1 | rev)
+
+code_df_cache="cache/facebook_react/code_reranker/fb_code_df.parquet"
+# code_df_cache="data/merged_code_df/multi_code_df.parquet"
 # code_df_cache="data/2_7/facebook_react/cache/repr_0.1663/code_df.parquet"
 # triplet_cache_path="data/2_7/facebook_react/cache/combined_diffs/diff_code_triplets.parquet"
 
@@ -59,12 +64,12 @@ model_path="microsoft/codebert-base"
 # overwrite_cache=False # whether to overwrite the cache
 batch_size=32 # batch size for inference
 num_epochs=20 # number of epochs to train
-learning_rate=5e-5 # learning rate for training
+learning_rate=1e-5 # learning rate for training
 num_positives=10 # number of positive samples per query
 num_negatives=10 # number of negative samples per querys
 train_depth=1000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
-train_commits=1500 # number of commits to train on (train + val)
+train_commits=2000 # number of commits to train on (train + val)
 psg_cnt=25 # number of commits to use for psg generation
 psg_len=350
 psg_stride=250
@@ -75,9 +80,9 @@ openai_model="gpt4" # openai model to use
 # bert_best_model="${data_path}/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 bert_best_model="data/combined_commit_train/best_model"
-train_mode="regression"
+# train_mode="regression"
 # best_model_path="data/2_7/facebook_react/models/bce/best_model"
-# best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
+best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
 # best_model_path="data/2_7/facebook_react/models/X_function_split/best_model"
 # best_model_path="data/2_7/facebook_react/models/combined_random/best_model"
 
@@ -128,14 +133,14 @@ python -u src/CodeReranker.py \
     --triplet_mode $triplet_mode \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
-    --do_eval \
-    --do_train \
-    --train_mode $train_mode \
+    --best_model_path $best_model_path \
+    # --do_eval \
+    # --do_train \
+    # --train_mode $train_mode \
     # --triplet_cache_path $triplet_cache_path \
 
     # --use_previous_file \
     # --debug
-    # --best_model_path $best_model_path \
 
 
 
@@ -146,7 +151,7 @@ python -u src/CodeReranker.py \
     # --do_combined \
     # --repo_paths "${repo_paths[@]}" \
 
-
+find models/$repo_name/"code_rerank"/$eval_folder -type d -name 'checkpoint*' -exec rm -rf {} +
 echo "Job completed"
 
 

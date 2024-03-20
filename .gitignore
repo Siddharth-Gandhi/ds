@@ -2,6 +2,7 @@ merged_code_df/
 wandb/
 models/
 cache/
+out/
 results/
 */parser
 parser/
