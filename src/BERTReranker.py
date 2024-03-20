@@ -1,5 +1,6 @@
 import argparse
 import gc
+import json
 import os
 import sys
 
@@ -85,13 +86,15 @@ def do_training(triplet_data, bert_reranker, hf_output_dir, args):
         save_total_limit=1,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        # logging_steps=1000,
-        lr_scheduler_type='constant',
-        logging_strategy='epoch',
+        logging_steps=1000,
+        logging_strategy='steps',
         fp16=True,
         dataloader_num_workers=args.num_workers,
         report_to='wandb' if not args.debug else "none", # type: ignore
         )
+
+    print('Training arguments:')
+    print(train_args)
 
     small_train_dataset = tokenized_train_dataset.shuffle(seed=42).select(range(100))
     small_val_dataset = tokenized_val_dataset.shuffle(seed=42).select(range(100))
@@ -135,7 +138,17 @@ def main(args):
     n = args.n
     combined_df = get_combined_df(data_path)
     # ! important
-    BM25_AGGR_STRAT = 'sump'
+    BM25_AGGR_STRAT = 'maxp'
+
+    # load fid_to_path and path_to_fid json files to dicts
+    with open(f"facebook_react_FID_to_paths.json") as f:
+        fid_to_path = json.load(f)
+
+    # make all fids ints
+    fid_to_path = {int(k): v for k, v in fid_to_path.items()}
+
+    with open(f"facebook_react_path_to_FID.json") as f:
+        path_to_fid = json.load(f)
 
 
     # create eval directory to store results
@@ -144,9 +157,9 @@ def main(args):
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
 
-    bm25_searcher = BM25Searcher(index_path)
+    bm25_searcher = BM25Searcher(index_path, fid_to_path, path_to_fid)
     evaluator = SearchEvaluator(metrics)
-    model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
+    model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df, fid_to_path, path_to_fid)
 
     # Reranking with BERT
     params = {
@@ -156,6 +169,7 @@ def main(args):
         'batch_size': args.batch_size,
         'use_gpu': args.use_gpu,
         'rerank_depth': args.rerank_depth,
+        'output_length': args.output_length,
         'num_epochs': args.num_epochs,
         'lr': args.learning_rate,
         'num_positives': args.num_positives,
@@ -319,6 +333,7 @@ if __name__ == '__main__':
     parser.add_argument('--aggregation_strategy', type=str, default='sump', help='Aggregation strategy (default: sump)')
     parser.add_argument('--use_gpu', action='store_true', help='Use GPU.')
     parser.add_argument('--rerank_depth', type=int, default=250, help='Number of commits to rerank (default: 250)')
+    parser.add_argument('--output_length', type=int, default=1000, help='Number of output documents per query in .teIn file (default: 1000)')
     parser.add_argument('--do_train', action='store_true', help='Train the model.')
     parser.add_argument('--do_eval', action='store_true', help='Evaluate the model.')
     parser.add_argument('--eval_gold', action='store_true', help='Evaluate the model on gold data.')
@@ -354,5 +369,8 @@ if __name__ == '__main__':
         # wandb.save('bert_rerank.sh', policy='now')
         wandb.save('src/*', policy='now')
         wandb.save('scripts/bert_rerank.sh', policy='now')
+
+    if args.debug:
+        print('Running in debug mode')
     print(args)
     main(args)

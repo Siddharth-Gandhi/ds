@@ -38,6 +38,7 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
+    os.environ['PYTHONHASHSEED'] = str(seed)
 
 def get_combined_df(repo_dir):
     all_files = glob.glob(os.path.join(repo_dir, '*.parquet'))
@@ -58,9 +59,10 @@ def get_avg_metrics(results):
     return {metric: round(np.mean([result[metric] for result in results]), 4) for metric in results[0]}
 
 class SearchResult:
-    def __init__(self, commit_id, file_path, score, commit_date, commit_message):
+    def __init__(self, commit_id, fid, file_path, score, commit_date, commit_message):
         self.commit_id = commit_id
         self.file_path = file_path
+        self.fid = fid
         self.score = score
         self.commit_date = commit_date
         self.commit_message = commit_message
@@ -68,7 +70,7 @@ class SearchResult:
 
     def __repr__(self):
         class_name = self.__class__.__name__
-        return f"{class_name}(score={self.score:.5f}, file_path={self.file_path!r}, commit_id={self.commit_id!r}, commit_date={self.commit_date})"
+        return f"{class_name}(score={self.score:.5f}, fid={self.fid!r}, file_path={self.file_path!r}, commit_id={self.commit_id!r}, commit_date={self.commit_date})"
 
     def is_actual_modified(self, actual_modified_files):
         return self.file_path in actual_modified_files
@@ -81,15 +83,32 @@ class SearchResult:
                 continue
             print(f"{i+1:2} {result}")
 
+
+def run_command(command: str, cwd=None, timeout=None, return_status=False):
+    result = subprocess.run(
+        [command],
+        timeout=timeout,
+        capture_output=True,
+        text=True,
+        shell=True,
+        cwd=cwd,
+    )
+    if return_status:
+        return result.stdout, result.returncode
+    return result.stdout
+
+
+
 class AggregatedSearchResult:
-    def __init__(self, file_path, aggregated_score, contributing_results):
+    def __init__(self, fid, aggregated_score, contributing_results, file_path='NP'):
+        self.fid = fid
         self.file_path = file_path
         self.score = aggregated_score
         self.contributing_results = contributing_results
 
     def __repr__(self):
         class_name = self.__class__.__name__
-        return f"{class_name}(file_path={self.file_path!r}, score={self.score}, " \
+        return f"{class_name}(fid={self.fid!r}, file_path={self.file_path!r},score={self.score}, " \
                f"contributing_results={self.contributing_results})"
 
 class AggregatedCommitResult:

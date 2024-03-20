@@ -25,6 +25,7 @@ class Reranker:
         self.aggregation_strategy = parameters['aggregation_strategy'] # how to aggregate the scores of the psg_cnt contributing_results
         self.batch_size = parameters['batch_size'] # batch size for reranking efficiently
         self.rerank_depth = parameters['rerank_depth']
+        self.output_length = parameters['output_length'] # max length of the output sequence
 
     def rerank(self, query, aggregated_results: List[AggregatedSearchResult]):
         raise NotImplementedError
@@ -107,16 +108,15 @@ class BERTReranker(Reranker):
         for agg_result in aggregated_results:
             query_passage_pairs.extend(
                 (query, result.commit_message)
-                for result in agg_result.contributing_results[: self.psg_cnt]
+                for result in agg_result.contributing_results# [: self.psg_cnt]
             )
-
         if not query_passage_pairs:
             print('WARNING: No query passage pairs to rerank, returning original results from previous stage')
             print(query, aggregated_results, self.psg_cnt)
             return aggregated_results
 
         # tokenize the query passage pairs
-        encoded_pairs = [self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True) for query, passage in query_passage_pairs]
+        encoded_pairs = [self.tokenizer.encode_plus([query, passage], max_length=self.max_seq_length, truncation='only_second', padding='max_length', return_tensors='pt', add_special_tokens=True) for query, passage in query_passage_pairs]
 
         # create tensors for the input ids, attention masks
         input_ids = torch.stack([encoded_pair['input_ids'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
@@ -133,7 +133,7 @@ class BERTReranker(Reranker):
         for agg_result in aggregated_results:
             # Each aggregated result gets a slice of the scores equal to the number of contributing results it has which should be min(psg_cnt, len(contributing_results))
             assert score_index < len(scores), f'score_index {score_index} is greater than or equal to scores length {len(scores)}'
-            end_index = score_index + len(agg_result.contributing_results[: self.psg_cnt]) # only use psg_cnt contributing_results
+            end_index = score_index + len(agg_result.contributing_results) #[: self.psg_cnt]) # only use psg_cnt contributing_results
             cur_passage_scores = scores[score_index:end_index]
             score_index = end_index
 
@@ -153,7 +153,7 @@ class BERTReranker(Reranker):
         if len(aggregated_results) == 0:
             return aggregated_results
         top_results = aggregated_results[:self.rerank_depth]
-        bottom_results = aggregated_results[self.rerank_depth:]
+        bottom_results = aggregated_results[self.rerank_depth:self.output_length]
         reranked_results = self.rerank(query, top_results)
         min_top_score = reranked_results[-1].score
         # now adjust the scores of bottom_results
@@ -161,7 +161,7 @@ class BERTReranker(Reranker):
             result.score = min_top_score - i - 1
         # combine the results
         reranked_results.extend(bottom_results)
-        assert(len(reranked_results) == len(aggregated_results))
+        # assert(len(reranked_results) == len(aggregated_results))
         return reranked_results
 
 

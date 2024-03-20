@@ -18,10 +18,10 @@ def generate_teIn_file(commit_results: Dict[str, List[AggregatedSearchResult]], 
     with open(file_path, "w") as file:
         for commit_id, results in commit_results.items():
             for result in results:
-                file.write(f'{commit_id}\t{result.file_path}\t{result.score}\t{[{"score": sr.score, "file_path": sr.file_path, "commit_id": sr.commit_id, "commit_date": sr.commit_date} for sr in result.contributing_results]}\n')
+                file.write(f'{commit_id}\t{result.fid}\t{result.file_path}\t{result.score}\t{[{"score": sr.score, "file_path": sr.file_path, "commit_id": sr.commit_id, "commit_date": sr.commit_date} for sr in result.contributing_results]}\n')
 
 # Function to generate .qry file
-def generate_qry_file(gold_df, file_path: str, use_gpt_train: bool = True):
+def generate_qry_file(gold_df, file_path: str, fid_to_path: Dict[int, str]):
     # Ensure folder exists
     # os.makedirs(folder_path, exist_ok=True)
     # file_path = os.path.join(folder_path, "output.qry")
@@ -29,7 +29,8 @@ def generate_qry_file(gold_df, file_path: str, use_gpt_train: bool = True):
         for index, row in gold_df.iterrows():
             cid, date, orig, files, query = row
             for f in files:
-                file.write(f'{cid}\t{date}\t{f}\n')
+                fid = fid_to_path[f]
+                file.write(f'{cid}\t{date}\t{fid}\t{f}\n')
 
             # write in order cid, date, files, query, orig
             # file.write(f'{cid}\t{[f"{f}" for f in files]}\n')
@@ -43,7 +44,8 @@ def evaluate_results(teIn_path, qry_path, output_path, evaluator):
         for line in f:
             parts = line.strip().split('\t')
             cid = parts[0]
-            files = parts[2]
+            # files = parts[2]
+            fid = int(parts[2])
             # files_str = parts[2].replace("'", '"')
             # try:
             #     files = json.loads(files_str)
@@ -52,7 +54,7 @@ def evaluate_results(teIn_path, qry_path, output_path, evaluator):
             #     continue  # Skip this line or handle error as needed
             if cid not in actual_files:
                 actual_files[cid] = []
-            actual_files[cid].append(files)
+            actual_files[cid].append(fid)
 
     # Read predicted files and scores from .teIn file
     predicted_files = {}
@@ -60,12 +62,13 @@ def evaluate_results(teIn_path, qry_path, output_path, evaluator):
         for line in f:
             parts = line.strip().split('\t')
             cid = parts[0]
-            file_path = parts[1]
+            # file_path = parts[1]
+            fid = int(parts[1])
             # score = float(parts[2]) # Score is not used directly in evaluation, but might be useful for other purposes
 
             if cid not in predicted_files:
                 predicted_files[cid] = []
-            predicted_files[cid].append(file_path)
+            predicted_files[cid].append(fid)
 
     # Evaluate results and write to .teOut file
     # os.makedirs(output_folder, exist_ok=True)
@@ -136,10 +139,10 @@ class SearchEvaluator:
 
     def evaluate(self, search_results, actual_modified_files):
         # check if search results is a list of strings (i.e. file paths) instead of a list of SearchResult objects
-        if isinstance(search_results[0], str):
+        if isinstance(search_results[0], int):
             retrieved_files = search_results
         else:
-            retrieved_files = [result.file_path for result in search_results]
+            retrieved_files = [result.fid for result in search_results]
 
         relevant = [1 if file in actual_modified_files else 0 for file in retrieved_files]
 
@@ -161,10 +164,12 @@ class SearchEvaluator:
 
 
 class ModelEvaluator:
-    def __init__(self, model, eval_model, combined_df, seed=42):
+    def __init__(self, model, eval_model, combined_df, fid_to_path, path_to_fid, seed=42):
         self.model = model
         self.eval_model = eval_model
         self.combined_df = combined_df
+        self.fid_to_path = fid_to_path
+        self.path_to_fid = path_to_fid
         self.seed = seed
 
     def sample_commits(self, n):
@@ -179,10 +184,14 @@ class ModelEvaluator:
     def evaluate_df(self, df, k, aggregation_strategy, rerankers, output_folder_path):
         results = []
         if output_folder_path:
+
+            # create output folder
+            os.makedirs(output_folder_path, exist_ok=True)
+
             qry_file_path = os.path.join(output_folder_path, "output.qry")
             teIn_file_path = os.path.join(output_folder_path, "output.teIn")
             teOut_file_path = os.path.join(output_folder_path, "output.teOut")
-            generate_qry_file(df, qry_file_path)
+            generate_qry_file(df, qry_file_path, self.path_to_fid)
 
         query_res_dict = {}
 
@@ -201,7 +210,10 @@ class ModelEvaluator:
                 actual_modified_files = row['actual_modified_files']
             else:
                 actual_modified_files = self.combined_df[self.combined_df['commit_id'] == row['commit_id']]['file_path'].tolist()
-            evaluation = self.eval_model.evaluate(search_results, actual_modified_files)
+
+            # convert actual_modified_files to file paths if it is a list of file ids
+            actual_fids = [self.path_to_fid[f] for f in actual_modified_files]
+            evaluation = self.eval_model.evaluate(search_results, actual_fids)
             results.append(evaluation)
 
         if output_folder_path:

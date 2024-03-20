@@ -16,13 +16,16 @@ from utils import (
 
 
 class BM25Searcher:
-    def __init__(self, index_path):
+    def __init__(self, index_path, fid_to_path, path_to_fid):
         if not os.path.exists(index_path):
             raise FileNotFoundError(f"Index at {index_path} does not exist!")
         self.searcher = LuceneSearcher(index_path)
         print(f"Loaded index at {index_path}")
         print(f'Index Stats: {IndexReader(index_path).stats()}')
         # self.ranking_depth = ranking_depth
+
+        self.fid_to_path = fid_to_path
+        self.path_to_fid = path_to_fid
 
     def search(self, query, query_date, ranking_depth):
         # TODO maybe change this to mean returning reranking_depths total results instead of being pruned by the query date
@@ -35,45 +38,84 @@ class BM25Searcher:
             return []
         unix_date = query_date
         filtered_hits = [
-            SearchResult(hit.docid, json.loads(hit.raw)['file_path'], hit.score, int(json.loads(hit.raw)["commit_date"]), reverse_tokenize(json.loads(hit.raw)['contents']))
+            SearchResult(commit_id=hit.docid,
+                         file_path=json.loads(hit.raw)['file_path'],
+                         score=hit.score,
+                         commit_date=int(json.loads(hit.raw)["commit_date"]),
+                         commit_message=reverse_tokenize(json.loads(hit.raw)['contents']),
+                         fid=self.path_to_fid[json.loads(hit.raw)['file_path']] if json.loads(hit.raw)['file_path'] in self.path_to_fid else -1
+                         )
             for hit in hits if int(json.loads(hit.raw)["commit_date"]) < unix_date
         ]
         return filtered_hits
 
-    def search_full(self, query, query_date, ranking_depth):
-        filtered_hits = []
-        step_size = ranking_depth  # Initial search window
-        total_hits_retrieved = 0
+    # def search_full(self, query, query_date, ranking_depth):
+    #     filtered_hits = []
+    #     step_size = ranking_depth  # Initial search window
+    #     total_hits_retrieved = 0
 
-        while len(filtered_hits) < ranking_depth and step_size > 0:
-            current_hits = self.searcher.search(tokenize(query), total_hits_retrieved + step_size)
-            if not current_hits:
-                break  # No more results to retrieve
+    #     while len(filtered_hits) < ranking_depth and step_size > 0:
+    #         current_hits = self.searcher.search(tokenize(query), total_hits_retrieved + step_size)
+    #         if not current_hits:
+    #             break  # No more results to retrieve
 
-            # Filter hits by query date
-            for hit in current_hits:
-                loaded_obj = json.loads(hit.raw)
-                if int(loaded_obj["commit_date"]) < query_date:
-                    filtered_hits.append(
-                        SearchResult(hit.docid, loaded_obj['file_path'], hit.score,
-                                     int(loaded_obj["commit_date"]),
-                                     reverse_tokenize(loaded_obj['contents']))
-                    )
-                if len(filtered_hits) == ranking_depth:
-                    break  # We have enough results
+    #         # Filter hits by query date
+    #         for hit in current_hits:
+    #             loaded_obj = json.loads(hit.raw)
+    #             if int(loaded_obj["commit_date"]) < query_date:
+    #                 filtered_hits.append(
+    #                     SearchResult(hit.docid, loaded_obj['file_path'], hit.score,
+    #                                  int(loaded_obj["commit_date"]),
+    #                                  reverse_tokenize(loaded_obj['contents']))
+    #                 )
+    #             if len(filtered_hits) == ranking_depth:
+    #                 break  # We have enough results
 
-            total_hits_retrieved += step_size
-            step_size = ranking_depth - len(filtered_hits)  # Decrease step size to only get as many as needed
+    #         total_hits_retrieved += step_size
+    #         step_size = ranking_depth - len(filtered_hits)  # Decrease step size to only get as many as needed
 
-        return filtered_hits[:ranking_depth]  # Return up to ranking_depth results
+    #     return filtered_hits[:ranking_depth]  # Return up to ranking_depth results
+
+    # def aggregate_file_scores(self, search_results, aggregation_method='sump', sort_contributing_result_by_date=False):
+    #     file_to_results = defaultdict(list)
+    #     for result in search_results:
+    #         file_to_results[result.file_path].append(result)
+
+    #     aggregated_results = []
+    #     for file_path, results in file_to_results.items():
+    #         # aggregated_score = sum(result.score for result in results)
+    #         if aggregation_method == 'sump':
+    #             aggregated_score = sum(result.score for result in results)
+    #         elif aggregation_method == 'maxp':
+    #             aggregated_score = max(result.score for result in results)
+    #         # elif aggregation_method == 'firstp':
+    #         #     aggregated_score = results[0].score
+    #         elif aggregation_method == 'avgp':
+    #             aggregated_score = np.mean([result.score for result in results])
+    #         elif aggregation_method == 'recentp':
+    #             # sort results by date and take the score of the most recent one
+    #             results.sort(key=lambda result: result.commit_date, reverse=True)
+    #             aggregated_score = results[0].score
+    #         else:
+    #             raise ValueError(f"Unknown aggregation method {aggregation_method}")
+
+    #         aggregated_results.append(AggregatedSearchResult(file_path, aggregated_score, results))
+
+
+    #     aggregated_results.sort(key=lambda result: result.score, reverse=True)
+    #     if sort_contributing_result_by_date: # by default, it is sorted by score
+    #         # for each aggregated result, sort the contributing results by date
+    #         for result in aggregated_results:
+    #             result.contributing_results.sort(key=lambda result: result.commit_date, reverse=True)
+    #     return aggregated_results
 
     def aggregate_file_scores(self, search_results, aggregation_method='sump', sort_contributing_result_by_date=False):
-        file_to_results = defaultdict(list)
+        fid_to_results = defaultdict(list)
         for result in search_results:
-            file_to_results[result.file_path].append(result)
+            fid_to_results[result.fid].append(result)
 
         aggregated_results = []
-        for file_path, results in file_to_results.items():
+        for fid, results in fid_to_results.items():
             # aggregated_score = sum(result.score for result in results)
             if aggregation_method == 'sump':
                 aggregated_score = sum(result.score for result in results)
@@ -90,7 +132,7 @@ class BM25Searcher:
             else:
                 raise ValueError(f"Unknown aggregation method {aggregation_method}")
 
-            aggregated_results.append(AggregatedSearchResult(file_path, aggregated_score, results))
+            aggregated_results.append(AggregatedSearchResult(fid, aggregated_score, results))
 
 
         aggregated_results.sort(key=lambda result: result.score, reverse=True)
