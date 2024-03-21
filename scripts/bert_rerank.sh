@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=bp
+#SBATCH --job-name=bpm
 #SBATCH --output=logs/bert_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -17,7 +17,7 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="bm25_fix_combined_bert_classification"
+eval_folder="eval_bm25_fix_combined_bert_maxp"
 notes="test_out"
 
 
@@ -38,18 +38,18 @@ repo_name=$(echo $data_path | rev | cut -d'/' -f1 | rev)
 
 train_mode="classification"
 
-repo_paths=(
-    "data/2_7/apache_spark"
-    "data/2_7/apache_kafka"
-    "data/2_7/facebook_react"
-    "data/2_8/angular_angular"
-    "data/2_8/django_django"
-    "data/2_8/pytorch_pytorch"
-    "data/2_7/julialang_julia"
-    "data/2_7/ruby_ruby"
-    "data/2_9/huggingface_transformers"
-    "data/2_9/redis_redis"
-)
+# repo_paths=(
+#     "data/2_7/apache_spark"
+#     "data/2_7/apache_kafka"
+#     "data/2_7/facebook_react"
+#     "data/2_8/angular_angular"
+#     "data/2_8/django_django"
+#     "data/2_8/pytorch_pytorch"
+#     "data/2_7/julialang_julia"
+#     "data/2_7/ruby_ruby"
+#     "data/2_9/huggingface_transformers"
+#     "data/2_9/redis_redis"
+# )
 
 
 
@@ -71,7 +71,7 @@ train_depth=10000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
 train_commits=2000 # number of commits to train on (train + val)
 psg_cnt=5 # number of commits to use for psg generation
-aggregation_strategy="sump" # aggregation strategy for bert reranker
+aggregation_strategy="maxp" # aggregation strategy for bert reranker
 # use_gpu=True # whether to use gpu or not
 rerank_depth=250 # depth to go while reranking
 output_length=1000 # length of the output in .teIn file
@@ -85,6 +85,7 @@ triplet_cache_path="/home/ssg2/ssg2/ds/cache/facebook_react/bert_reranker/combin
 # triplet_cache_path="/home/ssg2/ssg2/ds/cache/facebook_react/bert_reranker/bert_bce_fb/triplet_data_cache.pkl"
 # best_model_path="data/combined_commit_train/best_model"
 # best_model_path="models/facebook_react/bert_reranker/4xbert_bce_fb/best_model"
+best_model_path="/home/ssg2/ssg2/ds/models/facebook_react/bert_reranker/bm25_fix_combined_bert_classification/best_model"
 
 python -u src/BERTReranker.py \
     --data_path $data_path \
@@ -112,10 +113,10 @@ python -u src/BERTReranker.py \
     --eval_gold \
     --use_gpt_train \
     --do_eval \
-    --do_train \
     --train_mode $train_mode \
     --triplet_cache_path $triplet_cache_path \
-    # --best_model_path $best_model_path \
+    --best_model_path $best_model_path \
+    # --do_train \
 
 
     # --overwrite_eval \
