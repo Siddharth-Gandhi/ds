@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=ctest_out
+#SBATCH --job-name=cr_fi
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
 #SBATCH --nodes=1
@@ -19,7 +19,7 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="test_out"
+eval_folder="eval_bm25_fix_filter_invalid"
 notes="test_out"
 # triplet_mode="parse_functions"
 # triplet_mode="sliding_window"
@@ -52,7 +52,7 @@ code_df_cache="cache/facebook_react/code_reranker/fb_code_df.parquet"
 
 
 index_path="${data_path}/index_commit_tokenized"
-k=1000 # initial ranker depth
+k=10000 # initial ranker depth
 n=100 # number of samples to evaluate on
 # no_bm25=False # whether to use bm25 or not
 
@@ -63,30 +63,37 @@ model_path="microsoft/codebert-base"
 
 # overwrite_cache=False # whether to overwrite the cache
 batch_size=32 # batch size for inference
-num_epochs=20 # number of epochs to train
+num_epochs=5 # number of epochs to train
 learning_rate=1e-5 # learning rate for training
 num_positives=10 # number of positive samples per query
 num_negatives=10 # number of negative samples per querys
-train_depth=1000 # depth to go while generating training data
+output_length=1000
+train_depth=10000 # depth to go while generating training data
 num_workers=8 # number of workers for dataloader
 train_commits=2000 # number of commits to train on (train + val)
 psg_cnt=25 # number of commits to use for psg generation
 psg_len=350
 psg_stride=250
-# aggregation_strategy="sump" # aggregation strategy for bert reranker
 aggregation_strategy="maxp" # aggregation strategy for both bert reranker and codebert reranker
 rerank_depth=100 # depth to go while reranking
 openai_model="gpt4" # openai model to use
+
+
+# BERT paths
 # bert_best_model="${data_path}/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
 # bert_best_model="2_7/facebook_react/models/microsoft_codebert-base_bertrr_gpt_train/best_model"
-bert_best_model="data/combined_commit_train/best_model"
-# train_mode="regression"
+# bert_best_model="data/combined_commit_train/best_model"
+bert_best_model="/home/ssg2/ssg2/ds/models/facebook_react/bert_reranker/bm25_fix_combined_bert_classification/best_model"
+
+
+# CodeReranker paths
 # best_model_path="data/2_7/facebook_react/models/bce/best_model"
 best_model_path="data/2_7/facebook_react/models/combined_diffs/best_model"
 # best_model_path="data/2_7/facebook_react/models/X_function_split/best_model"
 # best_model_path="data/2_7/facebook_react/models/combined_random/best_model"
 
 
+# train_mode="regression"
 
 
 # repo_paths=(
@@ -109,6 +116,7 @@ python -u src/CodeReranker.py \
     --index_path $index_path \
     --k $k \
     --n $n \
+    --output_length $output_length \
     --model_path $model_path \
     --batch_size $batch_size \
     --num_epochs $num_epochs \
@@ -134,7 +142,10 @@ python -u src/CodeReranker.py \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
     --best_model_path $best_model_path \
-    # --do_eval \
+    --do_eval \
+    --filter_invalid \
+    # --debug
+
     # --do_train \
     # --train_mode $train_mode \
     # --triplet_cache_path $triplet_cache_path \

@@ -1,5 +1,6 @@
 import argparse
 import gc
+import json
 import os
 import sys
 from typing import List
@@ -142,11 +143,21 @@ def main(args):
     K = args.k
     n = args.n
     combined_df = get_combined_df(data_path)
-    github_repo = git.Repo(github_repo_path) # type: ignore
-    BM25_AGGR_STRAT = 'sump'
+    # github_repo = git.Repo(github_repo_path) # type: ignore
+    BM25_AGGR_STRAT = 'maxp'
 
     # create eval directory to store results
     # eval_path = os.path.join(data_path, 'eval', 'coderr')
+
+    # load fid_to_path and path_to_fid json files to dicts
+    with open(f"facebook_react_FID_to_paths.json") as f:
+        fid_to_path = json.load(f)
+
+    # make all fids ints
+    fid_to_path = {int(k): v for k, v in fid_to_path.items()}
+
+    with open(f"facebook_react_path_to_FID.json") as f:
+        path_to_fid = json.load(f)
 
     save_name = f'code_reranker_{args.code_reranker_mode}'
 
@@ -155,9 +166,9 @@ def main(args):
     if not os.path.exists(eval_path):
         os.makedirs(eval_path)
 
-    bm25_searcher = BM25Searcher(index_path)
+    bm25_searcher = BM25Searcher(index_path, fid_to_path, path_to_fid)
     evaluator = SearchEvaluator(metrics)
-    model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df)
+    model_evaluator = ModelEvaluator(bm25_searcher, evaluator, combined_df, fid_to_path, path_to_fid)
 
     params = {
         'model_name': args.model_path,
@@ -175,14 +186,15 @@ def main(args):
         'train_commits': args.train_commits,
         'bm25_aggr_strategy': BM25_AGGR_STRAT,
         'psg_len': args.psg_len,
-        'psg_stride': args.psg_stride
+        'psg_stride': args.psg_stride,
+        'output_length': args.output_length
     }
 
     tokenizer = AutoTokenizer.from_pretrained(params['model_name'])
 
     split_strategy = TokenizedLineSplitStrategy(tokenizer=tokenizer, psg_len=args.psg_len, psg_stride=args.psg_stride)
 
-    code_reranker = CodeReranker(params, github_repo, args.code_reranker_mode, args.train_mode, split_strategy)
+    code_reranker = CodeReranker(params, github_repo_path, fid_to_path, path_to_fid, args.code_reranker_mode, args.train_mode, split_strategy, filter_invalid=args.filter_invalid)
 
     hf_output_dir = os.path.join('models', repo_name, save_name, args.eval_folder)
     if not os.path.exists(hf_output_dir):
@@ -290,8 +302,8 @@ def main(args):
 
         if args.bert_best_model is not None:
             print(f'Loading BERT model from {args.bert_best_model}...')
-            bert_reranker = BERTReranker(bert_params, train_mode = 'regression')
-            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.bert_best_model, num_labels=1, problem_type='regression')
+            bert_reranker = BERTReranker(bert_params, train_mode = 'classification')
+            bert_reranker.model = AutoModelForSequenceClassification.from_pretrained(args.bert_best_model, num_labels=2, problem_type='classification')
             bert_reranker.model.to(bert_reranker.device)
             rerankers = [bert_reranker, code_reranker]
         else:
@@ -360,13 +372,12 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', type=str, help='Path to the data folder with .parquet files.', required=True)
     parser.add_argument('-k', '--k', type=int, default=1000, help='The number of top documents to retrieve (default: 1000)')
     parser.add_argument('-n', '--n', type=int, default=100, help='The number of commits to sample (default: 100)')
-    # parser.add_argument('--no_bm25', action='store_true', help='Do not run BM25.')
+    parser.add_argument('--output_length', type=int, default=1000, help='The length of the output sequence (default: 1000)')
     parser.add_argument('-m', '--model_path', type=str, help='Path to the pretrained model.')
     parser.add_argument('-o', '--overwrite_cache', action='store_true', help='Overwrite existing cache files.')
     parser.add_argument('-b', '--batch_size', type=int, default=32, help='Batch size for training (default: 32)')
     parser.add_argument('-e', '--num_epochs', type=int, default=10, help='Number of epochs to train (default: 10)')
     parser.add_argument('-lr', '--learning_rate', type=float, default=5e-5, help='Learning rate (default: 5e-5)')
-    # parser.add_argument('-l', '--load_model', action='store_true', help='Load a pretrained model.')
     parser.add_argument('--run_name', type=str, help='Wandb run name.')
     parser.add_argument('--notes', type=str, help='Wandb run notes.', default='')
     parser.add_argument('--num_positives', type=int, default=10, help='Number of positive samples per query (default: 10)')
@@ -385,6 +396,7 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite_eval', action='store_true', help='Replace evaluation files if they already exist.')
     parser.add_argument('--sanity_check', action='store_true', help='Run sanity check on training data.')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode.')
+    parser.add_argument('--filter_invalid', action='store_true', help='Filter invalid in CodeReranker.')
     # parser.add_argument('--do_combined_train', action='store_true', help='Train on combined data from multiple repositories.')
     # parser.add_argument('--repo_paths', nargs='+', help='List of repository paths for combined training.', required='--do_combined_train' in sys.argv)
     parser.add_argument('--best_model_path', type=str, help='Path to the best model.')
@@ -417,15 +429,17 @@ if __name__ == '__main__':
         run.define_metric('R@1000', summary='max') # type: ignore
         wandb.save('src/*', policy='now')
         wandb.save('scripts/code_rerank.sh', policy='now')
+    if args.debug:
+        print('Running in debug mode')
     print(args)
     combined_df = get_combined_df(args.data_path)
     bert_params = {
         'model_name': args.model_path,
         'psg_cnt': 5,
-        'aggregation_strategy': 'sump',
+        'aggregation_strategy': 'maxp',
         'batch_size': args.batch_size,
         'use_gpu': args.use_gpu,
-        'rerank_depth': 250,
+        'rerank_depth': 1000,
         'num_epochs': args.num_epochs,
         'lr': args.learning_rate,
         'num_positives': args.num_positives,
@@ -433,6 +447,7 @@ if __name__ == '__main__':
         'train_depth': args.train_depth,
         'num_workers': args.num_workers,
         'train_commits': args.train_commits,
-        'bm25_aggr_strategy': 'sump',
+        'bm25_aggr_strategy': 'maxp',
+        'output_length': args.output_length
     }
     main(args)

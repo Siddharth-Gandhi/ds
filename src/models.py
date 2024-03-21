@@ -1,5 +1,6 @@
 from typing import List
 
+import git
 import numpy as np
 import pandas as pd
 import torch
@@ -7,7 +8,12 @@ from torch.utils.data import DataLoader, TensorDataset
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 from splitter import *
-from utils import AggregatedSearchResult, PatchResult, get_file_at_commit_from_git
+from utils import (
+    AggregatedSearchResult,
+    PatchResult,
+    get_file_at_commit_from_git,
+    run_command,
+)
 
 
 class Reranker:
@@ -168,11 +174,12 @@ class BERTReranker(Reranker):
 
 
 class CodeReranker(Reranker):
-    def __init__(self, parameters, repo, mode, train_mode, split_strategy: SplitStrategy):
-        super().__init__(parameters, train_mode)
-
+    def __init__(self, parameters, repo_path, fid_to_path, path_to_fid, rerank_mode, train_mode, split_strategy: SplitStrategy, filter_invalid=False):
+        super().__init__(parameters=parameters, train_mode=train_mode)
         # specific to CodeReranker type
-        self.repo = repo # git repo object
+        self.repo_path = repo_path
+        # git repo object
+        self.git_repo = git.Repo(self.repo_path) # type: ignore
 
         self.train_mode = train_mode
         if self.train_mode == 'regression':
@@ -193,8 +200,39 @@ class CodeReranker(Reranker):
         self.psg_stride = parameters.get('psg_stride', self.psg_len)
         print(f"Initialized Patch Code Reranker with parameters: {parameters}")
 
-        self.mode = mode # either 'file' or 'patch'
+        self.fid_to_paths = fid_to_path
+        self.path_to_fid = path_to_fid
+
+        self.rerank_mode = rerank_mode # either 'file' or 'patch'
         self.passage_splitter = PassageSplitter(split_strategy)
+
+        self.filter_invalid = filter_invalid
+
+    def get_file_path_at_commit(self, commit_id, fid):
+        possible_paths = self.fid_to_paths[fid]
+        for path in possible_paths:
+            _, status_code = run_command(f'cd {self.repo_path} && git cat-file -e {commit_id}:{path}', return_status=True)
+            if status_code == 0:
+                return path
+        # print(f'WARNING: Could not find file path at commit {commit_id} for FID {fid} for {self.repo_path}')
+        return 'NA'
+
+    def filter_results(self, aggregated_results, test_commit_id):
+        # given a list of aggregated results, filter out the ones that are not present in the test_commit_id
+        filtered_results = []
+        for agg_result in aggregated_results:
+            fid = agg_result.fid
+            file_path = self.get_file_path_at_commit(test_commit_id, fid)
+
+            if file_path == 'NA':
+                # this means that the file is not present in the test_commit_id
+                continue
+
+            # exists, so set the file_path
+            agg_result.file_path = file_path
+            filtered_results.append(agg_result)
+        return filtered_results
+
 
 
     def rerank(self, query, aggregated_results: List[AggregatedSearchResult], test_commit_id): # type: ignore
@@ -206,6 +244,9 @@ class CodeReranker(Reranker):
         """
         self.model.eval()
 
+        if self.filter_invalid:
+            aggregated_results = self.filter_results(aggregated_results, test_commit_id)
+
         query_passage_pairs, per_result_contribution = self.split_into_query_passage_pairs(query, aggregated_results, test_commit_id)
 
         if not query_passage_pairs:
@@ -214,7 +255,7 @@ class CodeReranker(Reranker):
             return aggregated_results
 
         # tokenize the query passage pairs
-        encoded_pairs = [self.tokenizer.encode_plus([query, obj.passage], max_length=self.max_seq_length, truncation=True, padding='max_length', return_tensors='pt', add_special_tokens=True) for (query, file_path, obj) in query_passage_pairs]
+        encoded_pairs = [self.tokenizer.encode_plus([query, obj.passage], max_length=self.max_seq_length, truncation='only_second', padding='max_length', return_tensors='pt', add_special_tokens=True) for (query, file_path, obj) in query_passage_pairs]
 
         # create tensors for the input ids, attention masks
         input_ids = torch.stack([encoded_pair['input_ids'].squeeze() for encoded_pair in encoded_pairs], dim=0) # type: ignore
@@ -226,7 +267,7 @@ class CodeReranker(Reranker):
 
         scores = self.get_scores(dataloader, self.model)
 
-        if self.mode == 'file':
+        if self.rerank_mode == 'file':
 
             score_index = 0
 
@@ -249,7 +290,7 @@ class CodeReranker(Reranker):
 
             return aggregated_results
 
-        elif self.mode == 'patch':
+        elif self.rerank_mode == 'patch':
             # convert the scores to PatchResult objects
             patch_results = [PatchResult(file_path, obj, score) for (query, file_path, obj), score in zip(query_passage_pairs, scores)]
 
@@ -258,7 +299,7 @@ class CodeReranker(Reranker):
 
             return sorted_patch_results
         else:
-            raise ValueError(f"Invalid mode: {self.mode}")
+            raise ValueError(f"Invalid rerank_mode: {self.rerank_mode}")
 
     def split_into_query_passage_pairs(self, query, aggregated_results, test_commit_id):
 
@@ -267,14 +308,20 @@ class CodeReranker(Reranker):
 
         for agg_result in aggregated_results:
             file_path = agg_result.file_path
+            fid = agg_result.fid
+            if not self.filter_invalid:
+                file_path = self.get_file_path_at_commit(test_commit_id, fid)
+            else:
+                # already set in the filter_results function
+                file_path = agg_result.file_path
 
             # get most recent version of the file BEFORE test_commit_id
-            file_content = get_file_at_commit_from_git(self.repo, file_path, test_commit_id, from_parent=True)
+            file_content = get_file_at_commit_from_git(self.git_repo, file_path, test_commit_id, from_parent=True)
 
 
-            if pd.isna(file_content):
+            if pd.isna(file_content) or file_content is None or file_content == '' or not file_content:
                 # if file_content is NaN, then we can just set file_content to empty string
-                print(f'WARNING: file_content is NaN for commit_id: {test_commit_id}, file_path: {file_path}, setting file_content to empty string')
+                print(f'WARNING: file_content is NaN for commit_id: {test_commit_id}, fid: {fid}, file_path: {file_path}, setting file_content to empty string')
                 file_content = ''
 
             # now split the file content into psg_cnt passages - nope, doing all passages
@@ -290,9 +337,9 @@ class CodeReranker(Reranker):
     def rerank_pipeline(self, query, aggregated_results, test_commit_id):
         if len(aggregated_results) == 0:
                 return aggregated_results
-        if self.mode == 'file':
+        if self.rerank_mode == 'file':
             top_results = aggregated_results[:self.rerank_depth]
-            bottom_results = aggregated_results[self.rerank_depth:]
+            bottom_results = aggregated_results[self.rerank_depth:self.output_length]
             reranked_results = self.rerank(query, top_results, test_commit_id)
             min_top_score = reranked_results[-1].score # type: ignore
             # now adjust the scores of bottom_results
@@ -300,7 +347,7 @@ class CodeReranker(Reranker):
                 result.score = min_top_score - i - 1
             # combine the results
             reranked_results.extend(bottom_results) # type: ignore
-            assert(len(reranked_results) == len(aggregated_results)) # type: ignore
+            # assert(len(reranked_results) == len(aggregated_results)) # type: ignore
             return reranked_results # list of AggregatedSearchResult
         else:
             top_results = aggregated_results[:self.rerank_depth]

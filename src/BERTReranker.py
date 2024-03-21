@@ -348,7 +348,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_gpt_train', action='store_true', help='Use GPT transformed training data.')
     parser.add_argument('--eval_folder', type=str, help='Folder to store evaluation results for a particular experiment.', required=True)
     parser.add_argument('--notes', type=str, help='Notes for the run.', default='')
-    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='regression', help='Training mode for the model (default: regression')
+    parser.add_argument('--train_mode', choices=['regression', 'classification'], default='classification', help='Training mode for the model (default: classification')
     parser.add_argument('--triplet_cache_path', type=str, help='Path to the triplet data cache file.')
     args = parser.parse_args()
     if not args.debug:

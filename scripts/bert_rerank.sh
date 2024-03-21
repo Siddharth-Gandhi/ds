@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=bpm
+#SBATCH --job-name=bpm1k
 #SBATCH --output=logs/bert_rerank/output_%A.log
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
@@ -17,7 +17,7 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="eval_bm25_fix_combined_bert_maxp"
+eval_folder="eval_bm25_fix_combined_bert_maxp_1k"
 notes="test_out"
 
 
@@ -73,7 +73,8 @@ train_commits=2000 # number of commits to train on (train + val)
 psg_cnt=5 # number of commits to use for psg generation
 aggregation_strategy="maxp" # aggregation strategy for bert reranker
 # use_gpu=True # whether to use gpu or not
-rerank_depth=250 # depth to go while reranking
+# rerank_depth=250 # depth to go while reranking
+rerank_depth=1000 # depth to go while reranking
 output_length=1000 # length of the output in .teIn file
 # do_train=True # whether to train or not
 # do_eval=True # whether to evaluate or not
@@ -112,10 +113,10 @@ python -u src/BERTReranker.py \
     --eval_folder $eval_folder \
     --eval_gold \
     --use_gpt_train \
-    --do_eval \
     --train_mode $train_mode \
     --triplet_cache_path $triplet_cache_path \
     --best_model_path $best_model_path \
+    # --do_eval \
     # --do_train \
 
 
