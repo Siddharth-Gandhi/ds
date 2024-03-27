@@ -4,7 +4,7 @@ import sys
 import pandas as pd
 
 from bm25_v2 import BM25Searcher
-from eval import ModelEvaluator, SearchEvaluator
+from eval_oracle import ModelEvaluator, SearchEvaluator
 from utils import get_code_df, get_combined_df
 
 if __name__ == "__main__":

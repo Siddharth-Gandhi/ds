@@ -8,7 +8,7 @@
 #SBATCH --time=48:00:00
 #SBATCH --mem=64GB
 #SBATCH --output=logs/jupyter.log
-#SBATCH --nodelist=boston-1-7
+#SBATCH --nodelist=boston-2-35
 
 source ~/miniconda3/etc/profile.d/conda.sh
 conda activate ds

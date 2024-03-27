@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=cr_fi
+#SBATCH --job-name=cr_or_f2
 #SBATCH --output=logs/code_rerank/output_%A.log
 #SBATCH --partition=gpu
-#SBATCH --mem=64G
+#SBATCH --mem=32G
 #SBATCH --time=24:00:00
 #SBATCH --cpus-per-gpu=8
 #SBATCH --nodes=1
@@ -19,7 +19,7 @@ nvidia-smi
 export TOKENIZERS_PARALLELISM=true
 
 
-eval_folder="eval_bm25_fix_filter_invalid"
+eval_folder="eval_cr_oracle_final"
 notes="test_out"
 # triplet_mode="parse_functions"
 # triplet_mode="sliding_window"
@@ -142,9 +142,9 @@ python -u src/CodeReranker.py \
     --bert_best_model $bert_best_model \
     --code_df_cache $code_df_cache \
     --best_model_path $best_model_path \
-    --do_eval \
-    --filter_invalid \
     # --debug
+    # --do_eval \
+    # --filter_invalid \
 
     # --do_train \
     # --train_mode $train_mode \

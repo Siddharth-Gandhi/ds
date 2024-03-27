@@ -208,6 +208,9 @@ class CodeReranker(Reranker):
 
         self.filter_invalid = filter_invalid
 
+        if self.filter_invalid:
+            print('Filtering invalid files for reranking')
+
     def get_file_path_at_commit(self, commit_id, fid):
         possible_paths = self.fid_to_paths[fid]
         for path in possible_paths:
@@ -341,10 +344,11 @@ class CodeReranker(Reranker):
             top_results = aggregated_results[:self.rerank_depth]
             bottom_results = aggregated_results[self.rerank_depth:self.output_length]
             reranked_results = self.rerank(query, top_results, test_commit_id)
-            min_top_score = reranked_results[-1].score # type: ignore
-            # now adjust the scores of bottom_results
-            for i, result in enumerate(bottom_results):
-                result.score = min_top_score - i - 1
+            if bottom_results and reranked_results:
+                min_top_score = reranked_results[-1].score # type: ignore
+                # now adjust the scores of bottom_results
+                for i, result in enumerate(bottom_results):
+                    result.score = min_top_score - i - 1
             # combine the results
             reranked_results.extend(bottom_results) # type: ignore
             # assert(len(reranked_results) == len(aggregated_results)) # type: ignore
